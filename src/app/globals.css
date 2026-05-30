@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Default palette = Editorial. Admin overrides via inline <style> in layout. */
+:root {
+  --paper: 251 250 246;
+  --paper-50: 255 255 255;
+  --paper-100: 250 250 246;
+  --paper-200: 244 243 237;
+  --line: 230 228 220;
+  --line-strong: 205 202 190;
+  --ink: 10 14 31;
+  --ink-muted: 90 97 114;
+  --ink-soft: 139 145 163;
+  --primary-50: 239 245 255;
+  --primary-100: 219 231 255;
+  --primary-200: 191 211 255;
+  --primary-300: 147 180 255;
+  --primary-400: 96 139 255;
+  --primary-500: 47 99 255;
+  --primary-600: 31 72 230;
+  --primary-700: 26 55 184;
+  --primary-800: 26 47 147;
+  --primary-900: 27 44 117;
+  --primary-950: 15 22 68;
+  --accent-400: 34 211 238;
+  --accent-500: 6 182 212;
+  --accent-600: 8 145 178;
+  --amber-400: 251 191 36;
+  --amber-500: 245 158 11;
+  --amber-600: 217 119 6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv11', 'ss01';
+  /* Smooth palette transitions */
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+::selection {
+  background: rgb(var(--ink));
+  color: rgb(var(--paper));
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--ink) / 0.18);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Engineering blueprint grid */
+.blueprint {
+  background-image:
+    linear-gradient(to right, rgb(var(--ink) / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--ink) / 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* Marquee tracks */
+.track {
+  display: inline-flex;
+  width: max-content;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Status pulsing dot — uses amber by default, but inherits palette */
+.live-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(var(--amber-500));
+  box-shadow: 0 0 0 0 rgb(var(--amber-500) / 0.7);
+}
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: live-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes live-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  80%,100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* Smooth color transitions for palette swaps everywhere */
+header, footer, section, aside, main, nav, article, button, a, input, textarea {
+  transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease;
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

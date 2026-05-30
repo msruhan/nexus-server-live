@@ -1,0 +1,896 @@
+// Nexus Server — Prisma schema (PostgreSQL / Supabase for production)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth & User ────────────────────────────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("USER") // ADMIN | SUB_ADMIN | USER
+  isActive  Boolean  @default(true)
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String? @db.Text
+
+  // Optional pricing tier. Null = retail (uses service.price as-is).
+  priceGroupId String?
+
+  // ─── Telegram linking ─────────────────────────────────────────
+  telegramChatId        String?
+  telegramUsername      String?
+  telegramLinkCode      String?
+  telegramLinkExpiresAt DateTime?
+  telegramLinkedAt      DateTime?
+  telegramNotifyEnabled Boolean @default(true)
+
+  // Per-account dashboard palette (member desk / admin bureau — independent per user)
+  paletteTemplate String  @default("editorial")
+  paletteCustom   String? // JSON partial PaletteTokens overrides
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wallet       Wallet?
+  imeiOrders   ImeiOrder[]
+  serverOrders ServerOrder[]
+  topupRequests TopupRequest[]
+  activityLogs ActivityLog[]
+  backupCodes  BackupCode[]
+  apiKeys      ApiKey[]
+  supportTickets SupportTicket[]
+  priceGroup   PriceGroup? @relation(fields: [priceGroupId], references: [id], onDelete: SetNull)
+  paymentIntents PaymentIntent[]
+  subAdminPermissions SubAdminPermission?
+
+  @@index([priceGroupId])
+}
+
+// ─── Sub-Admin Permissions ──────────────────────────────────────
+// Granular permission set for SUB_ADMIN users. Each boolean field
+// maps to a specific admin feature/page. ADMIN role bypasses all
+// checks (full access). SUB_ADMIN must have explicit permission.
+model SubAdminPermission {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // Dashboard
+  viewDashboard          Boolean @default(false)
+
+  // Orders
+  viewImeiOrders         Boolean @default(false)
+  viewServerOrders       Boolean @default(false)
+  cancelRefundOrders     Boolean @default(false)
+
+  // Services
+  viewImeiServices       Boolean @default(false)
+  editImeiServices       Boolean @default(false)
+  viewServerServices     Boolean @default(false)
+  editServerServices     Boolean @default(false)
+  manageServiceGroups    Boolean @default(false)
+
+  // API Providers
+  viewProviders          Boolean @default(false)
+  editProviders          Boolean @default(false)
+  syncServices           Boolean @default(false)
+
+  // Users & Wallet
+  viewUsers              Boolean @default(false)
+  editUsers              Boolean @default(false)
+  viewWalletTopups       Boolean @default(false)
+  approveTopups          Boolean @default(false)
+  managePriceGroups      Boolean @default(false)
+
+  // Support Tickets
+  viewTickets            Boolean @default(false)
+  replyTickets           Boolean @default(false)
+  closeTickets           Boolean @default(false)
+
+  // CMS
+  viewCms                Boolean @default(false)
+  editCms                Boolean @default(false)
+
+  // Settings & System
+  viewSettings           Boolean @default(false)
+  editSettings           Boolean @default(false)
+  viewActivityLog        Boolean @default(false)
+  manageApiKeys          Boolean @default(false)
+  managePaymentGateways  Boolean @default(false)
+  manageEmailSettings    Boolean @default(false)
+  manageTelegram         Boolean @default(false)
+  manageSystem           Boolean @default(false)
+  manageSubAdmins        Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BackupCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  apiUsername String?  @unique
+  keyPrefix   String   @unique
+  keyHash     String
+  scopes      String   @default("orders:write,orders:read,services:read")
+  isActive    Boolean  @default(true)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // ─── Security hardening (P1) ────────────────────────────────
+  // All fields below are OPTIONAL and DEFAULT to legacy behavior.
+  // Existing keys keep working unchanged unless owner opts in.
+
+  // IP policy: "none" | "allowlist" | "lock_first"
+  ipMode      String   @default("none")
+  // CSV of IPs / CIDRs (used when ipMode = "allowlist")
+  allowedIps  String?
+  // First seen IP (used when ipMode = "lock_first"); auto-bound on first call.
+  lockedIp    String?
+  lockedAt    DateTime?
+  lockedByUa  String?  @db.Text
+
+  // Rate limits (per this key). null = no limit.
+  rateLimitPerMinute Int?
+  rateLimitPerHour   Int?
+
+  // ─── Financial circuit breakers (per this key). null = no limit.
+  // All amounts in USD, matching wallet currency.
+  spendLimitPerDay   Decimal? @db.Decimal(14, 2)
+  spendLimitPerHour  Decimal? @db.Decimal(14, 2)
+  maxOrdersPerHour   Int?
+
+  // Auto-throttle on consecutive failures (auth/scope/balance).
+  consecutiveFails   Int      @default(0)
+  throttleUntil      DateTime?
+
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts ApiKeyAttemptLog[]
+  buckets  ApiKeyRateBucket[]
+
+  @@index([userId, isActive])
+  @@index([isActive, expiresAt])
+}
+
+// Audit log of accepted + rejected API key calls. Trimmed by background job
+// (we keep last 200 per key to bound storage).
+model ApiKeyAttemptLog {
+  id        String   @id @default(cuid())
+  apiKeyId  String
+  outcome   String   // "ALLOWED" | "REJECTED_IP" | "REJECTED_SCOPE" | "REJECTED_RATE" | "REJECTED_SPEND" | "REJECTED_AUTH" | "REJECTED_THROTTLE"
+  reason    String?  @db.Text
+  ip        String?
+  ipCountry String?
+  userAgent String?  @db.Text
+  action    String?
+  createdAt DateTime @default(now())
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt])
+  @@index([apiKeyId, outcome, createdAt])
+}
+
+// Sliding-window rate limit buckets (per key + action + minute floor).
+model ApiKeyRateBucket {
+  id        String   @id @default(cuid())
+  apiKeyId  String
+  scope     String   // "minute" | "hour"
+  bucketAt  DateTime // floor to start of minute/hour
+  count     Int      @default(0)
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([apiKeyId, scope, bucketAt])
+  @@index([bucketAt])
+}
+
+// ─── Wallet & Ledger ────────────────────────────────────────────
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Decimal  @default(0) @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledger WalletLedger[]
+}
+
+model WalletLedger {
+  id          String   @id @default(cuid())
+  walletId    String
+  type        String   // TOPUP | PAYMENT | REFUND
+  amount      Decimal  @db.Decimal(14, 2)
+  balance     Decimal  @db.Decimal(14, 2)
+  description String?
+  referenceId String?
+  createdAt   DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
+}
+
+model TopupRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Decimal  @db.Decimal(14, 2)
+  proofUrl    String?
+  note        String?
+  status      String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+// ─── IMEI / Server API Management (1:1 IndoTeknizi) ─────────────
+
+enum ImeiApiStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ImeiServiceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ImeiOrderStatus {
+  PENDING
+  IN_PROCESS
+  SUCCESS
+  REJECTED
+  CANCELLED
+}
+
+enum ServerOrderStatus {
+  PENDING
+  IN_PROCESS
+  SUCCESS
+  REJECTED
+  CANCELLED
+}
+
+model ImeiApi {
+  id        String        @id @default(cuid())
+  title     String
+  host      String
+  username  String
+  apiKey    String        @db.Text
+  apiType   String        @default("DhruFusion")
+  libraryId Int           @default(1)
+  status    ImeiApiStatus @default(ACTIVE)
+  notes     String?       @db.Text
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  services       ImeiService[]
+  serverServices ServerService[]
+
+  @@index([status])
+}
+
+model ImeiServiceGroup {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  services ImeiService[]
+}
+
+model ImeiService {
+  id           String            @id @default(cuid())
+  apiId        String
+  groupId      String
+  toolId       String?
+  title        String
+  description  String?           @db.Text
+  price        Decimal           @db.Decimal(12, 2)
+  deliveryTime String?
+  status       ImeiServiceStatus @default(ACTIVE)
+
+  requiresImei     Boolean @default(true)
+  requiresNetwork  Boolean @default(false)
+  requiresModel    Boolean @default(false)
+  requiresProvider Boolean @default(false)
+  requiresPin      Boolean @default(false)
+  requiresKbh      Boolean @default(false)
+  requiresMep      Boolean @default(false)
+  requiresPrd      Boolean @default(false)
+  requiresSn       Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  api    ImeiApi          @relation(fields: [apiId], references: [id], onDelete: Cascade)
+  group  ImeiServiceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  orders ImeiOrder[]
+
+  @@index([groupId, status])
+  @@index([apiId])
+}
+
+model ImeiOrder {
+  id        String          @id @default(cuid())
+  orderCode String          @unique
+  userId    String
+  serviceId String
+  imei      String
+  price     Decimal         @db.Decimal(12, 2)
+  status    ImeiOrderStatus @default(PENDING)
+
+  network      String?
+  model        String?
+  provider     String?
+  pin          String?
+  kbh          String?
+  mep          String?
+  prd          String?
+  serialNumber String?
+  note         String? @db.Text
+
+  code        String? @db.Text
+  comments    String? @db.Text
+  referenceId String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  processedAt DateTime?
+  completedAt DateTime?
+
+  user    User        @relation(fields: [userId], references: [id])
+  service ImeiService @relation(fields: [serviceId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([imei])
+}
+
+model ServerServiceBox {
+  id        String   @id @default(cuid())
+  title     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  services ServerService[]
+}
+
+model ServerService {
+  id             String            @id @default(cuid())
+  apiId          String
+  boxId          String
+  toolId         String?
+  title          String
+  description    String?           @db.Text
+  price          Decimal           @db.Decimal(12, 2)
+  deliveryTime   String?
+  quantity       Int               @default(1)
+  requiredFields String?           @db.Text
+  status         ImeiServiceStatus @default(ACTIVE)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  api    ImeiApi          @relation(fields: [apiId], references: [id], onDelete: Cascade)
+  box    ServerServiceBox @relation(fields: [boxId], references: [id], onDelete: Cascade)
+  orders ServerOrder[]
+
+  @@index([boxId, status])
+  @@index([apiId])
+}
+
+model ServerOrder {
+  id             String            @id @default(cuid())
+  orderCode      String            @unique
+  userId         String
+  serviceId      String
+  price          Decimal           @db.Decimal(12, 2)
+  status         ServerOrderStatus @default(PENDING)
+  requiredFields String?           @db.Text
+  email          String?
+  notes          String?           @db.Text
+  code           String?           @db.Text
+  comments       String?           @db.Text
+  referenceId    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  processedAt    DateTime?
+  completedAt    DateTime?
+
+  user    User          @relation(fields: [userId], references: [id])
+  service ServerService @relation(fields: [serviceId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+// ─── Activity Log ───────────────────────────────────────────────
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  metadata  String?  // JSON-as-string
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([action, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ─── CMS ────────────────────────────────────────────────────────
+model SiteSettings {
+  id                  String   @id @default("singleton")
+  siteName            String   @default("Nexus Server")
+  siteTagline         String   @default("IMEI & Server Bureau")
+  logoUrl             String?
+  faviconUrl          String?
+  themeMode           String   @default("light")
+  primaryColor        String   @default("#2f63ff")
+  accentColor         String   @default("#06b6d4")
+
+  // Palette template + custom overrides
+  paletteTemplate     String   @default("editorial") // template id
+  paletteCustom       String?  // JSON-as-string of PaletteTokens partial overrides
+
+  metaTitle           String?
+  metaDescription     String?
+  metaKeywords        String?
+  ogImage             String?
+
+  socialInstagram     String?
+  socialTiktok        String?
+  socialWhatsapp      String?
+  socialTelegram      String?
+  socialFacebook      String?
+  socialYoutube       String?
+
+  footerText          String?
+  copyrightText       String?
+
+  enableDarkMode      Boolean  @default(true)
+  enableRegistration  Boolean  @default(true)
+  enableDirectPayment Boolean  @default(false)
+  maintenanceMode     Boolean  @default(false)
+  maintenanceMessage  String?
+  // Maintenance page customization
+  maintenanceTitle    String?
+  maintenanceTemplate String   @default("aurora") // aurora | grid | orbit | minimal
+  maintenanceEndsAt   DateTime? // optional countdown target
+
+  // Security policy
+  // When true, ADMIN users without 2FA are redirected to the 2FA setup
+  // page on every admin route hit until they enable it. This is OPT-IN
+  // (default false) so existing deployments are not surprised by lockouts.
+  enforceAdmin2FA     Boolean  @default(false)
+
+  // ─── Payment gateway feature flags ────────────────────────────
+  // All gateways are OPT-IN. With every flag false (default), the
+  // top-up flow keeps using manual admin-approved transfers exactly
+  // as before — no behavioral change for existing deployments.
+  paymentUsdtPortalEnabled         Boolean @default(false)
+  paymentUsdtPortalEmail           String?
+  paymentUsdtPortalApiKey          String? @db.Text
+  paymentUsdtPortalCallbackPassword String? @db.Text
+
+  paymentPaypalEnabled     Boolean @default(false)
+  paymentPaypalClientId    String?
+  paymentPaypalClientSecret String? @db.Text
+  // PayPal mode: "sandbox" | "live"
+  paymentPaypalMode        String   @default("sandbox")
+  // Webhook ID from PayPal dashboard, used for signature verification.
+  paymentPaypalWebhookId   String?
+
+  paymentStripeEnabled     Boolean @default(false)
+  paymentStripeSecretKey   String?  @db.Text
+  paymentStripePublishableKey String?
+  paymentStripeWebhookSecret String? @db.Text
+
+  // USD per 1 USDT — used by USDT Portal to convert the user's USD
+  // wallet amount to USDT for the hosted checkout.
+  // Example: 1.00 means 1 USD = 1 USDT (1:1 peg).
+  paymentUsdtRate    Decimal? @db.Decimal(10, 6)
+
+  // ─── Telegram Bot ────────────────────────────────────────────────
+  // OPT-IN. With telegramBotEnabled=false (default), all Telegram
+  // features are no-ops. No regression vs. existing deployments.
+  telegramBotEnabled     Boolean @default(false)
+  telegramBotToken       String? @db.Text
+  telegramBotUsername    String?
+  telegramWebhookSecret  String?
+  telegramAdminChatId    String?
+  telegramChannelId      String?
+  telegramChannelEnabled Boolean @default(false)
+  // Comma-separated allow-list of enabled notification events.
+  // null = all enabled (default, non-breaking). "" = none enabled.
+  // e.g. "order.created,order.success,payment.credited"
+  telegramUserEvents     String?
+  telegramAdminEvents    String?
+
+  // ─── Licensing & Updates ───────────────────────────────────────
+  // License validation against the external NexusPortal (License Server).
+  // With licenseStatus="not_activated" (default), the system runs normally
+  // but cannot check for or apply updates.
+  licenseKey             String?  @db.Text
+  licenseStatus          String   @default("not_activated") // active | inactive | not_activated
+  licenseDomain          String?
+  licensePlan            String?
+  licenseExpiresAt       DateTime?
+  licenseLastValidated   DateTime?
+  licenseReason          String?  // reason if inactive (e.g. "expired", "revoked", "grace_period_exceeded")
+  lastUpdateVersion      String?
+  lastUpdateAt           DateTime?
+
+  // ─── SMTP / Email ──────────────────────────────────────────────
+  // OPT-IN. With smtpEnabled=false (default), the email service is a
+  // no-op: every send call returns ok=false silently. No regression vs.
+  // existing deployments which never had email at all.
+  smtpEnabled       Boolean @default(false)
+  smtpHost          String?
+  smtpPort          Int?    @default(587)
+  smtpSecure        Boolean @default(false)  // TLS on connect (465). false = STARTTLS on 587/25.
+  smtpUsername      String?
+  smtpPassword      String? @db.Text
+  smtpFromAddress   String?
+  smtpFromName      String?
+  // Comma-separated allow-list of event types to send. Empty = all enabled.
+  // e.g. "ticket.reply,order.success,payment.credited"
+  smtpEvents        String?
+
+  updatedAt           DateTime @updatedAt
+}
+
+model PageSection {
+  id          String   @id @default(cuid())
+  pageSlug    String   @default("home")
+  sectionType String
+  title       String?
+  subtitle    String?
+  content     String   @default("{}") // JSON-as-string
+  settings    String   @default("{}")
+  isVisible   Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([pageSlug, isVisible, sortOrder])
+}
+
+model Banner {
+  id         String    @id @default(cuid())
+  title      String
+  subtitle   String?
+  imageUrl   String
+  linkUrl    String?
+  position   String    @default("home_top")
+  isActive   Boolean   @default(true)
+  sortOrder  Int       @default(0)
+  startDate  DateTime?
+  endDate    DateTime?
+  clickCount Int       @default(0)
+  viewCount  Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([position, isActive, sortOrder])
+}
+
+model RunningAd {
+  id        String    @id @default(cuid())
+  text      String
+  linkUrl   String?
+  bgColor   String?
+  textColor String?
+  icon      String?
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model NavigationMenu {
+  id         String   @id @default(cuid())
+  location   String
+  label      String
+  href       String
+  icon       String?
+  isExternal Boolean  @default(false)
+  isVisible  Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  parentId   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([location, isVisible, sortOrder])
+}
+
+model FaqItem {
+  id        String   @id @default(cuid())
+  category  String   @default("general")
+  question  String
+  answer    String
+  isVisible Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, isVisible, sortOrder])
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  avatar    String?
+  role      String?
+  rating    Int      @default(5)
+  content   String
+  isVisible Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MediaFile {
+  id         String   @id @default(cuid())
+  filename   String
+  url        String
+  mimeType   String
+  size       Int
+  altText    String?
+  uploadedBy String?
+  folder     String   @default("general")
+  createdAt  DateTime @default(now())
+}
+
+model CustomPage {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  title           String
+  content         String
+  metaTitle       String?
+  metaDescription String?
+  isPublished     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── Tiered Pricing (Customer Groups) ──────────────────────────
+//
+// Strictly additive. A user with no priceGroup uses service.price as-is.
+// Group rule: PERCENT off retail, or FIXED +/- USD on retail.
+// Per-service override price always wins over the group rule.
+model PriceGroup {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  description     String?  @db.Text
+  // PERCENT = apply discountPercent | FIXED = add fixedAdjustment to retail (e.g. -5 or +5 USD)
+  adjustmentType  String   @default("PERCENT")
+  // Global discount percent (when adjustmentType = PERCENT). Example: 10 → 10% off.
+  discountPercent Decimal  @default(0) @db.Decimal(5, 2)
+  // USD delta on retail (when adjustmentType = FIXED). Negative = cheaper, positive = markup.
+  fixedAdjustment Decimal  @default(0) @db.Decimal(12, 2)
+  isDefault       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users     User[]
+  overrides ServicePriceOverride[]
+}
+
+// Per-service override for a specific group. Wins over discountPercent.
+// Either imeiServiceId OR serverServiceId is set, never both.
+model ServicePriceOverride {
+  id              String   @id @default(cuid())
+  priceGroupId    String
+  imeiServiceId   String?
+  serverServiceId String?
+  price           Decimal  @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  priceGroup PriceGroup @relation(fields: [priceGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([priceGroupId, imeiServiceId])
+  @@unique([priceGroupId, serverServiceId])
+  @@index([imeiServiceId])
+  @@index([serverServiceId])
+}
+
+// ─── Payment Gateways ──────────────────────────────────────────
+//
+// PaymentIntent represents a request to top up the wallet via an external
+// gateway. The supplier order workflow is unaffected — wallet credit only
+// happens once a webhook (or poller) confirms the payment.
+//
+// All amounts are in USD (2 decimal places).
+model PaymentIntent {
+  id              String   @id @default(cuid())
+  reference       String   @unique // public reference shared with gateway / user
+  userId          String
+  gateway         String   // "usdt_portal" | "paypal" | "stripe" | ...
+
+  // Wallet credit on success (USD).
+  amount          Decimal  @db.Decimal(14, 2)
+
+  // Source asset details (crypto). null for fiat gateways.
+  cryptoAsset     String?  // "USDT-TRC20"
+  cryptoAmount    String?  // string to preserve precision (e.g. "12.345600")
+  cryptoAddress   String?  // deposit address presented to user
+
+  status          String   @default("PENDING") // "PENDING" | "DETECTED" | "CONFIRMED" | "EXPIRED" | "FAILED" | "CANCELLED"
+  confirmations   Int      @default(0)
+  txHash          String?  // chain tx hash (crypto), or gateway transaction id (fiat)
+
+  // Free-form gateway response payload for debugging.
+  gatewayPayload  String?  @db.Text
+
+  // External hosted-checkout URL (USDT Portal etc.) so the user can be
+  // redirected back later from "view intent" without re-creating it.
+  externalUrl     String?
+
+  expiresAt       DateTime
+  confirmedAt     DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([gateway, status])
+  @@index([status, expiresAt])
+}
+
+// Audit + retry queue for outbound email. Sends are best-effort: a row
+// here does not block the originating action (ticket reply etc.).
+model EmailLog {
+  id          String   @id @default(cuid())
+  toAddress   String
+  subject     String
+  event       String   // "ticket.reply" | "order.success" | etc.
+  status      String   @default("PENDING") // "PENDING" | "SENT" | "FAILED"
+  attempts    Int      @default(0)
+  lastError   String?  @db.Text
+  bodyText    String?  @db.Text
+  bodyHtml    String?  @db.Text
+  refType     String?  // entity type for grouping ("SupportTicket", "ImeiOrder", ...)
+  refId       String?
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([refType, refId])
+}
+
+// ─── Support Tickets ────────────────────────────────────────────
+//
+// Threaded support conversations between users and admins. Optionally
+// attached to an IMEI/Server order so that supplier file responses
+// (FILE_URL etc.) and other context can be threaded together.
+//
+// Designed to NEVER touch the order workflow itself — tickets are a
+// parallel, additive model. Order rows are referenced by id (no FK
+// cascade) so deleting a ticket has no effect on order processing.
+model SupportTicket {
+  id          String   @id @default(cuid())
+  ticketCode  String   @unique // e.g. "TCK-2026-AB12CD"
+  userId      String
+  subject     String
+  category    String   @default("general") // "general" | "order" | "billing" | "technical"
+  priority    String   @default("normal")  // "low" | "normal" | "high" | "urgent"
+  status      String   @default("OPEN")    // "OPEN" | "AWAITING_USER" | "AWAITING_ADMIN" | "RESOLVED" | "CLOSED"
+
+  // Optional cross-reference to an order. We use opaque string ids and
+  // do NOT add FK relations so that deleting a ticket cannot cascade
+  // into order rows under any circumstance.
+  imeiOrderId   String?
+  serverOrderId String?
+
+  lastReplyAt   DateTime?
+  lastReplyBy   String?  // "USER" | "ADMIN"
+  closedAt      DateTime?
+  closedBy      String?  // userId of admin who closed
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies SupportTicketReply[]
+
+  @@index([userId, status])
+  @@index([status, lastReplyAt])
+  @@index([category, status])
+}
+
+model SupportTicketReply {
+  id         String   @id @default(cuid())
+  ticketId   String
+  authorId   String?  // null for system events
+  authorRole String   // "USER" | "ADMIN" | "SYSTEM"
+  body       String   @db.Text
+  // JSON-as-string array of attachments: [{ url, filename, mimeType, size }]
+  attachments String? @db.Text
+  // System-generated entries (status change, attached order, ...) are
+  // visually distinct from real replies. They never count as "replied
+  // by user/admin" for the AWAITING_* status flip.
+  isSystem   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
+// ─── Download tools library ────────────────────────────────────
+model DownloadTool {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  category    String   @default("general")
+  version     String?
+  platform    String? // e.g. Windows, macOS, Linux, Multi
+  downloadUrl String   @db.Text
+  isPublished Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished, sortOrder])
+  @@index([category, isPublished])
+}
+
+// ─── System Update Log ─────────────────────────────────────────
+// Records every update attempt (success or failure) for the admin
+// System & Update page history view.
+model UpdateLog {
+  id              String   @id @default(cuid())
+  fromVersion     String
+  toVersion       String
+  status          String   // "success" | "failed" | "rolled_back"
+  error           String?  @db.Text
+  appliedAt       DateTime @default(now())
+  durationSeconds Int?
+
+  @@index([appliedAt])
+}
