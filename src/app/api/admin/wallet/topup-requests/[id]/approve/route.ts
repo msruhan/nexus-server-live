@@ -65,5 +65,21 @@ export async function POST(
     /* swallow — never affect the admin response */
   }
 
+  // Invoice/receipt — fire-and-forget; never blocks the admin action.
+  try {
+    void import('@/lib/invoice/service').then(({ createInvoice }) =>
+      createInvoice({
+        userId: tr.userId,
+        kind: 'TOPUP',
+        amount: tr.amount.toString(),
+        description: 'Wallet top-up (manual approval)',
+        refType: 'TopupRequest',
+        refId: tr.id,
+      }),
+    );
+  } catch {
+    /* swallow — never affect the admin response */
+  }
+
   return NextResponse.json({ ok: true });
 }

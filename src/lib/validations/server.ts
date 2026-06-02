@@ -42,4 +42,14 @@ export function resolveRequiredFieldsFromUpdate(
 export const createServerOrderSchema = z.object({
   serviceId: z.string().min(1),
   requiredFields: z.record(z.string(), z.string()).optional().default({}),
+
+  // ─── Dhru-compatible callback (optional, additive) ───────────────
+  // See createImeiOrderSchema for the rationale. The route handles these
+  // via extractFeedbackInput(); declared here so they pass validation.
+  feedback_url: z.string().max(2048).optional().nullable(),
+  feedbackUrl: z.string().max(2048).optional().nullable(),
+  reference_id: z.string().max(255).optional().nullable(),
+  referenceId: z.string().max(255).optional().nullable(),
+  quantity: z.union([z.number(), z.string()]).optional().nullable(),
+  Quantity: z.union([z.number(), z.string()]).optional().nullable(),
 })

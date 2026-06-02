@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
-import { prisma } from '@/lib/db';
+import { getSiteSettingsSafe } from '@/lib/site-settings-safe';
 import { auth } from '@/auth';
 import { Ticker } from '@/components/landing/Ticker';
 import { Navbar } from '@/components/landing/Navbar';
@@ -8,7 +8,7 @@ import { Footer } from '@/components/landing/Footer';
 import { ScrollProgress } from '@/components/landing/ScrollProgress';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await prisma.siteSettings.findUnique({ where: { id: 'singleton' } });
+  const settings = await getSiteSettingsSafe();
   return {
     title: settings?.metaTitle ?? `${settings?.siteName ?? 'Nexus Server'} — ${settings?.siteTagline ?? 'IMEI & Server Bureau'}`,
     description: settings?.metaDescription ?? undefined,
@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
-  const settings = await prisma.siteSettings.findUnique({ where: { id: 'singleton' } });
+  const settings = await getSiteSettingsSafe();
   if (settings?.maintenanceMode) {
     const session = await auth();
     const role = session?.user.role;

@@ -15,7 +15,8 @@ export type EmailEvent =
   | 'wallet.topup_approved'
   | 'wallet.topup_rejected'
   | 'payment.credited'
-  | 'auth.password_changed';
+  | 'auth.password_changed'
+  | 'backup.created';
 
 export const ALL_EMAIL_EVENTS: EmailEvent[] = [
   'ticket.reply',
@@ -30,7 +31,16 @@ export const ALL_EMAIL_EVENTS: EmailEvent[] = [
   'wallet.topup_rejected',
   'payment.credited',
   'auth.password_changed',
+  'backup.created',
 ];
+
+/** Mail attachment. Provide `path` (file on disk) or `content` (buffer/string). */
+export type EmailAttachment = {
+  filename: string;
+  path?: string;
+  content?: Buffer | string;
+  contentType?: string;
+};
 
 export type EmailMessage = {
   to: string;
@@ -40,4 +50,11 @@ export type EmailMessage = {
   event: EmailEvent;
   refType?: string;
   refId?: string;
+  attachments?: EmailAttachment[];
+  /**
+   * When true, send regardless of the admin's per-event allow-list. Use for
+   * explicit admin-triggered sends (e.g. emailing a backup) that should
+   * never be silently muted by the events filter.
+   */
+  force?: boolean;
 };

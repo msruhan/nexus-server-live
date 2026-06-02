@@ -83,6 +83,18 @@ export const createImeiOrderSchema = z.object({
   prd: z.string().max(100).optional().nullable(),
   serialNumber: z.string().max(100).optional().nullable(),
   note: z.string().max(2000).optional().nullable(),
+
+  // ─── Dhru-compatible callback (optional, additive) ───────────────
+  // Accept both snake_case (Dhru) and camelCase. The route passes the raw
+  // body through extractFeedbackInput() for SSRF-safe handling, so these
+  // are only declared to be passthrough-tolerant. They never affect the
+  // order flow when omitted.
+  feedback_url: z.string().max(2048).optional().nullable(),
+  feedbackUrl: z.string().max(2048).optional().nullable(),
+  reference_id: z.string().max(255).optional().nullable(),
+  referenceId: z.string().max(255).optional().nullable(),
+  quantity: z.union([z.number(), z.string()]).optional().nullable(),
+  Quantity: z.union([z.number(), z.string()]).optional().nullable(),
 })
 
 export const updateImeiOrderSchema = z.object({

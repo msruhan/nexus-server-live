@@ -7,7 +7,7 @@ export const { auth: middlewareAuth } = NextAuth(authConfig);
 export default middlewareAuth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
-  const role = req.auth?.user?.role;
+  const role = (req.auth?.user as { role?: string } | undefined)?.role;
 
   const isAdminRoute = nextUrl.pathname.startsWith('/admin');
   const isUserRoute = nextUrl.pathname.startsWith('/user');
@@ -20,13 +20,9 @@ export default middlewareAuth((req) => {
       url.searchParams.set('next', nextUrl.pathname);
       return NextResponse.redirect(url);
     }
-    // Both ADMIN and SUB_ADMIN may enter the admin area. Page-level
-    // permission checks gate individual features for SUB_ADMIN.
     if (role !== 'ADMIN' && role !== 'SUB_ADMIN') {
       return NextResponse.redirect(new URL('/user/dashboard', nextUrl));
     }
-    // Forward the current pathname so the admin layout can enforce
-    // per-route permissions for SUB_ADMIN.
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set('x-pathname', nextUrl.pathname);
     return NextResponse.next({ request: { headers: requestHeaders } });

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { MobileBar } from '@/components/dashboard/MobileBar';
 import { AccountThemeShell } from '@/components/appearance/AccountThemeShell';
+import { getBranding } from '@/lib/branding';
 
 export default async function UserLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -28,9 +29,11 @@ export default async function UserLayout({ children }: { children: React.ReactNo
     role: session.user.role,
   };
 
+  const brand = await getBranding();
+
   return (
     <AccountThemeShell userId={session.user.id}>
-      <Sidebar variant="user" user={userInfo}>
+      <Sidebar variant="user" user={userInfo} brand={{ siteName: brand.siteName, logoUrl: brand.logoUrl }}>
         <MobileBar user={userInfo} />
         <main className="flex-1 px-4 py-8 sm:px-8 lg:px-12 lg:py-12">{children}</main>
       </Sidebar>

@@ -2,6 +2,7 @@
  * Background scheduler: poll IMEI order status from supplier every ~90s.
  * Started via instrumentation.ts when the Node server boots (npm start / npm dev).
  */
+import { isPrismaMissingTableError } from '@/lib/db-schema-ready'
 import { pollImeiOrderFromSupplier, processImeiOrderQueue } from '@/lib/imei-order-worker'
 
 const DEFAULT_INTERVAL_MS = 90_000 // 1.5 menit (antara 1–2 menit)
@@ -9,6 +10,7 @@ const DEFAULT_INTERVAL_MS = 90_000 // 1.5 menit (antara 1–2 menit)
 const globalForScheduler = globalThis as typeof globalThis & {
   __imeiSchedulerStarted?: boolean
   __imeiSchedulerRunning?: boolean
+  __imeiSchedulerMissingDbWarned?: boolean
 }
 
 function getIntervalMs() {
@@ -24,6 +26,13 @@ async function runQueueTick() {
   try {
     await processImeiOrderQueue()
   } catch (e) {
+    if (isPrismaMissingTableError(e)) {
+      if (!globalForScheduler.__imeiSchedulerMissingDbWarned) {
+        globalForScheduler.__imeiSchedulerMissingDbWarned = true
+        console.warn('[IMEI_SCHEDULER] Tables missing — run npm run db:setup')
+      }
+      return
+    }
     console.error('[IMEI_SCHEDULER] tick error:', e)
   } finally {
     globalForScheduler.__imeiSchedulerRunning = false

@@ -46,6 +46,7 @@ type Item = {
   title: string | null;
   subtitle: string | null;
   content: unknown;
+  settings?: unknown;
   isVisible: boolean;
 };
 

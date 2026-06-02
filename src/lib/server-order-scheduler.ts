@@ -1,6 +1,7 @@
 /**
  * Background scheduler: submit & poll server orders from supplier every ~90s.
  */
+import { isPrismaMissingTableError } from '@/lib/db-schema-ready'
 import { pollServerOrderFromSupplier, processServerOrderQueue } from '@/lib/server-order-worker'
 
 const DEFAULT_INTERVAL_MS = 90_000
@@ -8,6 +9,7 @@ const DEFAULT_INTERVAL_MS = 90_000
 const globalForScheduler = globalThis as typeof globalThis & {
   __serverSchedulerStarted?: boolean
   __serverSchedulerRunning?: boolean
+  __serverSchedulerMissingDbWarned?: boolean
 }
 
 function getIntervalMs() {
@@ -23,6 +25,13 @@ async function runQueueTick() {
   try {
     await processServerOrderQueue()
   } catch (e) {
+    if (isPrismaMissingTableError(e)) {
+      if (!globalForScheduler.__serverSchedulerMissingDbWarned) {
+        globalForScheduler.__serverSchedulerMissingDbWarned = true
+        console.warn('[SERVER_SCHEDULER] Tables missing — run npm run db:setup')
+      }
+      return
+    }
     console.error('[SERVER_SCHEDULER] tick error:', e)
   } finally {
     globalForScheduler.__serverSchedulerRunning = false

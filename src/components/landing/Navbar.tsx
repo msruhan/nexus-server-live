@@ -34,6 +34,7 @@ export async function Navbar() {
       items={items}
       siteName={settings?.siteName ?? 'Nexus Server'}
       tagline={settings?.siteTagline ?? 'IMEI · Server Bureau'}
+      logoUrl={settings?.logoUrl ?? null}
     />
   );
 }

@@ -31,6 +31,18 @@ export async function POST(req: Request) {
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
 
+  // Enforce a per-type instance limit per page (R7.5).
+  const PER_TYPE_LIMIT = 20;
+  const typeCount = await prisma.pageSection.count({
+    where: { pageSlug: parsed.data.pageSlug, sectionType: parsed.data.sectionType },
+  });
+  if (typeCount >= PER_TYPE_LIMIT) {
+    return NextResponse.json(
+      { error: `Limit reached: a page may have at most ${PER_TYPE_LIMIT} "${parsed.data.sectionType}" sections.` },
+      { status: 400 },
+    );
+  }
+
   const last = await prisma.pageSection.findFirst({
     where: { pageSlug: parsed.data.pageSlug },
     orderBy: { sortOrder: 'desc' },

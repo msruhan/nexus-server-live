@@ -11,6 +11,7 @@ import {
 } from '@/lib/imei-order-duplicate';
 import { validateImeiOrderDeviceInput } from '@/lib/imei-order-input';
 import { generateOrderCode } from '@/lib/generate-order-code';
+import { extractFeedbackInput } from '@/lib/feedback/input';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,9 @@ export async function POST(req: Request) {
     };
     const parsed = createImeiOrderSchema.safeParse(body);
     if (!parsed.success) return apiError(parsed.error.issues[0].message);
+
+    // Optional Dhru-compatible callback inputs (SSRF-validated, additive).
+    const feedback = extractFeedbackInput(rawBody);
 
     const userId = auth.user.id;
 
@@ -126,6 +130,10 @@ export async function POST(req: Request) {
           prd: parsed.data.prd ?? null,
           serialNumber: deviceInput.serialNumber,
           note: parsed.data.note ?? null,
+          // Dhru-compatible callback (all optional; defaults preserve old behavior).
+          callerReference: feedback.callerReference,
+          feedbackUrl: feedback.feedbackUrl,
+          quantity: feedback.quantity,
         },
       });
 
@@ -163,6 +171,7 @@ export async function POST(req: Request) {
         orderCode: order.orderCode,
         status: order.status,
         referenceId: order.referenceId,
+        reference_id: feedback.callerReference ?? undefined,
       },
       201,
     );

@@ -3,6 +3,7 @@ import { Inter, Instrument_Serif, JetBrains_Mono, Plus_Jakarta_Sans } from 'next
 import './globals.css';
 import { Toaster } from '@/components/ui/Toaster';
 import { getSitePaletteCss } from '@/lib/active-palette';
+import { getBranding } from '@/lib/branding';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -32,11 +33,18 @@ const mono = JetBrains_Mono({
   weight: ['400', '500', '700'],
 });
 
-export const metadata: Metadata = {
-  title: 'Nexus Server — Bureau of IMEI & Server Operations',
-  description:
-    'A self-service desk for IMEI unlocks, iCloud removals, FRP bypass, and server flashing. Powered by DhruFusion. Engineered for resellers who count seconds.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getBranding();
+  const title = brand.metaTitle?.trim() || `${brand.siteName} — ${brand.tagline}`;
+  const description =
+    brand.metaDescription?.trim() ||
+    'A self-service desk for IMEI unlocks, iCloud removals, FRP bypass, and server flashing.';
+  return {
+    title,
+    description,
+    icons: brand.faviconUrl ? { icon: brand.faviconUrl } : undefined,
+  };
+}
 
 export const dynamic = 'force-dynamic';
 

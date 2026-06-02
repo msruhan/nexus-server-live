@@ -4,7 +4,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { hasPermission } from '@/lib/sub-admin';
-import { activateLicense, validateLicense, deactivateLicense } from '@/lib/license/client';
+import {
+  activateLicense,
+  clearLicenseLocally,
+  validateLicense,
+  deactivateLicense,
+} from '@/lib/license/client';
 
 async function requireAccess() {
   const session = await auth();
@@ -44,7 +49,16 @@ export async function POST(req: NextRequest) {
   if (action === 'deactivate') {
     const result = await deactivateLicense();
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      remote: result.remote,
+      warning: 'warning' in result ? result.warning : undefined,
+    });
+  }
+
+  if (action === 'remove_local') {
+    await clearLicenseLocally();
+    return NextResponse.json({ ok: true, remote: false });
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

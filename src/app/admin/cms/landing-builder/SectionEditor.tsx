@@ -2,10 +2,12 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
-import { X, FloppyDisk } from '@phosphor-icons/react/dist/ssr';
+import { X, FloppyDisk, CaretDown } from '@phosphor-icons/react/dist/ssr';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { SECTION_LABELS, type SectionType } from '@/lib/cms-types';
+import { resolveSettings, hasVariants, defaultVariant, type SectionStyle } from '@/lib/cms-style';
+import { StylePanel, VariantPicker } from './StylePanel';
 
 type Item = {
   id: string;
@@ -13,6 +15,7 @@ type Item = {
   title: string | null;
   subtitle: string | null;
   content: unknown;
+  settings?: unknown;
   isVisible: boolean;
 };
 
@@ -28,13 +31,24 @@ export function SectionEditor({
   const [content, setContent] = React.useState<Record<string, unknown>>(
     (item.content as Record<string, unknown>) ?? {},
   );
+  // Resolve stored settings into a fully-populated style + variant.
+  const resolved = React.useMemo(
+    () => resolveSettings(item.settings, item.sectionType),
+    [item.settings, item.sectionType],
+  );
+  const [style, setStyle] = React.useState<SectionStyle>(resolved.style);
+  const [variant, setVariant] = React.useState<string | null>(resolved.variant);
   const [advanced, setAdvanced] = React.useState(false);
   const [rawJson, setRawJson] = React.useState(JSON.stringify(content, null, 2));
   const [saving, setSaving] = React.useState(false);
+  const [showStyle, setShowStyle] = React.useState(false);
 
   React.useEffect(() => {
     setContent((item.content as Record<string, unknown>) ?? {});
     setRawJson(JSON.stringify(item.content ?? {}, null, 2));
+    const r = resolveSettings(item.settings, item.sectionType);
+    setStyle(r.style);
+    setVariant(r.variant);
   }, [item]);
 
   async function save() {
@@ -49,14 +63,20 @@ export function SectionEditor({
         return;
       }
     }
+    // Build settings payload. Only send variant when this type supports it.
+    const settings: Record<string, unknown> = { style };
+    if (hasVariants(item.sectionType)) {
+      settings.variant = variant ?? defaultVariant(item.sectionType);
+    }
     const res = await fetch(`/api/admin/cms/sections/${item.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: payloadContent }),
+      body: JSON.stringify({ content: payloadContent, settings }),
     });
     setSaving(false);
     if (!res.ok) {
-      toast.error('Save failed');
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error ?? 'Save failed');
       return;
     }
     onSaved();
@@ -78,6 +98,13 @@ export function SectionEditor({
         </button>
       </div>
 
+      {/* Variant picker (only for types with a variant catalog) */}
+      {hasVariants(item.sectionType) && !advanced && (
+        <div className="mt-5">
+          <VariantPicker sectionType={item.sectionType} value={variant} onChange={setVariant} />
+        </div>
+      )}
+
       <div className="mt-5 space-y-5">
         {advanced ? (
           <Textarea
@@ -88,9 +115,39 @@ export function SectionEditor({
             className="font-mono text-xs"
           />
         ) : (
-          <Fields type={item.sectionType as SectionType} content={content} setContent={setContent} />
+          <Fields
+            type={item.sectionType as SectionType}
+            content={content}
+            setContent={setContent}
+            heroLayout={variant ?? 'standard'}
+          />
         )}
       </div>
+
+      {/* Style panel (collapsible) */}
+      {!advanced && (
+        <div className="mt-6 rounded-xl border border-line bg-paper-50">
+          <button
+            type="button"
+            onClick={() => setShowStyle((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+          >
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+              Section style
+            </span>
+            <CaretDown
+              size={14}
+              weight="bold"
+              className={`text-ink-muted transition-transform ${showStyle ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {showStyle && (
+            <div className="border-t border-line p-4">
+              <StylePanel style={style} onChange={setStyle} />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-6 flex items-center justify-between border-t border-line pt-4">
         <button
@@ -126,10 +183,13 @@ function Fields({
   type,
   content,
   setContent,
+  heroLayout = 'standard',
 }: {
   type: SectionType;
   content: Record<string, unknown>;
   setContent: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
+  /** Structural hero layout — the visual-card picker only shows for 'standard'. */
+  heroLayout?: string;
 }) {
   function setField(key: string, value: unknown) {
     setContent((prev) => ({ ...prev, [key]: value }));
@@ -177,10 +237,20 @@ function Fields({
             value={(content.secondaryHref as string) ?? ''}
             onChange={(e) => setField('secondaryHref', e.target.value)}
           />
-          <HeroVisualPicker
-            value={((content.visualVariant as string) ?? 'ticket')}
-            onChange={(v) => setField('visualVariant', v)}
-          />
+          {heroLayout === 'split-image' && (
+            <Input
+              label="Image URL (right column)"
+              hint="Shown in the split-image layout. Use an https or /relative URL."
+              value={(content.bgImageUrl as string) ?? ''}
+              onChange={(e) => setField('bgImageUrl', e.target.value)}
+            />
+          )}
+          {heroLayout === 'standard' && (
+            <HeroVisualPicker
+              value={((content.visualVariant as string) ?? 'ticket')}
+              onChange={(v) => setField('visualVariant', v)}
+            />
+          )}
         </>
       );
 

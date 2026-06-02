@@ -82,6 +82,42 @@ export async function creditWalletForIntent(input: {
     /* never affect the credit flow */
   }
 
+  // Invoice/receipt — fire-and-forget. Never affects the credit flow.
+  try {
+    void import('@/lib/invoice/service').then(({ createInvoice }) =>
+      createInvoice({
+        userId: intent.userId,
+        kind: 'TOPUP',
+        amount: intent.amount.toString(),
+        description: `Wallet top-up via ${intent.gateway}`,
+        refType: 'PaymentIntent',
+        refId: intent.id,
+      }),
+    );
+  } catch {
+    /* never affect the credit flow */
+  }
+
+  // Outgoing webhook (payment.credited) — fire-and-forget, idempotent.
+  try {
+    void import('@/lib/webhook/dispatcher').then(({ enqueueWebhook }) =>
+      enqueueWebhook({
+        userId: intent.userId,
+        event: 'payment.credited',
+        refType: 'PaymentIntent',
+        refId: intent.id,
+        data: {
+          gateway: intent.gateway,
+          amount: intent.amount.toString(),
+          txHash: input.txHash ?? null,
+          reference: intent.reference,
+        },
+      }),
+    );
+  } catch {
+    /* never affect the credit flow */
+  }
+
   return { ok: true, credited: true, balance: result.toString() };
 }
 

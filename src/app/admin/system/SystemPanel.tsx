@@ -37,6 +37,7 @@ export function SystemPanel({ initial }: Props) {
   const [licenseKey, setLicenseKey] = React.useState('');
   const [activating, setActivating] = React.useState(false);
   const [deactivating, setDeactivating] = React.useState(false);
+  const [revalidating, setRevalidating] = React.useState(false);
   const [checking, setChecking] = React.useState(false);
   const [updating, setUpdating] = React.useState(false);
   const [message, setMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -103,6 +104,30 @@ export function SystemPanel({ initial }: Props) {
     }
   };
 
+  const handleRevalidate = async () => {
+    setRevalidating(true);
+    try {
+      const res = await fetch('/api/admin/system/license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'validate' }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setLicense(data.info);
+        showMessage('success', 'License is valid and active.');
+      } else {
+        // Validation failed → license is now inactive locally. Reflect it.
+        setLicense((prev) => ({ ...prev, status: 'inactive', reason: data.error ?? 'validation_failed' }));
+        showMessage('error', `License is no longer valid: ${data.error ?? 'unknown reason'}`);
+      }
+    } catch {
+      showMessage('error', 'Network error');
+    } finally {
+      setRevalidating(false);
+    }
+  };
+
   const handleDeactivate = async () => {
     if (!confirm('Are you sure? You will no longer receive updates until you activate a new license.')) return;
     setDeactivating(true);
@@ -115,7 +140,10 @@ export function SystemPanel({ initial }: Props) {
       const data = await res.json();
       if (data.ok) {
         setLicense({ status: 'not_activated', key: null, domain: null, plan: null, expiresAt: null, lastValidatedAt: null, reason: null });
-        showMessage('success', 'License deactivated');
+        showMessage(
+          'success',
+          data.warning ?? (data.remote === false ? 'License removed from this installation' : 'License deactivated'),
+        );
       } else {
         showMessage('error', data.error ?? 'Deactivation failed');
       }
@@ -284,13 +312,22 @@ export function SystemPanel({ initial }: Props) {
                 Reason: {license.reason}
               </div>
             )}
-            <button
-              onClick={handleDeactivate}
-              disabled={deactivating}
-              className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
-            >
-              {deactivating ? 'Deactivating…' : 'Deactivate License'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleRevalidate}
+                disabled={revalidating}
+                className="rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-paper-200 disabled:opacity-50"
+              >
+                {revalidating ? 'Re-checking…' : 'Re-check with vendor'}
+              </button>
+              <button
+                onClick={handleDeactivate}
+                disabled={deactivating}
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+              >
+                {deactivating ? 'Deactivating…' : 'Deactivate License'}
+              </button>
+            </div>
           </div>
         )}
       </section>

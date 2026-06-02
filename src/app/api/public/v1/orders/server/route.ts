@@ -6,6 +6,7 @@ import { pollServerOrderFromSupplier, submitServerOrderToSupplier } from '@/lib/
 import { parseServerFieldDefs, validateServerOrderFields } from '@/lib/server-fields';
 import { createServerOrderSchema } from '@/lib/validations/server';
 import { generateOrderCode } from '@/lib/generate-order-code';
+import { extractFeedbackInput } from '@/lib/feedback/input';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const parsed = createServerOrderSchema.safeParse(body);
     if (!parsed.success) return apiError(parsed.error.issues[0].message);
+
+    // Optional Dhru-compatible callback inputs (SSRF-validated, additive).
+    const feedback = extractFeedbackInput(body);
 
     const userId = auth.user.id;
 
@@ -63,6 +67,10 @@ export async function POST(req: Request) {
           notes: validation.notes,
           requiredFields:
             Object.keys(validation.fields).length > 0 ? JSON.stringify(validation.fields) : null,
+          // Dhru-compatible callback (all optional; defaults preserve old behavior).
+          callerReference: feedback.callerReference,
+          feedbackUrl: feedback.feedbackUrl,
+          quantity: feedback.quantity,
         },
       });
 
@@ -100,6 +108,7 @@ export async function POST(req: Request) {
         orderCode: order.orderCode,
         status: order.status,
         referenceId: order.referenceId,
+        reference_id: feedback.callerReference ?? undefined,
       },
       201,
     );

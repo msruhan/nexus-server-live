@@ -5,6 +5,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { formatUSD } from '@/lib/format';
 import { parseServerFieldDefs } from '@/lib/server-fields';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import { ServerOrderForm } from './ServerOrderForm';
 
 export const dynamic = 'force-dynamic';
@@ -45,7 +46,7 @@ export default async function NewServerOrderPage({
       {service.description && (
         <div
           className="prose prose-ink mt-2 max-w-2xl"
-          dangerouslySetInnerHTML={{ __html: service.description }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(service.description) }}
         />
       )}
 

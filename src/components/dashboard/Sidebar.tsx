@@ -14,6 +14,7 @@ import {
   CaretDown,
   CaretLeft,
   CaretRight,
+  X,
   SignOut,
   Database,
   ChartLineUp,
@@ -40,9 +41,13 @@ import {
   Warning,
   TelegramLogo,
   ArrowsClockwise,
+  ChartBar,
+  Broadcast,
+  Archive,
 } from '@phosphor-icons/react/dist/ssr';
 import { cn } from '@/lib/cn';
 import { formatAppVersion } from '@/lib/app-version';
+import { SidebarMobileNavProvider } from '@/components/dashboard/sidebar-mobile-context';
 import type { Icon } from '@phosphor-icons/react';
 
 type Item = {
@@ -73,6 +78,7 @@ const userSections: Section[] = [
         ],
       },
       { href: '/user/wallet', label: 'Wallet', icon: Wallet },
+      { href: '/user/invoices', label: 'Invoices', icon: Receipt },
       { href: '/user/download-tools', label: 'Download tools', icon: DownloadSimple },
     ],
   },
@@ -89,6 +95,7 @@ const userSections: Section[] = [
       { href: '/user/settings', label: 'Settings', icon: GearSix },
       { href: '/user/appearance', label: 'Palette & theme', icon: Palette },
       { href: '/user/api-keys', label: 'API keys', icon: Key },
+      { href: '/user/webhooks', label: 'Webhooks', icon: Broadcast },
       { href: '/user/tickets', label: 'Support', icon: ChatCircleDots },
     ],
   },
@@ -99,6 +106,7 @@ const adminSections: Section[] = [
     title: 'Operations',
     items: [
       { href: '/admin/dashboard', label: 'Dashboard', icon: ChartLineUp, perm: 'viewDashboard' },
+      { href: '/admin/reports', label: 'Reports', icon: ChartBar, perm: 'viewReports' },
       { href: '/admin/orders', label: 'Orders', icon: Package, perm: 'viewImeiOrders' },
       { href: '/admin/wallet', label: 'Top-up requests', icon: Receipt, perm: 'viewWalletTopups' },
       { href: '/admin/payments', label: 'Payment gateways', icon: CurrencyCircleDollar, perm: 'managePaymentGateways' },
@@ -125,6 +133,7 @@ const adminSections: Section[] = [
       { href: '/admin/email', label: 'Email / SMTP', icon: Envelope, perm: 'manageEmailSettings' },
       { href: '/admin/telegram', label: 'Telegram bot', icon: TelegramLogo, perm: 'manageTelegram' },
       { href: '/admin/system', label: 'System & update', icon: ArrowsClockwise, perm: 'manageSystem' },
+      { href: '/admin/backup', label: 'Database backup', icon: Archive, perm: 'manageBackups' },
       { href: '/admin/download-tools', label: 'Download tools', icon: DownloadSimple, perm: 'editCms' },
       { href: '/admin/appearance', label: 'Palette & theme', icon: Palette },
       { href: '/admin/maintenance', label: 'Maintenance mode', icon: Warning, perm: 'editSettings' },
@@ -171,6 +180,7 @@ export function Sidebar({
   user,
   navBadges,
   permissions,
+  brand,
   children,
 }: {
   variant: 'user' | 'admin';
@@ -179,6 +189,8 @@ export function Sidebar({
   navBadges?: Record<string, number>;
   /** Sub-admin permission map (perm key → boolean). Null/undefined = full admin. */
   permissions?: Record<string, boolean> | null;
+  /** White-label brand identity for the sidebar header. */
+  brand?: { siteName: string; logoUrl: string | null };
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -208,6 +220,8 @@ export function Sidebar({
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const [isLg, setIsLg] = React.useState(false);
 
   React.useEffect(() => {
     try {
@@ -217,6 +231,31 @@ export function Sidebar({
       /* ignore */
     }
   }, []);
+
+  React.useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const apply = () => setIsLg(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
+
+  React.useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
+  const closeMobileNav = React.useCallback(() => setMobileNavOpen(false), []);
+
+  const mobileNav = React.useMemo(
+    () => ({
+      open: mobileNavOpen,
+      setOpen: setMobileNavOpen,
+      toggle: () => setMobileNavOpen((v) => !v),
+    }),
+    [mobileNavOpen],
+  );
+
+  const showSidebar = isLg ? sidebarOpen : mobileNavOpen;
 
   const toggleSidebar = React.useCallback(() => {
     setSidebarOpen((prev) => {
@@ -239,33 +278,51 @@ export function Sidebar({
   );
 
   return (
-    <>
+    <SidebarMobileNavProvider value={mobileNav}>
+      {mobileNavOpen && !isLg && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-40 bg-ink/40 lg:hidden"
+          onClick={closeMobileNav}
+        />
+      )}
+
       <aside
         className={cn(
-          'fixed left-0 top-0 z-40 hidden h-screen flex-col border-r border-line bg-paper-50',
+          'fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-line bg-paper-50',
           SIDEBAR_WIDTH_CLASS,
-          'transition-[transform,box-shadow] duration-300 ease-out lg:flex',
-          sidebarOpen
-            ? 'translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.08)]'
+          'transition-[transform,box-shadow] duration-300 ease-out',
+          showSidebar
+            ? 'translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.12)]'
             : '-translate-x-full pointer-events-none shadow-none',
         )}
       >
       {/* Brand */}
-      <div className="border-b border-line px-5 py-5">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-paper">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none">
-              <path
-                d="M5 19V5L19 19V5"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                strokeLinecap="square"
-              />
-            </svg>
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary-400 ring-2 ring-paper-50" />
-          </span>
+      <div className="flex items-center justify-between border-b border-line px-5 py-5">
+        <Link href="/" className="flex min-w-0 flex-1 items-center gap-2" onClick={closeMobileNav}>
+          {brand?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={brand.logoUrl}
+              alt={brand.siteName}
+              className="h-8 w-auto max-w-[140px] object-contain"
+            />
+          ) : (
+            <span className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-paper">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+                <path
+                  d="M5 19V5L19 19V5"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="square"
+                />
+              </svg>
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary-400 ring-2 ring-paper-50" />
+            </span>
+          )}
           <div className="leading-tight">
-            <div className="font-display text-sm font-extrabold text-ink">Nexus Server</div>
+            <div className="font-display text-sm font-extrabold text-ink">{brand?.siteName ?? 'Nexus Server'}</div>
             <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-ink-muted">
               {variant === 'admin' ? (isSubAdmin ? 'Sub-admin · Bureau' : 'Admin · Bureau') : 'Member desk'}
             </div>
@@ -274,6 +331,14 @@ export function Sidebar({
             </div>
           </div>
         </Link>
+        <button
+          type="button"
+          onClick={closeMobileNav}
+          className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-paper-200 hover:text-ink lg:hidden"
+          aria-label="Close menu"
+        >
+          <X size={18} weight="bold" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -317,6 +382,7 @@ export function Sidebar({
                           <Link
                             key={c.href}
                             href={c.href}
+                            onClick={closeMobileNav}
                             className={cn(
                               'group relative flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
                               active
@@ -350,6 +416,7 @@ export function Sidebar({
                 <Link
                   key={it.href}
                   href={it.href}
+                  onClick={closeMobileNav}
                   className={cn(
                     'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                     active
@@ -431,6 +498,6 @@ export function Sidebar({
       >
         {children}
       </div>
-    </>
+    </SidebarMobileNavProvider>
   );
 }

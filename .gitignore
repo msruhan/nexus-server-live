@@ -6,3 +6,7 @@ dev.db
 dev.db-journal
 .DS_Store
 *.log
+
+# Database backups (local dumps)
+/storage/backups
+*.sql.gz

@@ -12,10 +12,12 @@ export function NavbarClient({
   items,
   siteName,
   tagline,
+  logoUrl,
 }: {
   items: Item[];
   siteName: string;
   tagline: string;
+  logoUrl?: string | null;
 }) {
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = React.useState(false);
@@ -38,7 +40,12 @@ export function NavbarClient({
       >
         <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-6 lg:px-10">
           <Link href="/" className="flex items-center gap-2.5">
-            <Logo />
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={siteName} className="h-9 w-auto max-w-[160px] object-contain" />
+            ) : (
+              <Logo />
+            )}
             <div className="hidden flex-col leading-none sm:flex">
               <span className="font-display text-[15px] font-extrabold tracking-tight text-ink">
                 {siteName}

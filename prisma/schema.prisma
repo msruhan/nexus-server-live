@@ -49,6 +49,8 @@ model User {
   priceGroup   PriceGroup? @relation(fields: [priceGroupId], references: [id], onDelete: SetNull)
   paymentIntents PaymentIntent[]
   subAdminPermissions SubAdminPermission?
+  invoices       Invoice[]
+  webhookEndpoints WebhookEndpoint[]
 
   @@index([priceGroupId])
 }
@@ -106,7 +108,10 @@ model SubAdminPermission {
   manageEmailSettings    Boolean @default(false)
   manageTelegram         Boolean @default(false)
   manageSystem           Boolean @default(false)
+  viewReports            Boolean @default(false)
+  manageWebhooks         Boolean @default(false)
   manageSubAdmins        Boolean @default(false)
+  manageBackups          Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -366,6 +371,14 @@ model ImeiOrder {
   comments    String? @db.Text
   referenceId String?
 
+  // ─── Reseller callback (Dhru-compatible, additive) ──────────────
+  // Caller-supplied idempotency key + feedback URL. All optional; when
+  // absent the order behaves exactly as before. quantity defaults to 1.
+  callerReference String?
+  feedbackUrl     String?  @db.Text
+  feedbackStatus  String?  // null | "PENDING" | "SENT" | "FAILED"
+  quantity        Int      @default(1)
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   processedAt DateTime?
@@ -425,6 +438,13 @@ model ServerOrder {
   code           String?           @db.Text
   comments       String?           @db.Text
   referenceId    String?
+
+  // ─── Reseller callback (Dhru-compatible, additive) ──────────────
+  callerReference String?
+  feedbackUrl     String?  @db.Text
+  feedbackStatus  String?  // null | "PENDING" | "SENT" | "FAILED"
+  quantity        Int      @default(1)
+
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   processedAt    DateTime?
@@ -483,6 +503,14 @@ model SiteSettings {
 
   footerText          String?
   copyrightText       String?
+
+  // ─── White-label / branding ────────────────────────────────────
+  // Full rebrand controls. All optional & non-breaking. When
+  // brandShowPoweredBy=true (default) a small "Powered by Nexus Server"
+  // line is shown in the footer; a licensed reseller can turn it off.
+  brandShowPoweredBy  Boolean  @default(true)
+  supportEmail        String?
+  brandInvoicePrefix  String?  // e.g. "INV" → INV-2026-0001 on invoices
 
   enableDarkMode      Boolean  @default(true)
   enableRegistration  Boolean  @default(true)
@@ -573,7 +601,49 @@ model SiteSettings {
   // e.g. "ticket.reply,order.success,payment.credited"
   smtpEvents        String?
 
+  // ─── Database Backups ──────────────────────────────────────────
+  // OPT-IN automated backups. With backupScheduleEnabled=false (default),
+  // no scheduled backups run; admins can still trigger manual backups.
+  backupScheduleEnabled   Boolean @default(false)
+  // Frequency of scheduled backups: "daily" | "weekly" | "monthly".
+  backupFrequency         String  @default("daily")
+  // Hour of day (0-23, server local time) to run scheduled backups.
+  backupHour              Int     @default(3)
+  // How many of the most recent backups to keep. Older ones are pruned.
+  backupRetention         Int     @default(7)
+  // Email the backup file as an attachment after each backup.
+  backupEmailEnabled      Boolean @default(false)
+  // Recipient address. When empty, falls back to smtpFromAddress.
+  backupEmailTo           String?
+  // Bookkeeping for the scheduler.
+  backupLastRunAt         DateTime?
+  backupNextRunAt         DateTime?
+
   updatedAt           DateTime @updatedAt
+}
+
+// History of database backups (manual + scheduled). The dump file lives on
+// disk under BACKUP_DIR; this row tracks metadata + status.
+model DatabaseBackup {
+  id          String   @id @default(cuid())
+  filename    String   // file on disk under BACKUP_DIR
+  sizeBytes   BigInt   @default(0)
+  // "manual" | "daily" | "weekly" | "monthly"
+  trigger     String   @default("manual")
+  // "pending" | "success" | "failed"
+  status      String   @default("pending")
+  error       String?  @db.Text
+  // userId of the admin who triggered a manual backup (null for scheduled).
+  createdBy   String?
+  durationMs  Int?
+  // Email delivery: null = not attempted, otherwise timestamp; emailError set on failure.
+  emailedAt   DateTime?
+  emailError  String?  @db.Text
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([status, startedAt])
+  @@index([trigger, startedAt])
 }
 
 model PageSection {
@@ -893,4 +963,152 @@ model UpdateLog {
   durationSeconds Int?
 
   @@index([appliedAt])
+}
+
+// ─── Invoices / Receipts ────────────────────────────────────────
+//
+// A lightweight, additive billing record. An invoice is created for
+// wallet top-ups (when approved/credited) and, optionally, for orders.
+// It NEVER affects the order or supplier workflow — it is a read model
+// generated alongside existing events. PDF is rendered on-demand.
+//
+// kind:
+//   "TOPUP" → wallet credit (references TopupRequest or PaymentIntent)
+//   "ORDER" → an order purchase (references ImeiOrder / ServerOrder)
+model Invoice {
+  id            String   @id @default(cuid())
+  number        String   @unique // e.g. "INV-2026-000123"
+  userId        String
+  kind          String   @default("TOPUP") // "TOPUP" | "ORDER"
+  status        String   @default("PAID")  // "PAID" | "REFUNDED" | "VOID"
+
+  // Monetary fields (USD, matching wallet currency).
+  amount        Decimal  @db.Decimal(14, 2)
+  currency      String   @default("USD")
+
+  // Human-readable line description, e.g. "Wallet top-up" or service title.
+  description   String
+
+  // Opaque cross-references (NO FK relations — never cascades into orders).
+  refType       String?  // "TopupRequest" | "PaymentIntent" | "ImeiOrder" | "ServerOrder"
+  refId         String?
+  orderCode     String?  // convenience copy for order invoices
+
+  // Snapshot of buyer + seller identity at issue time so historical
+  // invoices stay correct even if branding later changes.
+  sellerName    String?
+  sellerEmail   String?
+  buyerName     String?
+  buyerEmail    String?
+
+  issuedAt      DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, issuedAt])
+  @@index([kind, issuedAt])
+  @@index([refType, refId])
+}
+
+// ─── Outgoing Webhooks (Reseller integration) ──────────────────
+//
+// A reseller registers an endpoint URL to receive PUSH notifications when
+// their order status changes (success / rejected) or a payment is credited.
+// This is OUTBOUND from NexusServer → reseller's own system. It complements
+// the inbound API (REST + Dhru) without touching the order/supplier flow.
+//
+// Delivery is decoupled & idempotent: a background dispatcher scans for
+// pending deliveries and POSTs them. The order workers are NEVER modified.
+model WebhookEndpoint {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String   // human label, e.g. "Production callback"
+  url         String   @db.Text // HTTPS endpoint (validated, no private IPs)
+  secret      String   @db.Text // HMAC-SHA256 signing secret (shown once)
+  isActive    Boolean  @default(true)
+
+  // Comma-separated allow-list of subscribed events.
+  // Empty/null = all events. e.g. "order.success,order.rejected"
+  events      String?
+
+  // Health snapshot (updated by dispatcher).
+  lastStatus    String?   // "success" | "failed"
+  lastDeliveryAt DateTime?
+  failureCount  Int       @default(0) // consecutive failures; auto-pause threshold
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([userId, isActive])
+}
+
+model WebhookDelivery {
+  id          String   @id @default(cuid())
+  endpointId  String
+  event       String   // "order.success" | "order.rejected" | "payment.credited"
+  status      String   @default("PENDING") // "PENDING" | "SUCCESS" | "FAILED"
+
+  // The exact JSON body that was (or will be) sent.
+  payload     String   @db.Text
+
+  // Idempotency / dedup tag so the same (endpoint, event, ref) is queued once.
+  refType     String?  // "ImeiOrder" | "ServerOrder" | "PaymentIntent"
+  refId       String?
+
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5)
+  nextAttemptAt DateTime @default(now())
+
+  responseCode Int?
+  responseBody String?  @db.Text
+  error        String?  @db.Text
+
+  deliveredAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+  @@unique([endpointId, event, refType, refId])
+}
+
+// ─── Per-order Feedback Callback (Dhru-compatible) ──────────────
+//
+// When an inbound order is placed with a `feedback_url` (Dhru Fusion Pro
+// style), we record a delivery here and POST the status change to that URL
+// when the order completes. Fully decoupled from the supplier workers —
+// a background notifier scans completed orders and enqueues deliveries,
+// then the dispatcher sends them with retry/backoff. Never blocks ordering.
+model FeedbackDelivery {
+  id          String   @id @default(cuid())
+  orderKind   String   // "imei" | "server"
+  orderId     String   // ImeiOrder.id or ServerOrder.id (opaque, no FK)
+  url         String   @db.Text
+  callerRef   String?  // caller-supplied reference_id (echoed back)
+
+  status      String   @default("PENDING") // "PENDING" | "SUCCESS" | "FAILED"
+  payload     String   @db.Text // exact JSON body to POST
+
+  attempts      Int      @default(0)
+  maxAttempts   Int      @default(5)
+  nextAttemptAt DateTime @default(now())
+
+  responseCode Int?
+  responseBody String?  @db.Text
+  error        String?  @db.Text
+
+  deliveredAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // One feedback per (orderKind, orderId, status) so a SUCCESS and a later
+  // REJECTED don't collide, but the same final event isn't queued twice.
+  @@unique([orderKind, orderId, status])
+  @@index([status, nextAttemptAt])
 }

@@ -4,10 +4,13 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { MobileBar } from '@/components/dashboard/MobileBar';
+import { LicenseBanner } from '@/components/dashboard/LicenseBanner';
 import { AccountThemeShell } from '@/components/appearance/AccountThemeShell';
 import { getAdminNavBadges } from '@/lib/admin-nav-badges';
 import { getPermissions } from '@/lib/sub-admin';
 import { resolveRoutePermission } from '@/lib/admin-route-permissions';
+import { getBranding } from '@/lib/branding';
+import { revalidateIfStale } from '@/lib/license/client';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -20,8 +23,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // still see the warning + setup link without recursing into a redirect loop.
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
-    select: { enforceAdmin2FA: true },
+    select: { enforceAdmin2FA: true, licenseStatus: true, licenseReason: true },
   });
+
+  // Lazy, non-blocking license freshness check. If the last successful
+  // validation is stale (>15 min), re-check with the License Server in the
+  // background so a vendor-side revoke surfaces across the dashboard.
+  void revalidateIfStale();
 
   if (settings?.enforceAdmin2FA) {
     const fresh = await prisma.user.findUnique({
@@ -62,6 +70,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   const navBadges = await getAdminNavBadges();
+  const brand = await getBranding();
 
   return (
     <AccountThemeShell userId={session.user.id}>
@@ -70,8 +79,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         user={userInfo}
         navBadges={navBadges}
         permissions={permissions as Record<string, boolean> | null}
+        brand={{ siteName: brand.siteName, logoUrl: brand.logoUrl }}
       >
         <MobileBar user={userInfo} />
+        <LicenseBanner
+          status={settings?.licenseStatus ?? 'not_activated'}
+          reason={settings?.licenseReason ?? null}
+        />
         <main className="flex-1 px-4 py-8 sm:px-8 lg:px-12 lg:py-12">{children}</main>
       </Sidebar>
     </AccountThemeShell>

@@ -23,6 +23,7 @@ Dokumen ini menjelaskan cara **mengelola koneksi API supplier**, **sinkronisasi 
 11. [Referensi endpoint lengkap](#11-referensi-endpoint-lengkap)
 12. [Menerapkan di proyek lain](#12-menerapkan-di-proyek-lain)
 13. [Troubleshooting](#13-troubleshooting)
+14. [Feedback callback per-order (Dhru-compatible)](#14-feedback-callback-per-order-dhru-compatible)
 
 ---
 
@@ -889,6 +890,56 @@ Jika proyek lain **bukan** browser tapi backend service:
 - `docs/PRD-IMEI-SERVER-SERVICES.md` — PRD lengkap & spesifikasi Dhru mentah
 - `docs/functional-tests/07-imei.md`, `08-server.md` — skenario uji
 - `docs/security-hardening/PRODUCTION-READINESS.md` — checklist production
+
+---
+
+## 14. Feedback callback per-order (Dhru-compatible)
+
+Fitur **opsional & additive** yang setara dengan `feedback_url` pada DhruFusion Pro. Ketika sebuah order masuk disertai `feedback_url`, NexusServer akan **POST notifikasi perubahan status** ke URL tersebut saat order selesai (`SUCCESS`/`REJECTED`). Tidak diset = perilaku lama persis (tidak ada callback).
+
+Ini **berbeda** dari Webhook Outgoing per-reseller (HMAC-signed, dikonfigurasi di `/user/webhooks`). Feedback callback bersifat **per-order** dan ditentukan oleh pemanggil saat membuat order — cocok untuk integrasi gaya Dhru Pro.
+
+### 14.1 Field input (semua opsional)
+
+Diterima di ketiga endpoint order (`POST /api/index.php`, `POST /api/public/v1/orders/imei`, `POST /api/public/v1/orders/server`). Penamaan fleksibel — snake_case (Dhru), camelCase, atau UPPERCASE param Classic.
+
+| Field | Alias diterima | Keterangan |
+|-------|----------------|------------|
+| `feedback_url` | `feedbackUrl`, `FEEDBACK_URL`, `callback_url` | URL callback. Divalidasi SSRF (HTTPS publik; localhost hanya di dev). URL invalid **diabaikan** — order tetap dibuat. |
+| `reference_id` | `referenceId`, `REFERENCE_ID`, `customreference` | Kunci idempotensi pemanggil, di-echo balik. |
+| `quantity` | `Quantity`, `QNT` | Default `1`. |
+
+Pada Classic (`/api/index.php`), field ini bisa dikirim sebagai parameter top-level **atau** di dalam `CUSTOMFIELD` (base64 JSON). `reference_id` di-echo di respons sebagai `CUSTOMREFERENCE`.
+
+### 14.2 Payload callback
+
+Saat order selesai, NexusServer mengirim `POST` JSON ke `feedback_url`:
+
+```json
+{
+  "reference_id": "REF-123",
+  "order_id": "cmps3ujps00016jt32r8ngvar",
+  "status": "success",
+  "replay": "VU5MT0NLLUNPREUtWFla"
+}
+```
+
+- `reference_id` — nilai dari pemanggil (atau `order_id` bila tidak diisi).
+- `order_id` — id order NexusServer (yang dipakai untuk poll status).
+- `status` — `"success"` atau `"rejected"`.
+- `replay` — **base64** dari `code` hasil (atau `comments` bila code kosong). Decode untuk mendapat kode unlock.
+
+### 14.3 Pengiriman & retry
+
+- Antrian `FeedbackDelivery` (decoupled dari supplier worker — tidak pernah memblok order).
+- Di-enqueue oleh notifier yang memindai order baru selesai (lookback 30 menit), **idempoten** (unique `[orderKind, orderId, status]`).
+- Dispatch dijalankan bersama cron/scheduler webhook (`/api/cron/webhooks` + in-process scheduler).
+- Retry backoff: 1, 5, 15, 30, 60 menit (maks 5 percobaan), timeout 10s, `redirect: error`.
+- Status tercermin di kolom `feedbackStatus` order: `PENDING` → `SENT`/`FAILED`.
+
+### 14.4 `replay` pada poll status
+
+Aksi Classic `getimeiorder` kini juga mengembalikan field `replay` (base64 code) selain `CODE`/`COMMENTS` — untuk paritas penuh dengan klien Dhru. Field lama tetap ada (backward-compatible).
 
 ---
 

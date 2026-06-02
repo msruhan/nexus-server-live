@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   // Verify license is active
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
-    select: { licenseKey: true, licenseStatus: true },
+    select: { licenseKey: true, licenseStatus: true, licenseDomain: true },
   });
   if (settings?.licenseStatus !== 'active' || !settings.licenseKey) {
     return NextResponse.json({ error: 'Active license required to apply updates' }, { status: 403 });
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     targetVersion,
     checksum: checksum ?? null,
     licenseKey: settings.licenseKey,
+    licenseDomain: settings.licenseDomain,
   });
 
   return NextResponse.json({ ok: true, message: 'Update started' });

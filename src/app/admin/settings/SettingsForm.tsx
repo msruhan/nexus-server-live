@@ -10,6 +10,12 @@ type Initial = {
   siteName: string;
   siteTagline: string;
   primaryColor: string;
+  logoUrl: string;
+  faviconUrl: string;
+  supportEmail: string;
+  brandShowPoweredBy: boolean;
+  brandInvoicePrefix: string;
+  copyrightText: string;
   enableRegistration: boolean;
   enableDirectPayment: boolean;
   maintenanceMode: boolean;
@@ -27,9 +33,33 @@ export function SettingsForm({ initial }: { initial: Initial }) {
   const router = useRouter();
   const [loading, setLoading] = React.useState(false);
   const [state, setState] = React.useState(initial);
+  const [uploadingLogo, setUploadingLogo] = React.useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = React.useState(false);
 
   function patch<K extends keyof Initial>(k: K, v: Initial[K]) {
     setState((s) => ({ ...s, [k]: v }));
+  }
+
+  async function uploadBrandAsset(kind: 'logo' | 'favicon', file: File) {
+    const setBusy = kind === 'logo' ? setUploadingLogo : setUploadingFavicon;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('kind', kind);
+      const res = await fetch('/api/admin/branding/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        toast.error(data.error ?? 'Upload failed');
+        return;
+      }
+      patch(kind === 'logo' ? 'logoUrl' : 'faviconUrl', data.url);
+      toast.success(`${kind === 'logo' ? 'Logo' : 'Favicon'} uploaded`);
+    } catch {
+      toast.error('Upload failed');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -73,6 +103,122 @@ export function SettingsForm({ initial }: { initial: Initial }) {
                 style={{ background: state.primaryColor }}
               />
             }
+          />
+          <Input
+            label="Support email"
+            value={state.supportEmail}
+            onChange={(e) => patch('supportEmail', e.target.value)}
+            placeholder="support@yourbrand.com"
+          />
+        </div>
+      </Card>
+
+      <Card title="White-label">
+        <p className="-mt-1 mb-5 font-serif text-sm italic text-ink-muted">
+          Make the platform fully your own. Upload a logo and favicon, set your invoice prefix, and
+          optionally hide the &ldquo;Powered by&rdquo; credit.
+        </p>
+        <div className="space-y-6">
+          {/* Logo */}
+          <div className="flex items-center gap-5">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-paper">
+              {state.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={state.logoUrl} alt="Logo" className="max-h-14 max-w-14 object-contain" />
+              ) : (
+                <span className="font-mono text-[9px] uppercase text-ink-soft">No logo</span>
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-medium text-ink">Logo</div>
+              <div className="font-serif text-xs italic text-ink-muted">
+                PNG / SVG, transparent background recommended.
+              </div>
+              <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:border-ink">
+                {uploadingLogo ? 'Uploading…' : 'Upload logo'}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  className="hidden"
+                  disabled={uploadingLogo}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadBrandAsset('logo', f);
+                  }}
+                />
+              </label>
+              {state.logoUrl && (
+                <button
+                  type="button"
+                  onClick={() => patch('logoUrl', '')}
+                  className="ml-2 text-xs font-medium text-red-600 hover:underline"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Favicon */}
+          <div className="flex items-center gap-5">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-paper">
+              {state.faviconUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={state.faviconUrl} alt="Favicon" className="max-h-10 max-w-10 object-contain" />
+              ) : (
+                <span className="font-mono text-[9px] uppercase text-ink-soft">No icon</span>
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-medium text-ink">Favicon</div>
+              <div className="font-serif text-xs italic text-ink-muted">
+                Square PNG, 64×64 or larger.
+              </div>
+              <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:border-ink">
+                {uploadingFavicon ? 'Uploading…' : 'Upload favicon'}
+                <input
+                  type="file"
+                  accept="image/png,image/x-icon,image/svg+xml"
+                  className="hidden"
+                  disabled={uploadingFavicon}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadBrandAsset('favicon', f);
+                  }}
+                />
+              </label>
+              {state.faviconUrl && (
+                <button
+                  type="button"
+                  onClick={() => patch('faviconUrl', '')}
+                  className="ml-2 text-xs font-medium text-red-600 hover:underline"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Input
+              label="Invoice number prefix"
+              value={state.brandInvoicePrefix}
+              onChange={(e) => patch('brandInvoicePrefix', e.target.value.toUpperCase())}
+              placeholder="INV"
+            />
+            <Input
+              label="Copyright line (footer)"
+              value={state.copyrightText}
+              onChange={(e) => patch('copyrightText', e.target.value)}
+              placeholder="© 2026 Your Brand"
+            />
+          </div>
+
+          <Toggle
+            label='Show "Powered by Nexus Server"'
+            description="Turn off to fully white-label the footer credit."
+            checked={state.brandShowPoweredBy}
+            onChange={(v) => patch('brandShowPoweredBy', v)}
           />
         </div>
       </Card>

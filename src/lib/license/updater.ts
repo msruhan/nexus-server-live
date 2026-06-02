@@ -22,6 +22,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { prisma } from '@/lib/db';
 import { getCurrentVersion } from './client';
+import { portalPost, resolveLicenseDomain } from './portal-request';
 import type { UpdateProgress } from './types';
 
 const execAsync = promisify(execCb);
@@ -73,6 +74,7 @@ export async function applyUpdate(input: {
   targetVersion: string;
   checksum: string | null;
   licenseKey: string;
+  licenseDomain: string | null;
 }): Promise<void> {
   if (updateInProgress) return;
   updateInProgress = true;
@@ -87,12 +89,19 @@ export async function applyUpdate(input: {
     const zipPath = path.join(UPDATE_DIR, `nexus-${input.targetVersion}.zip`);
     fs.mkdirSync(UPDATE_DIR, { recursive: true });
 
-    const res = await fetch(input.downloadUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: input.licenseKey }),
-    });
-    if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
+    const domain = resolveLicenseDomain(input.licenseDomain);
+    if (!domain) throw new Error('License domain not configured');
+
+    const res = await portalPost(
+      input.downloadUrl,
+      { key: input.licenseKey, domain },
+      120_000,
+    );
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      const msg = (errBody as { error?: string }).error ?? `HTTP ${res.status}`;
+      throw new Error(`Download failed: ${msg}`);
+    }
 
     const buffer = Buffer.from(await res.arrayBuffer());
     fs.writeFileSync(zipPath, buffer);

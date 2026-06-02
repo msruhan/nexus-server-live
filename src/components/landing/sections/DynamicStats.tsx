@@ -5,9 +5,86 @@ import { Reveal } from '@/components/ui/Reveal';
 
 type Item = { label: string; value: string; note?: string };
 
-export function DynamicStats({ content }: { content: Record<string, unknown> }) {
+export function DynamicStats({
+  content,
+  variant,
+}: {
+  content: Record<string, unknown>;
+  variant?: string | null;
+}) {
   const items = (content.items as Item[]) ?? [];
+  const layout = variant ?? 'horizontal';
 
+  // Grid variant: bordered cards in a responsive grid.
+  if (layout === 'grid') {
+    return (
+      <section className="border-y border-line bg-paper-100">
+        <div className="mx-auto max-w-[1400px] px-6 py-20 lg:px-10 lg:py-28">
+          <Reveal className="mb-12">
+            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-muted">
+              The numbers
+            </span>
+          </Reveal>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {items.map((s, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-30px' }}
+                transition={{ delay: i * 0.06, duration: 0.5 }}
+                className="rounded-2xl border border-line bg-paper-50 p-6"
+              >
+                <div className="font-display text-[clamp(2.2rem,4vw,3.2rem)] font-black leading-none tracking-tightest text-ink">
+                  {s.value}
+                </div>
+                <div className="mt-4 font-display text-base font-bold text-ink">{s.label}</div>
+                {s.note && <div className="mt-1 text-[13px] text-ink-muted">{s.note}</div>}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Big-number variant: first stat oversized, rest stacked beside it.
+  if (layout === 'big-number') {
+    const [first, ...rest] = items;
+    return (
+      <section className="border-y border-line bg-paper-100">
+        <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-12 px-6 py-20 lg:grid-cols-2 lg:px-10 lg:py-28">
+          {first && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <div className="font-display text-[clamp(4rem,12vw,9rem)] font-black leading-none tracking-tightest text-ink">
+                {first.value}
+              </div>
+              <div className="mt-5 font-display text-xl font-bold text-ink">{first.label}</div>
+              {first.note && <div className="mt-2 max-w-sm text-ink-muted">{first.note}</div>}
+            </motion.div>
+          )}
+          <div className="grid grid-cols-1 gap-px self-center overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-2">
+            {rest.map((s, i) => (
+              <div key={i} className="bg-paper-50 p-6">
+                <div className="font-display text-3xl font-black tracking-tightest text-ink">
+                  {s.value}
+                </div>
+                <div className="mt-3 font-display text-sm font-bold text-ink">{s.label}</div>
+                {s.note && <div className="mt-1 text-xs text-ink-muted">{s.note}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Default: original horizontal divided row.
   return (
     <section className="border-y border-line bg-paper-100">
       <div className="mx-auto max-w-[1400px] px-6 py-20 lg:px-10 lg:py-28">

@@ -172,8 +172,13 @@ export async function Footer() {
       </div>
 
       <div className="border-t border-line">
-        <div className="mx-auto max-w-[1400px] px-6 py-6 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted lg:px-10">
-          {copyright}
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-1 px-6 py-6 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted sm:flex-row sm:items-center sm:justify-between lg:px-10">
+          <span>{copyright}</span>
+          {settings?.brandShowPoweredBy !== false && (
+            <span className="text-ink-soft">
+              Powered by Nexus Server
+            </span>
+          )}
         </div>
       </div>
     </footer>

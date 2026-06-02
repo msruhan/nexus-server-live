@@ -3,10 +3,14 @@
  */
 import { startImeiOrderScheduler } from '@/lib/imei-order-scheduler';
 import { startServerOrderScheduler } from '@/lib/server-order-scheduler';
+import { startWebhookScheduler } from '@/lib/webhook/scheduler';
+import { startLicenseScheduler } from '@/lib/license/scheduler';
+import { startBackupScheduler } from '@/lib/backup/scheduler';
 
 export function startOrderSchedulers(): void {
   startImeiOrderScheduler();
   startServerOrderScheduler();
+  startWebhookScheduler();
+  startLicenseScheduler();
+  startBackupScheduler();
 }
-
-startOrderSchedulers();

@@ -31,6 +31,7 @@ const ROUTE_PERMISSIONS: Array<{ prefix: string; perm: PermissionKey }> = [
   { prefix: '/admin/email', perm: 'manageEmailSettings' },
   { prefix: '/admin/telegram', perm: 'manageTelegram' },
   { prefix: '/admin/system', perm: 'manageSystem' },
+  { prefix: '/admin/backup', perm: 'manageBackups' },
   { prefix: '/admin/download-tools', perm: 'editCms' },
   { prefix: '/admin/maintenance', perm: 'editSettings' },
   { prefix: '/admin/settings', perm: 'viewSettings' },
@@ -52,6 +53,7 @@ const ROUTE_PERMISSIONS: Array<{ prefix: string; perm: PermissionKey }> = [
   { prefix: '/admin/cms', perm: 'viewCms' },
 
   // Dashboard
+  { prefix: '/admin/reports', perm: 'viewReports' },
   { prefix: '/admin/dashboard', perm: 'viewDashboard' },
 ];
 

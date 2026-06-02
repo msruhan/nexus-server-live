@@ -15,6 +15,8 @@ import { DynamicFeatures } from './sections/DynamicFeatures';
 import { CustomHtmlSection } from './sections/CustomHtmlSection';
 import { Spacer } from './sections/Spacer';
 import { BannerSlider } from './sections/BannerSlider';
+import { SectionFrame } from './SectionFrame';
+import { resolveSettings } from '@/lib/cms-style';
 import { renderMarkdown } from '@/lib/markdown';
 
 type StoredSection = {
@@ -56,9 +58,24 @@ export async function SectionRenderer({ sections }: { sections: StoredSection[] 
     <>
       {sections.map((s) => {
         const content = parseJson<Record<string, unknown>>(s.content, {});
+        const { style, variant } = resolveSettings(s.settings, s.sectionType);
         const key = `${s.sectionType}-${s.id}`;
-        const node = renderSection(s.sectionType, key, content, { faq, testimonials, banners });
-        if (!node) return null;
+        const inner = renderSection(s.sectionType, key, content, variant, {
+          faq,
+          testimonials,
+          banners,
+        });
+        if (!inner) return null;
+
+        // Apply per-section visual style. SectionFrame is a zero-overhead
+        // pass-through when the style is the per-type default, so existing
+        // sections render exactly as before.
+        const node = (
+          <SectionFrame key={key} style={style} sectionType={s.sectionType}>
+            {inner}
+          </SectionFrame>
+        );
+
         // If section is hidden, wrap with low-opacity + label badge so admins see it in preview.
         if (s.isVisible === false) {
           return (
@@ -93,25 +110,26 @@ function renderSection(
   sectionType: string,
   key: string,
   content: Record<string, unknown>,
+  variant: string | null,
   shared: Shared,
 ): React.ReactNode {
   const { faq, testimonials, banners } = shared;
   switch (sectionType) {
     case 'hero':
       return Object.keys(content).length > 0 ? (
-        <DynamicHero key={key} content={content} />
+        <DynamicHero key={key} content={content} variant={variant} />
       ) : (
         <Hero key={key} />
       );
     case 'stats':
       return Object.keys(content).length > 0 ? (
-        <DynamicStats key={key} content={content} />
+        <DynamicStats key={key} content={content} variant={variant} />
       ) : (
         <DefaultStats key={key} />
       );
     case 'features':
       return Object.keys(content).length > 0 ? (
-        <DynamicFeatures key={key} content={content} />
+        <DynamicFeatures key={key} content={content} variant={variant} />
       ) : (
         <Bento key={key} />
       );
@@ -162,7 +180,7 @@ function renderSection(
     }
     case 'cta':
       return Object.keys(content).length > 0 ? (
-        <DynamicCta key={key} content={content} />
+        <DynamicCta key={key} content={content} variant={variant} />
       ) : (
         <DefaultCta key={key} />
       );

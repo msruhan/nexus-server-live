@@ -14,6 +14,11 @@ export type LicenseInfo = {
   reason?: string; // if inactive, why
 };
 
+export type DeactivateLicenseResult =
+  | { ok: true; remote: true }
+  | { ok: true; remote: false; warning: string }
+  | { ok: false; error: string };
+
 export type UpdateInfo = {
   available: boolean;
   currentVersion: string;

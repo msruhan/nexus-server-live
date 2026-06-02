@@ -7,6 +7,7 @@ import { scheduleServerOrderFollowUp } from '@/lib/server-order-scheduler';
 import { parseServerFieldDefs, validateServerOrderFields } from '@/lib/server-fields';
 import { getClientIp } from '@/lib/ip-utils';
 import { generateOrderCode } from '@/lib/generate-order-code';
+import { extractFeedbackInput } from '@/lib/feedback/input';
 import {
   clearFailureCounter,
   consumeRateBuckets,
@@ -202,7 +203,14 @@ async function buildClassicServerListPayload() {
       list[groupKey] = { GROUPNAME: boxName, GROUPTYPE: 'SERVER', SERVICES: {} };
     }
     const fieldDefs = parseServerFieldDefs(svc.requiredFields);
-    const requiresCustom = fieldDefs.map((f) => ({ fieldname: f.key }));
+    const requiresCustom = fieldDefs.map((f) => ({
+      fieldname: f.key,
+      // Structured field metadata (Dhru parity, additive — old `fieldname`
+      // key preserved so existing parsers keep working).
+      label: f.label,
+      type: f.type,
+      required: f.required ? 1 : 0,
+    }));
 
     list[groupKey].SERVICES[String(svc.id)] = {
       SERVICEID: String(svc.id),
@@ -252,6 +260,10 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
   const custom = decodeCustomField(params.CUSTOMFIELD);
   const merged = { ...params, ...custom };
   const serial = String(merged.SN ?? merged.SERIALNUMBER ?? '').trim();
+
+  // Optional Dhru-compatible callback inputs (SSRF-validated, additive).
+  // Drawn from top-level params and/or the decoded CUSTOMFIELD payload.
+  const feedback = extractFeedbackInput(merged);
 
   const imeiSvc = await prisma.imeiService.findFirst({
     where: { id: serviceId, status: 'ACTIVE' },
@@ -308,6 +320,10 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
           mep: merged.MEP ?? null,
           prd: merged.PRD ?? null,
           serialNumber: serial || null,
+          // Dhru-compatible callback (all optional; defaults preserve old behavior).
+          callerReference: feedback.callerReference,
+          feedbackUrl: feedback.feedbackUrl,
+          quantity: feedback.quantity,
         },
       });
 
@@ -337,7 +353,12 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
       console.error('[DHRU_SUPPLIER_PLACE_IMEI_SUBMIT]', e);
     }
 
-    return ok({ REFERENCEID: order.id, STATUS: 'Pending', MESSAGE: 'Order submitted' });
+    return ok({
+      REFERENCEID: order.id,
+      STATUS: 'Pending',
+      MESSAGE: 'Order submitted',
+      ...(feedback.callerReference ? { CUSTOMREFERENCE: feedback.callerReference } : {}),
+    });
   }
 
   const srvSvc = await prisma.serverService.findFirst({
@@ -385,6 +406,10 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
         notes: validation.notes,
         requiredFields:
           Object.keys(validation.fields).length > 0 ? JSON.stringify(validation.fields) : null,
+        // Dhru-compatible callback (all optional; defaults preserve old behavior).
+        callerReference: feedback.callerReference,
+        feedbackUrl: feedback.feedbackUrl,
+        quantity: feedback.quantity,
       },
     });
 
@@ -414,7 +439,12 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
     console.error('[DHRU_SUPPLIER_PLACE_SERVER_SUBMIT]', e);
   }
 
-  return ok({ REFERENCEID: order.id, STATUS: 'Pending', MESSAGE: 'Order submitted' });
+  return ok({
+    REFERENCEID: order.id,
+    STATUS: 'Pending',
+    MESSAGE: 'Order submitted',
+    ...(feedback.callerReference ? { CUSTOMREFERENCE: feedback.callerReference } : {}),
+  });
 }
 
 async function getImeiStyleOrderStatus(params: Record<string, string>): Promise<Response> {
@@ -428,6 +458,11 @@ async function getImeiStyleOrderStatus(params: Record<string, string>): Promise<
       STATUS: asDhruStatus(imeiOrder.status),
       CODE: imeiOrder.code ?? '',
       COMMENTS: imeiOrder.comments ?? '',
+      // Dhru `replay` parity — base64 of the result code (or comments).
+      replay: Buffer.from(
+        (imeiOrder.code && imeiOrder.code.trim() ? imeiOrder.code : imeiOrder.comments) ?? '',
+        'utf8',
+      ).toString('base64'),
     });
   }
 
@@ -438,6 +473,10 @@ async function getImeiStyleOrderStatus(params: Record<string, string>): Promise<
       STATUS: asDhruStatus(serverOrder.status),
       CODE: serverOrder.code ?? '',
       COMMENTS: serverOrder.comments ?? '',
+      replay: Buffer.from(
+        (serverOrder.code && serverOrder.code.trim() ? serverOrder.code : serverOrder.comments) ?? '',
+        'utf8',
+      ).toString('base64'),
     });
   }
 

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/imei-orders",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/webhooks",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

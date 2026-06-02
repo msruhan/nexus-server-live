@@ -170,7 +170,7 @@ export async function sendEmail(msg: EmailMessage): Promise<{ ok: boolean; logId
     return { ok: false, logId: log?.id ?? null, reason: 'smtp_disabled' };
   }
 
-  if (!eventAllowed(msg.event, cfg.events)) {
+  if (!eventAllowed(msg.event, cfg.events) && !msg.force) {
     if (log) {
       await prisma.emailLog
         .update({
@@ -190,6 +190,12 @@ export async function sendEmail(msg: EmailMessage): Promise<{ ok: boolean; logId
     subject: msg.subject,
     text: msg.text,
     html: msg.html,
+    attachments: msg.attachments?.map((a) => ({
+      filename: a.filename,
+      path: a.path,
+      content: a.content,
+      contentType: a.contentType,
+    })),
   };
 
   try {

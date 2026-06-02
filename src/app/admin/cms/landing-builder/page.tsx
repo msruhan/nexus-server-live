@@ -22,6 +22,7 @@ export default async function LandingBuilderPage() {
         title: s.title,
         subtitle: s.subtitle,
         content: safeJson(s.content),
+        settings: safeJson(s.settings),
         isVisible: s.isVisible,
       }))}
     />

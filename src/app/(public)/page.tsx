@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { isPrismaSchemaMissing } from '@/lib/site-settings-safe';
 import { SectionRenderer } from '@/components/landing/SectionRenderer';
 import { Hero } from '@/components/landing/Hero';
 import { Catalog } from '@/components/landing/Catalog';
@@ -15,10 +16,15 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage() {
   // If admin has authored sections, the CMS drives the page.
   // Otherwise we render the curated editorial default.
-  const sections = await prisma.pageSection.findMany({
-    where: { pageSlug: 'home', isVisible: true },
-    orderBy: { sortOrder: 'asc' },
-  });
+  let sections: Awaited<ReturnType<typeof prisma.pageSection.findMany>> = [];
+  try {
+    sections = await prisma.pageSection.findMany({
+      where: { pageSlug: 'home', isVisible: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+  } catch (error) {
+    if (!isPrismaSchemaMissing(error)) throw error;
+  }
 
   if (sections.length > 0) {
     return <SectionRenderer sections={sections} />;
