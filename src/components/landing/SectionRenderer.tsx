@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/db';
 import { Hero } from './Hero';
 import { Catalog } from './Catalog';
-import { Method } from './Method';
+import { HowToOrder } from './HowToOrder';
+import type { HowToOrderContent } from '@/lib/cms-types';
 import { Stats as DefaultStats } from './Stats';
 import { Bento } from './Bento';
 import { Voices } from './Voices';
@@ -15,6 +16,7 @@ import { DynamicFeatures } from './sections/DynamicFeatures';
 import { CustomHtmlSection } from './sections/CustomHtmlSection';
 import { Spacer } from './sections/Spacer';
 import { BannerSlider } from './sections/BannerSlider';
+import { Ticker } from './Ticker';
 import { SectionFrame } from './SectionFrame';
 import { resolveSettings } from '@/lib/cms-style';
 import { renderMarkdown } from '@/lib/markdown';
@@ -187,9 +189,12 @@ function renderSection(
     case 'partners':
       return <Partners key={key} />;
     case 'running_ads':
-      return null;
+      return <Ticker key={key} />;
+    case 'how_to_order':
     case 'method':
-      return <Method key={key} />;
+      return (
+        <HowToOrder key={key} content={content as HowToOrderContent} />
+      );
     case 'custom_html':
       return <CustomHtmlSection key={key} html={(content.html as string) ?? ''} />;
     case 'spacer':

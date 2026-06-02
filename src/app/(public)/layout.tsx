@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getSiteSettingsSafe } from '@/lib/site-settings-safe';
 import { auth } from '@/auth';
-import { Ticker } from '@/components/landing/Ticker';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { ScrollProgress } from '@/components/landing/ScrollProgress';
@@ -10,7 +9,7 @@ import { ScrollProgress } from '@/components/landing/ScrollProgress';
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettingsSafe();
   return {
-    title: settings?.metaTitle ?? `${settings?.siteName ?? 'Nexus Server'} — ${settings?.siteTagline ?? 'IMEI & Server Bureau'}`,
+    title: settings?.metaTitle ?? `${settings?.siteName ?? 'Nexus Server'} — ${settings?.siteTagline ?? 'Unlock Service Portal'}`,
     description: settings?.metaDescription ?? undefined,
   };
 }
@@ -28,7 +27,6 @@ export default async function PublicLayout({ children }: { children: React.React
   return (
     <main className="relative">
       <ScrollProgress />
-      <Ticker />
       <Navbar />
       {children}
       <Footer />

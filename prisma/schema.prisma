@@ -50,6 +50,7 @@ model User {
   supportTickets SupportTicket[]
   priceGroup   PriceGroup? @relation(fields: [priceGroupId], references: [id], onDelete: SetNull)
   paymentIntents PaymentIntent[]
+  marketplaceCheckouts MarketplaceCheckout[]
   subAdminPermissions SubAdminPermission?
   invoices       Invoice[]
   webhookEndpoints WebhookEndpoint[]
@@ -311,6 +312,9 @@ model ImeiServiceGroup {
   id          String   @id @default(cuid())
   title       String
   description String?  @db.Text
+  imageUrl    String?
+  marketplaceVisible Boolean @default(true)
+  featured    Boolean  @default(false)
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -395,11 +399,15 @@ model ImeiOrder {
 }
 
 model ServerServiceBox {
-  id        String   @id @default(cuid())
-  title     String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  imageUrl    String?
+  marketplaceVisible Boolean @default(true)
+  featured    Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   services ServerService[]
 }
@@ -848,10 +856,37 @@ model PaymentIntent {
   updatedAt       DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketplaceCheckout MarketplaceCheckout?
 
   @@index([userId, status])
   @@index([gateway, status])
   @@index([status, expiresAt])
+}
+
+model MarketplaceCheckout {
+  id              String   @id @default(cuid())
+  token           String   @unique
+  kind            String   // "imei" | "server"
+  userId          String
+  serviceId       String
+  email           String
+  gateway         String
+  quotedAmount    Decimal  @db.Decimal(14, 2)
+  payload         String   @db.Text // JSON payload for order fields
+  status          String   @default("AWAITING_PAYMENT") // AWAITING_PAYMENT | PROCESSING | COMPLETED | FAILED
+  paymentIntentId String?  @unique
+  orderType       String?  // "imei" | "server"
+  orderId         String?
+  errorMessage    String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentIntent PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([kind, serviceId, status])
+  @@index([status, createdAt])
 }
 
 // Audit + retry queue for outbound email. Sends are best-effort: a row

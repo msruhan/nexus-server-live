@@ -25,7 +25,9 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const intentId = url.searchParams.get('intent') ?? '';
   const paypalOrderId = url.searchParams.get('token') ?? undefined;
-  const wallet = new URL('/user/wallet', url.origin);
+  const next = url.searchParams.get('next');
+  const nextSafe = next && next.startsWith('/') ? next : null;
+  const wallet = new URL(nextSafe ?? '/user/wallet', url.origin);
 
   if (!intentId) return bounceTo(wallet, 'failed', 'missing_intent');
 

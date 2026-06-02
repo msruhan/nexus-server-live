@@ -18,10 +18,16 @@ type Menu = {
   isVisible: boolean;
 };
 
+type PageOption = {
+  id: string;
+  label: string;
+  href: string;
+};
+
 const LOCATIONS = ['header', 'footer', 'mobile_bottom', 'sidebar'] as const;
 type Location = (typeof LOCATIONS)[number];
 
-export function MenuManager({ initial }: { initial: Menu[] }) {
+export function MenuManager({ initial, pageOptions }: { initial: Menu[]; pageOptions: PageOption[] }) {
   const router = useRouter();
   const [items, setItems] = React.useState(initial);
   const [tab, setTab] = React.useState<Location>('header');
@@ -137,6 +143,7 @@ export function MenuManager({ initial }: { initial: Menu[] }) {
         <MenuForm
           item={editing === 'new' ? null : editing}
           defaultLocation={tab}
+          pageOptions={pageOptions}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -151,18 +158,25 @@ export function MenuManager({ initial }: { initial: Menu[] }) {
 function MenuForm({
   item,
   defaultLocation,
+  pageOptions,
   onClose,
   onSaved,
 }: {
   item: Menu | null;
   defaultLocation: Location;
+  pageOptions: PageOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const initialPage = React.useMemo(
+    () => pageOptions.find((p) => p.href === (item?.href ?? ''))?.id ?? '',
+    [item?.href, pageOptions],
+  );
   const [state, setState] = React.useState({
     location: item?.location ?? defaultLocation,
     label: item?.label ?? '',
     href: item?.href ?? '',
+    selectedPage: initialPage,
     icon: item?.icon ?? '',
     isExternal: item?.isExternal ?? false,
     isVisible: item?.isVisible ?? true,
@@ -176,10 +190,18 @@ function MenuForm({
     }
     setSaving(true);
     const url = item ? `/api/admin/cms/menus/${item.id}` : '/api/admin/cms/menus';
+    const payload = {
+      location: state.location,
+      label: state.label,
+      href: state.href,
+      icon: state.icon || null,
+      isExternal: state.isExternal,
+      isVisible: state.isVisible,
+    };
     const res = await fetch(url, {
       method: item ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(state),
+      body: JSON.stringify(payload),
     });
     setSaving(false);
     if (!res.ok) {
@@ -226,10 +248,48 @@ function MenuForm({
           <Input
             label="Href"
             value={state.href}
-            onChange={(e) => setState((s) => ({ ...s, href: e.target.value }))}
+            onChange={(e) => {
+              const nextHref = e.target.value;
+              const matched = pageOptions.find((p) => p.href === nextHref);
+              setState((s) => ({ ...s, href: nextHref, selectedPage: matched?.id ?? '' }));
+            }}
             placeholder="/services or https://example.com"
             required
           />
+          <div>
+            <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+              Page (optional)
+            </label>
+            <select
+              value={state.selectedPage}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                const selected = pageOptions.find((p) => p.id === nextId);
+                if (!selected) {
+                  setState((s) => ({ ...s, selectedPage: '', href: '' }));
+                  return;
+                }
+                setState((s) => ({
+                  ...s,
+                  selectedPage: nextId,
+                  href: selected.href,
+                  label: s.label.trim().length > 0 ? s.label : selected.label,
+                  isExternal: false,
+                }));
+              }}
+              className="mt-1.5 block w-full rounded-lg border border-line bg-paper-50 px-3 py-2.5 text-sm focus:border-ink focus:outline-none"
+            >
+              <option value="">Manual href</option>
+              {pageOptions.map((page) => (
+                <option key={page.id} value={page.id}>
+                  {page.label} ({page.href})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-ink-muted">
+              Pilih halaman yang sudah ada, atau kosongkan untuk isi href manual.
+            </p>
+          </div>
           <Input
             label="Icon (optional)"
             value={state.icon}

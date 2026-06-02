@@ -60,10 +60,10 @@ export function LiveOrderTicket() {
             </div>
           </div>
 
-          {/* IMEI input row — looks scanned */}
+          {/* Device ID row — looks scanned */}
           <div className="border-b border-line px-5 py-3">
             <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
-              IMEI
+              Device ID
             </div>
             <div className="mt-1 flex items-center gap-3">
               <ScanningNumber digits="3 5 3 4 5 6 7 8 9 0 1 2 3 4 5" />

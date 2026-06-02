@@ -14,7 +14,7 @@ const FALLBACK: FaqItem[] = [
     id: '1',
     question: 'Do I need my own DhruFusion API key?',
     answer:
-      'No. The bureau holds the upstream connection. You register, fund your wallet, and submit dockets.',
+      'No. The portal handles the upstream connection. You register, fund your wallet, and submit dockets.',
   },
   {
     id: '2',

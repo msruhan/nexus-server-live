@@ -21,9 +21,9 @@ export async function Footer() {
   ]);
 
   const siteName = settings?.siteName ?? 'Nexus Server';
-  const tagline = settings?.siteTagline ?? 'IMEI · Server Bureau';
+  const tagline = settings?.siteTagline ?? 'Unlock Service Portal';
   const footerText =
-    settings?.footerText ?? 'A self-service bureau for IMEI &amp; server operations.';
+    settings?.footerText ?? 'A self-service unlock operations portal for resellers and technicians.';
   const copyright =
     settings?.copyrightText ?? `© ${new Date().getFullYear()} ${siteName} · All rights reserved`;
 
@@ -40,14 +40,14 @@ export async function Footer() {
     {
       title: 'Catalog',
       links: [
-        { label: 'IMEI register', href: '/services/imei' },
-        { label: 'Server register', href: '/services/server' },
+        { label: 'Unlock services', href: '/services/imei' },
+        { label: 'Remote services', href: '/services/server' },
       ],
     },
     {
       title: 'The desk',
       links: [
-        { label: 'How it works', href: '#method' },
+        { label: 'How it works', href: '#how-to-order' },
         { label: 'Voices', href: '#voices' },
       ],
     },
@@ -74,7 +74,7 @@ export async function Footer() {
       <div className="mx-auto max-w-[1400px] px-6 py-14 lg:px-10">
         <div className="grid gap-12 lg:grid-cols-12">
           <div className="lg:col-span-4">
-            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-muted">
+            <span className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-primary-700/70">
               {tagline}
             </span>
             <p className="mt-3 max-w-sm font-display text-lg font-bold tracking-tight text-ink">

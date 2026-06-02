@@ -1,7 +1,7 @@
 // Local filesystem upload helper.
 // Writes to public/uploads/<folder>/<timestamp>-<sanitized-name>.
-// Swap this module for an S3/R2 implementation in production without
-// touching consumers.
+// Files are served via /api/uploads to avoid static public directory caching
+// behavior in production server mode.
 
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
@@ -53,7 +53,7 @@ export async function saveUpload(
   await writeFile(fullPath, buf);
 
   return {
-    url: `/uploads/${safeFolder}/${filename}`,
+    url: `/api/uploads/${safeFolder}/${filename}`,
     filename,
     mimeType: file.type,
     size: file.size,

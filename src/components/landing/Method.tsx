@@ -21,14 +21,14 @@ const steps = [
   {
     no: '03',
     label: 'Pick a service',
-    body: 'Browse the register. Each line is annotated with required fields, delivery window, final price.',
-    log: 'GET /api/services/imei?status=ACTIVE → 47 entries · cached 60s · grouped by category',
+    body: 'Browse the catalog. Each line is annotated with required fields, delivery window, final price.',
+    log: 'GET /api/services/catalog?status=ACTIVE → 47 entries · cached 60s · grouped by category',
     duration: 'browse',
   },
   {
     no: '04',
     label: 'Submit the docket',
-    body: 'Fill IMEI + the fields the service asks for. Wallet is debited atomically. Order is created PENDING.',
+    body: 'Fill device details + the fields the service asks for. Wallet is debited atomically. Order is created PENDING.',
     log: 'POST /api/imei/orders → 201 · status=PENDING · wallet debited · idempotency lock 5m',
     duration: 'instant',
   },

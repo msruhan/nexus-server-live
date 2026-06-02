@@ -4,22 +4,10 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ArrowUpRight, Warning } from '@phosphor-icons/react/dist/ssr';
-import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { ImeiOrderFields, type ImeiRequires } from '@/components/orders/ImeiOrderFields';
 
-type Requires = {
-  imei: boolean;
-  network: boolean;
-  model: boolean;
-  provider: boolean;
-  pin: boolean;
-  kbh: boolean;
-  mep: boolean;
-  prd: boolean;
-  sn: boolean;
-  email: boolean;
-  note: boolean;
-};
+type Requires = ImeiRequires;
 
 type DuplicateInfo = {
   orderCode: string;
@@ -203,40 +191,7 @@ export function ImeiOrderForm({
   return (
     <>
       <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-paper-50 p-6 lg:p-8">
-        <div className="grid gap-5 sm:grid-cols-2">
-          {requires.imei && (
-            <div className="sm:col-span-2">
-              <Input
-                name="imei"
-                label="IMEI"
-                placeholder="15 digits"
-                hint="Device IMEI — find it in Settings or dial *#06#"
-                pattern="[0-9]{14,16}"
-                maxLength={16}
-                required
-              />
-            </div>
-          )}
-          {requires.network && (
-            <Input name="network" label="Network / Carrier" placeholder="T-Mobile USA" required />
-          )}
-          {requires.model && <Input name="model" label="Model" placeholder="SM-S928B" required />}
-          {requires.provider && <Input name="provider" label="Provider" required />}
-          {requires.pin && <Input name="pin" label="PIN" required />}
-          {requires.kbh && <Input name="kbh" label="KBH code" required />}
-          {requires.mep && <Input name="mep" label="MEP code" required />}
-          {requires.prd && <Input name="prd" label="PRD code" required />}
-          {requires.sn && <Input name="serialNumber" label="Serial Number" required />}
-          {requires.email && <Input name="email" type="email" label="Email" required />}
-        </div>
-        {requires.note && (
-          <Textarea
-            name="note"
-            label="Note"
-            placeholder="Additional information (optional)"
-            rows={3}
-          />
-        )}
+        <ImeiOrderFields requires={requires} />
 
         <div className="flex items-center gap-3 border-t border-line pt-5">
           <Button type="submit" size="lg" disabled={loading}>

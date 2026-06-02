@@ -10,9 +10,9 @@ export default async function LandingPreview() {
   const session = await auth();
   if (session?.user.role !== 'ADMIN') redirect('/login');
 
-  // Show ALL sections, even hidden ones, so admin can see what's stored
+  // Preview should match public output: hidden sections are not rendered.
   const sections = await prisma.pageSection.findMany({
-    where: { pageSlug: 'home' },
+    where: { pageSlug: 'home', isVisible: true },
     orderBy: { sortOrder: 'asc' },
   });
 

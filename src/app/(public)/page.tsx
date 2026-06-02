@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { isPrismaSchemaMissing } from '@/lib/site-settings-safe';
 import { SectionRenderer } from '@/components/landing/SectionRenderer';
 import { Hero } from '@/components/landing/Hero';
+import { Ticker } from '@/components/landing/Ticker';
 import { Catalog } from '@/components/landing/Catalog';
 import { Method } from '@/components/landing/Method';
 import { Stats } from '@/components/landing/Stats';
@@ -32,6 +33,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <Ticker />
       <Hero />
       <Catalog />
       <Method />

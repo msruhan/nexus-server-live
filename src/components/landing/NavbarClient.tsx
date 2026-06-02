@@ -50,14 +50,14 @@ export function NavbarClient({
               <span className="font-display text-[15px] font-extrabold tracking-tight text-ink">
                 {siteName}
               </span>
-              <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-ink-muted">
+              <span className="mt-0.5 font-display text-[10px] font-semibold uppercase tracking-[0.22em] text-primary-700/70">
                 {tagline}
               </span>
             </div>
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex">
-            {items.map((l, i) => (
+            {items.map((l) => (
               <Link
                 key={l.id}
                 href={l.href}
@@ -65,9 +65,6 @@ export function NavbarClient({
                 rel={l.isExternal ? 'noreferrer' : undefined}
                 className="group relative rounded-full px-3.5 py-1.5 text-[13px] font-medium text-ink/70 transition-colors hover:text-ink"
               >
-                <span className="mr-2 font-mono text-[10px] text-ink-soft">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
                 {l.label}
               </Link>
             ))}
@@ -129,16 +126,13 @@ export function NavbarClient({
               </button>
             </div>
             <div className="flex flex-col">
-              {items.map((l, i) => (
+              {items.map((l) => (
                 <Link
                   key={l.id}
                   href={l.href}
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-3 border-b border-line py-3 text-base font-medium text-ink last:border-0 hover:text-primary-600"
                 >
-                  <span className="font-mono text-xs text-ink-soft">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
                   {l.label}
                 </Link>
               ))}

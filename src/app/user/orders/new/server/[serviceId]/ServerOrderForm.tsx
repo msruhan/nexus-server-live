@@ -4,11 +4,9 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ArrowUpRight } from '@phosphor-icons/react/dist/ssr';
-import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { ServerOrderFields } from '@/components/orders/ServerOrderFields';
 import {
-  inputTypeForField,
-  labelForFieldKey,
   type ServerFieldDef,
   validateServerOrderFields,
 } from '@/lib/server-fields';
@@ -64,30 +62,11 @@ export function ServerOrderForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-paper-50 p-6 lg:p-8">
-      <div className="grid gap-5 sm:grid-cols-2">
-        {fieldDefs.map((field) => (
-          <div key={field.key} className={field.type === 'textarea' ? 'sm:col-span-2' : ''}>
-            {field.type === 'textarea' ? (
-              <Textarea
-                name={field.key}
-                label={field.label || labelForFieldKey(field.key)}
-                value={values[field.key] ?? ''}
-                onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
-                required={field.required}
-              />
-            ) : (
-              <Input
-                name={field.key}
-                type={inputTypeForField(field)}
-                label={field.label || labelForFieldKey(field.key)}
-                value={values[field.key] ?? ''}
-                onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
-                required={field.required}
-              />
-            )}
-          </div>
-        ))}
-      </div>
+      <ServerOrderFields
+        fieldDefs={fieldDefs}
+        values={values}
+        onChange={(key, value) => setValues((v) => ({ ...v, [key]: value }))}
+      />
       <Button type="submit" disabled={loading} className="w-full sm:w-auto">
         {loading ? 'Submitting…' : 'Submit docket'}
         <ArrowUpRight weight="bold" className="ml-1" />

@@ -19,6 +19,8 @@ export type CreateIntentInput = {
   userId: string;
   amount: Decimal | number; // USD
   reference: string;
+  successUrl?: string;
+  cancelUrl?: string;
 };
 
 export type CreateIntentResult =

@@ -18,7 +18,7 @@ const stats = [
     suffix: '%',
     decimals: 1,
     label: 'Closed successful',
-    note: 'Last 30 days, IMEI + server combined',
+    note: 'Last 30 days, all unlock and remote services combined',
   },
   {
     num: '03',

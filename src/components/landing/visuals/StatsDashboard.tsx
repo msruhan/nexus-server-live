@@ -261,7 +261,7 @@ const ACTIVITY = [
   { name: 'Sari', service: 'T-Mobile unlock', delta: 38 },
   { name: 'Rudi', service: 'FRP bypass', delta: 64 },
   { name: 'Dimas', service: 'Mi Account remove', delta: 102 },
-  { name: 'Rina', service: 'IMEI check', delta: 145 },
+  { name: 'Rina', service: 'Premium check', delta: 145 },
   { name: 'Budi', service: 'Sprint unlock', delta: 188 },
 ];
 

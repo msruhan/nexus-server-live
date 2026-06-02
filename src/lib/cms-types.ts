@@ -5,7 +5,7 @@ export const SECTION_TYPES = [
   'stats',
   'features',
   'service_catalog',
-  'method',
+  'how_to_order',
   'testimonials',
   'faq',
   'banner_slider',
@@ -23,7 +23,7 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   stats: 'Stats counter',
   features: 'Features grid',
   service_catalog: 'Service catalog',
-  method: 'Method timeline',
+  how_to_order: 'How to order',
   testimonials: 'Testimonials',
   faq: 'FAQ accordion',
   banner_slider: 'Banner slider',
@@ -39,7 +39,7 @@ export const SECTION_DESCRIPTIONS: Record<SectionType, string> = {
   stats: 'Large counter figures with labels.',
   features: 'Bento grid of value propositions.',
   service_catalog: 'Live catalog with IMEI / Server tabs.',
-  method: 'Seven-step timeline of how an order moves through the desk.',
+  how_to_order: 'Three-step guide: browse, order, and track.',
   testimonials: 'Pull-quote and grid of voices.',
   faq: 'Accordion Q&A from the FAQ table.',
   banner_slider: 'Promo carousel from the Banner table.',
@@ -55,7 +55,7 @@ export const SECTION_ICONS: Record<SectionType, string> = {
   stats: 'ChartLineUp',
   features: 'GridFour',
   service_catalog: 'ListChecks',
-  method: 'TreeStructure',
+  how_to_order: 'Path',
   testimonials: 'ChatTeardrop',
   faq: 'Question',
   banner_slider: 'Image',
@@ -124,6 +124,16 @@ export type RunningAdsContent = Record<string, never>;
 export type ServiceCatalogContent = Record<string, never>;
 export type PartnersContent = Record<string, never>;
 
+export type HowToOrderContent = {
+  eyebrow?: string;
+  heading?: string;
+  subhead?: string;
+  ctaBrowseHref?: string;
+  ctaBrowseLabel?: string;
+  ctaTrackHref?: string;
+  ctaTrackLabel?: string;
+};
+
 export function defaultContent(type: SectionType): unknown {
   switch (type) {
     case 'hero':
@@ -134,8 +144,8 @@ export function defaultContent(type: SectionType): unknown {
           'Self-service bureau for IMEI unlocks, iCloud removals, FRP bypass, and server flashing.',
         ctaText: 'Browse the catalog',
         ctaHref: '/services',
-        secondaryText: 'How a job moves through the desk',
-        secondaryHref: '#method',
+        secondaryText: 'How to order',
+        secondaryHref: '#how-to-order',
         visualVariant: 'ticket',
       } satisfies HeroContent;
     case 'stats':
@@ -178,6 +188,17 @@ export function defaultContent(type: SectionType): unknown {
       return { heading: 'What the {italic:resellers} say.' } satisfies TestimonialsContent;
     case 'banner_slider':
       return { position: 'home_top', autoplay: true } satisfies BannerSliderContent;
+    case 'how_to_order':
+      return {
+        eyebrow: '§ How it works',
+        heading: 'Order in {italic:three simple steps}.',
+        subhead:
+          'Browse the catalog, place your order as a guest or signed-in user, then track progress anytime.',
+        ctaBrowseHref: '/marketplace',
+        ctaBrowseLabel: 'Open marketplace',
+        ctaTrackHref: '/track',
+        ctaTrackLabel: 'Track order',
+      } satisfies HowToOrderContent;
     default:
       return {};
   }

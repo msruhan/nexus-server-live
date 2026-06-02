@@ -6,6 +6,10 @@ export const dynamic = 'force-dynamic'
 
 const createBoxSchema = z.object({
   title: z.string().min(2).max(255),
+  description: z.string().max(2000).optional().nullable(),
+  imageUrl: z.string().max(2048).optional().nullable(),
+  marketplaceVisible: z.boolean().optional().default(true),
+  featured: z.boolean().optional().default(false),
   sortOrder: z.number().int().default(0),
 })
 

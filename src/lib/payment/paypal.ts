@@ -148,9 +148,13 @@ export async function createPaypalIntent(
       shipping_preference: 'NO_SHIPPING',
       user_action: 'PAY_NOW',
       return_url: `${base}/api/payment/paypal/return?intent=${intent.id}`,
-      cancel_url: `${base}/user/wallet?payment=cancelled`,
+      cancel_url: input.cancelUrl?.trim() || `${base}/user/wallet?payment=cancelled`,
     },
   };
+  if (input.successUrl?.trim()) {
+    const successPath = new URL(input.successUrl.trim(), base).pathname + new URL(input.successUrl.trim(), base).search;
+    orderBody.application_context.return_url = `${base}/api/payment/paypal/return?intent=${intent.id}&next=${encodeURIComponent(successPath)}`;
+  }
 
   let createRes: Response;
   try {

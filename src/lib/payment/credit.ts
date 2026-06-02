@@ -118,6 +118,15 @@ export async function creditWalletForIntent(input: {
     /* never affect the credit flow */
   }
 
+  // Marketplace guest checkout finalization — fire-and-forget and idempotent.
+  try {
+    void import('@/lib/marketplace-checkout').then(({ finalizeMarketplaceCheckoutByIntent }) =>
+      finalizeMarketplaceCheckoutByIntent(intent.id),
+    );
+  } catch {
+    /* never affect the credit flow */
+  }
+
   return { ok: true, credited: true, balance: result.toString() };
 }
 

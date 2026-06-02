@@ -124,8 +124,8 @@ export async function createStripeIntent(
       payment_intent_data: {
         metadata: { intent_id: intent.id, reference: intent.reference },
       },
-      success_url: `${base}/user/wallet?payment=success&intent=${intent.id}`,
-      cancel_url: `${base}/user/wallet?payment=cancelled`,
+      success_url: input.successUrl?.trim() || `${base}/user/wallet?payment=success&intent=${intent.id}`,
+      cancel_url: input.cancelUrl?.trim() || `${base}/user/wallet?payment=cancelled`,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'create_failed';

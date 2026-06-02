@@ -17,7 +17,7 @@ export const HERO_VISUAL_VARIANTS: Array<{
   {
     id: 'ticket',
     label: 'Order ticket',
-    description: 'Editorial paper docket with timeline, IMEI scan, result code reveal.',
+    description: 'Editorial paper docket with timeline, device ID scan, and result code reveal.',
   },
   {
     id: 'console',
@@ -32,6 +32,6 @@ export const HERO_VISUAL_VARIANTS: Array<{
   {
     id: 'phone',
     label: 'Phone unlock',
-    description: 'Animated phone mockup scanning IMEI, transitioning lock → unlock.',
+    description: 'Animated phone mockup scanning device ID, transitioning lock → unlock.',
   },
 ];

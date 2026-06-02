@@ -187,7 +187,7 @@ export function DynamicHero({ content, variant }: Props) {
           <span className="live-dot" />
           <span>System nominal · 60s polling cadence</span>
         </span>
-        <span className="hidden md:block">Bureau of IMEI &amp; Server Operations</span>
+        <span className="hidden md:block">Unlock Service Portal Operations</span>
       </motion.div>
 
       <div className="relative overflow-hidden">

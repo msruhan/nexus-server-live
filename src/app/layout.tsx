@@ -38,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = brand.metaTitle?.trim() || `${brand.siteName} — ${brand.tagline}`;
   const description =
     brand.metaDescription?.trim() ||
-    'A self-service desk for IMEI unlocks, iCloud removals, FRP bypass, and server flashing.';
+    'A self-service unlock portal for iCloud removals, FRP bypass, and remote device services.';
   return {
     title,
     description,

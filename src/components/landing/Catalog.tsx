@@ -35,7 +35,7 @@ const imeiServices: ServiceRow[] = [
   },
   {
     ref: 'A.118',
-    title: 'iPhone IMEI check premium',
+    title: 'iPhone premium check',
     meta: 'GSX · blacklist · sim-lock · warranty',
     delivery: 'instant',
     price: '$0.99',
@@ -89,7 +89,7 @@ const serverServices: ServiceRow[] = [
   },
   {
     ref: 'B.452',
-    title: 'EFS / IMEI repair',
+    title: 'EFS / baseband repair',
     meta: 'Qualcomm + MediaTek devices',
     delivery: '30–60 minutes',
     price: '$8.99',
@@ -109,10 +109,10 @@ export function Catalog() {
               § 01 · Catalog
             </span>
             <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-ink sm:text-4xl lg:text-[56px] lg:leading-[1.02]">
-              The bureau&rsquo;s <span className="font-serif italic font-normal">working</span> menu.
+              The portal&rsquo;s <span className="font-serif italic font-normal">working</span> menu.
             </h2>
             <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-ink/70">
-              Two registers. One desk. Everything below is live, priced final, and synced
+              Two service tracks. One portal. Everything below is live, priced final, and synced
               automatically from upstream — when an operator drops support, the line disappears
               from this page.
             </p>
@@ -122,8 +122,8 @@ export function Catalog() {
           <div className="lg:col-span-5 lg:justify-self-end">
             <div className="inline-flex rounded-full border border-line bg-paper p-1">
               {([
-                { key: 'imei' as const, label: 'IMEI register', count: imeiServices.length },
-                { key: 'server' as const, label: 'Server register', count: serverServices.length },
+                { key: 'imei' as const, label: 'Unlock services', count: imeiServices.length },
+                { key: 'server' as const, label: 'Remote services', count: serverServices.length },
               ]).map((t) => {
                 const active = tab === t.key;
                 return (
@@ -190,7 +190,7 @@ export function Catalog() {
             href="#"
             className="group inline-flex items-center gap-1.5 text-sm font-semibold text-ink"
           >
-            <span className="border-b border-ink pb-0.5">Open the full register</span>
+            <span className="border-b border-ink pb-0.5">Open the full catalog</span>
             <ArrowUpRight
               weight="bold"
               size={14}

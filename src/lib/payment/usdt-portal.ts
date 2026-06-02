@@ -95,8 +95,8 @@ export async function createUsdtPortalIntent(
     'customer[amount]': usdtAmount.toFixed(2),
     'customer[currency]': 'USD',
     order_id: intent.id,
-    redirect_paid: `${base}/user/wallet?payment=success`,
-    redirect_canceled: `${base}/user/wallet?payment=cancelled`,
+    redirect_paid: input.successUrl?.trim() || `${base}/user/wallet?payment=success`,
+    redirect_canceled: input.cancelUrl?.trim() || `${base}/user/wallet?payment=cancelled`,
   });
 
   let res: Response;

@@ -2,8 +2,9 @@ import { prisma } from '@/lib/db';
 import { NavbarClient } from './NavbarClient';
 
 const FALLBACK = [
+  { id: 'l0', label: 'Marketplace', href: '/marketplace' },
   { id: 'l1', label: 'Catalog', href: '#catalog' },
-  { id: 'l2', label: 'Method', href: '#method' },
+  { id: 'l2', label: 'How it works', href: '#how-to-order' },
   { id: 'l3', label: 'Track order', href: '/track' },
   { id: 'l4', label: 'Ledger', href: '#ledger' },
   { id: 'l5', label: 'Voices', href: '#voices' },
@@ -19,7 +20,7 @@ export async function Navbar() {
     prisma.siteSettings.findUnique({ where: { id: 'singleton' } }),
   ]);
 
-  const items =
+  const baseItems =
     menus.length > 0
       ? menus.map((m) => ({
           id: m.id,
@@ -31,9 +32,9 @@ export async function Navbar() {
 
   return (
     <NavbarClient
-      items={items}
+      items={baseItems}
       siteName={settings?.siteName ?? 'Nexus Server'}
-      tagline={settings?.siteTagline ?? 'IMEI · Server Bureau'}
+      tagline={settings?.siteTagline ?? 'Unlock Service Portal'}
       logoUrl={settings?.logoUrl ?? null}
     />
   );

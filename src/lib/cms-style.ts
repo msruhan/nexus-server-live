@@ -62,6 +62,7 @@ export const DEFAULT_WIDTH_BY_TYPE: Record<string, SectionWidth> = {
   stats: 'full',
   features: 'full',
   method: 'full',
+  how_to_order: 'full',
   testimonials: 'full',
   faq: 'full',
 };

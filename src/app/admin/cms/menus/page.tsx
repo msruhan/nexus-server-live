@@ -4,10 +4,41 @@ import { MenuManager } from './MenuManager';
 
 export const dynamic = 'force-dynamic';
 
+const STATIC_PAGE_OPTIONS = [
+  { id: 'home', label: 'Home', href: '/' },
+  { id: 'marketplace', label: 'Marketplace', href: '/marketplace' },
+  { id: 'services', label: 'Services', href: '/services' },
+  { id: 'imei-services', label: 'IMEI Services', href: '/services/imei' },
+  { id: 'server-services', label: 'Server Services', href: '/services/server' },
+  { id: 'track-order', label: 'Track Order', href: '/track' },
+  { id: 'login', label: 'Login', href: '/login' },
+  { id: 'register', label: 'Register', href: '/register' },
+];
+
 export default async function MenusPage() {
-  const items = await prisma.navigationMenu.findMany({
-    orderBy: [{ location: 'asc' }, { sortOrder: 'asc' }],
-  });
+  const [items, customPages] = await Promise.all([
+    prisma.navigationMenu.findMany({
+      orderBy: [{ location: 'asc' }, { sortOrder: 'asc' }],
+    }),
+    prisma.customPage.findMany({
+      orderBy: [{ title: 'asc' }],
+      select: { id: true, slug: true, title: true, isPublished: true },
+    }),
+  ]);
+
+  const pageOptions = [
+    ...STATIC_PAGE_OPTIONS.map((page) => ({
+      id: `static:${page.id}`,
+      label: page.label,
+      href: page.href,
+    })),
+    ...customPages.map((page) => ({
+      id: `custom:${page.id}`,
+      label: page.isPublished ? page.title : `${page.title} (draft)`,
+      href: `/${page.slug}`,
+    })),
+  ];
+
   return (
     <div>
       <PageHeader
@@ -29,6 +60,7 @@ export default async function MenusPage() {
           isExternal: m.isExternal,
           isVisible: m.isVisible,
         }))}
+        pageOptions={pageOptions}
       />
     </div>
   );

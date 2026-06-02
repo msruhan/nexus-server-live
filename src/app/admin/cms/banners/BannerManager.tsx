@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { toast } from 'sonner';
 import { Plus, Trash, Eye, EyeSlash, X, Upload } from '@phosphor-icons/react/dist/ssr';
 import { Input } from '@/components/ui/Input';
@@ -23,6 +22,10 @@ type Banner = {
 };
 
 const POSITIONS = ['home_top', 'home_middle', 'sidebar', 'service_page', 'popup'];
+
+function resolveBannerImageUrl(url: string) {
+  return url.startsWith('/uploads/') ? `/api${url}` : url;
+}
 
 export function BannerManager({ initial }: { initial: Banner[] }) {
   const router = useRouter();
@@ -75,13 +78,13 @@ export function BannerManager({ initial }: { initial: Banner[] }) {
           {items.map((b) => (
             <div
               key={b.id}
-              className={`group overflow-hidden rounded-2xl border bg-paper-50 transition-all hover:shadow-card ${
+              className={`group overflow-hidden rounded-2xl border bg-paper-50 transition-all ${
                 b.isActive ? 'border-line' : 'border-line opacity-60'
               }`}
             >
               <div className="relative aspect-[16/9] overflow-hidden bg-paper-200">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={b.imageUrl} alt={b.title} className="h-full w-full object-cover" />
+                <img src={resolveBannerImageUrl(b.imageUrl)} alt={b.title} className="h-full w-full object-contain" />
                 <div className="absolute left-2 top-2 flex gap-1">
                   <span className="rounded-md bg-ink/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-paper">
                     {b.position}
@@ -90,9 +93,6 @@ export function BannerManager({ initial }: { initial: Banner[] }) {
               </div>
               <div className="p-4">
                 <h3 className="font-display text-sm font-bold tracking-tight text-ink">{b.title}</h3>
-                {b.subtitle && (
-                  <p className="mt-1 line-clamp-2 font-serif text-xs italic text-ink-muted">{b.subtitle}</p>
-                )}
                 <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
                   <div className="flex gap-3 font-mono text-[10px] text-ink-muted">
                     <span>{b.viewCount} views</span>
@@ -151,7 +151,6 @@ function BannerForm({
 }) {
   const [state, setState] = React.useState({
     title: item?.title ?? '',
-    subtitle: item?.subtitle ?? '',
     imageUrl: item?.imageUrl ?? '',
     linkUrl: item?.linkUrl ?? '',
     position: item?.position ?? 'home_top',
@@ -221,14 +220,12 @@ function BannerForm({
 
         <div className="space-y-5 p-6">
           <Input label="Title" value={state.title} onChange={(e) => setState((s) => ({ ...s, title: e.target.value }))} required />
-          <Input label="Subtitle" value={state.subtitle} onChange={(e) => setState((s) => ({ ...s, subtitle: e.target.value }))} />
-
           <div>
             <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">Image</label>
             {state.imageUrl ? (
               <div className="mt-2 overflow-hidden rounded-lg border border-line">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={state.imageUrl} alt="" className="aspect-[16/9] w-full object-cover" />
+                <img src={resolveBannerImageUrl(state.imageUrl)} alt="" className="aspect-[16/9] w-full object-contain" />
               </div>
             ) : (
               <div className="mt-2 rounded-lg border-2 border-dashed border-line bg-paper-50 p-8 text-center">

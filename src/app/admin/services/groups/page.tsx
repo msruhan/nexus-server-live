@@ -41,12 +41,19 @@ export default async function AdminGroupServicesPage({
           id: g.id,
           title: g.title,
           description: g.description,
+          imageUrl: g.imageUrl,
+          marketplaceVisible: g.marketplaceVisible,
+          featured: g.featured,
           sortOrder: g.sortOrder,
           servicesCount: g._count.services,
         }))}
         serverBoxes={serverBoxes.map((b) => ({
           id: b.id,
           title: b.title,
+          description: b.description,
+          imageUrl: b.imageUrl,
+          marketplaceVisible: b.marketplaceVisible,
+          featured: b.featured,
           sortOrder: b.sortOrder,
           servicesCount: b._count.services,
         }))}

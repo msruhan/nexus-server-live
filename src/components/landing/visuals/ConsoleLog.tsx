@@ -78,7 +78,7 @@ export function ConsoleLog() {
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
           </div>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-paper/50">
-            nexus-bureau · production
+            unlock-portal · production
           </span>
           <span className="font-mono text-[10px] tabular-nums text-paper/50">
             {String(visibleLines).padStart(2, '0')} / {SCRIPT.length}

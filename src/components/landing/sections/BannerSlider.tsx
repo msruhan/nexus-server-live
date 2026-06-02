@@ -3,7 +3,7 @@
 import * as React from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight } from '@phosphor-icons/react/dist/ssr';
 import { Reveal } from '@/components/ui/Reveal';
 
@@ -15,20 +15,21 @@ type Item = {
   linkUrl: string | null;
 };
 
+function resolveBannerImageUrl(url: string) {
+  return url.startsWith('/uploads/') ? `/api${url}` : url;
+}
+
 export function BannerSlider({ items }: { items: Item[] }) {
   const [emblaRef, emblaApi] = useEmblaCarousel(
     { loop: true, align: 'start', skipSnaps: false },
     [Autoplay({ delay: 5500, stopOnInteraction: true, stopOnMouseEnter: true })],
   );
   const [selected, setSelected] = React.useState(0);
-  const [direction, setDirection] = React.useState(0);
 
   React.useEffect(() => {
     if (!emblaApi) return;
     const onSelect = () => {
-      const prev = selected;
       const next = emblaApi.selectedScrollSnap();
-      setDirection(next > prev ? 1 : -1);
       setSelected(next);
     };
     emblaApi.on('select', onSelect);
@@ -49,7 +50,7 @@ export function BannerSlider({ items }: { items: Item[] }) {
   return (
     <section className="relative mx-auto max-w-[1400px] px-6 py-10 lg:px-10 lg:py-14">
       <Reveal>
-        <div className="group relative overflow-hidden rounded-3xl border border-line shadow-card-hover">
+        <div className="group relative overflow-hidden rounded-3xl border border-line bg-paper">
           {/* Embla viewport */}
           <div ref={emblaRef} className="overflow-hidden">
             <div className="flex">
@@ -57,7 +58,6 @@ export function BannerSlider({ items }: { items: Item[] }) {
                 <div key={b.id} className="min-w-0 shrink-0 grow-0 basis-full">
                   <BannerSlide
                     item={b}
-                    active={idx === selected}
                     onClick={() => onClick(b)}
                   />
                 </div>
@@ -125,80 +125,18 @@ export function BannerSlider({ items }: { items: Item[] }) {
 
 function BannerSlide({
   item,
-  active,
   onClick,
 }: {
   item: Item;
-  active: boolean;
   onClick: () => void;
 }) {
   const content = (
-    <>
-      {/* Image with Ken Burns zoom */}
-      <motion.div
-        className="absolute inset-0"
-        animate={active ? { scale: 1.06 } : { scale: 1 }}
-        transition={{ duration: 8, ease: 'easeOut' }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={item.imageUrl}
-          alt={item.title}
-          className="h-full w-full object-cover"
-        />
-      </motion.div>
-
-      {/* Gradient overlay for text readability */}
-      <div className="absolute inset-0 bg-gradient-to-r from-ink/60 via-ink/30 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-ink/50 via-transparent to-transparent" />
-
-      {/* Text content with stagger reveal */}
-      <div className="relative flex h-full items-end p-6 sm:p-8 lg:p-12">
-        <div className="max-w-2xl">
-          <AnimatePresence mode="wait">
-            {active && (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <motion.h3
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1, duration: 0.6 }}
-                  className="font-display text-2xl font-extrabold leading-tight tracking-tight text-paper sm:text-3xl lg:text-4xl"
-                >
-                  {item.title}
-                </motion.h3>
-                {item.subtitle && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25, duration: 0.6 }}
-                    className="mt-3 max-w-xl font-serif text-base italic text-paper/85 sm:text-lg"
-                  >
-                    {item.subtitle}
-                  </motion.p>
-                )}
-                {item.linkUrl && (
-                  <motion.span
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4, duration: 0.5 }}
-                    className="mt-5 inline-flex items-center gap-2 rounded-full bg-paper px-5 py-2.5 text-xs font-bold text-ink transition-colors hover:bg-primary-300"
-                  >
-                    Learn more
-                    <ArrowRight weight="bold" size={12} />
-                  </motion.span>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-    </>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={resolveBannerImageUrl(item.imageUrl)}
+      alt={item.title}
+      className="h-full w-full object-contain"
+    />
   );
 
   if (item.linkUrl) {
@@ -208,7 +146,7 @@ function BannerSlide({
         onClick={onClick}
         target={item.linkUrl.startsWith('http') ? '_blank' : undefined}
         rel={item.linkUrl.startsWith('http') ? 'noreferrer' : undefined}
-        className="relative block aspect-[16/6] overflow-hidden bg-ink sm:aspect-[16/5]"
+        className="relative block aspect-[16/6] overflow-hidden bg-paper sm:aspect-[16/5]"
       >
         {content}
       </a>
@@ -216,7 +154,7 @@ function BannerSlide({
   }
 
   return (
-    <div className="relative block aspect-[16/6] overflow-hidden bg-ink sm:aspect-[16/5]">
+    <div className="relative block aspect-[16/6] overflow-hidden bg-paper sm:aspect-[16/5]">
       {content}
     </div>
   );

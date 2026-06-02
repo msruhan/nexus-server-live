@@ -9,9 +9,10 @@ type Default = { sectionType: SectionType; title?: string };
 
 export const DEFAULT_HOME_SECTIONS: Default[] = [
   { sectionType: 'hero', title: 'Hero · live order ticket' },
+  { sectionType: 'running_ads', title: 'Running ads strip · live ticker' },
   { sectionType: 'banner_slider', title: 'Promo banners · carousel' },
   { sectionType: 'service_catalog', title: 'Catalog · IMEI / Server' },
-  { sectionType: 'method', title: 'Method · 7 step timeline' },
+  { sectionType: 'how_to_order', title: 'How to order · 3 steps' },
   { sectionType: 'stats', title: 'Stats · the numbers' },
   { sectionType: 'features', title: 'Features · principles' },
   { sectionType: 'testimonials', title: 'Voices · pull quote + grid' },

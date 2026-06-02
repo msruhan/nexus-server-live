@@ -40,7 +40,7 @@ export function Hero({ variant = 'ticket' }: { variant?: HeroVisualVariant }) {
           <span>System nominal · 60s polling cadence</span>
         </span>
         <span className="hidden sm:block">Issue №{getEdition()} / {dateLabel()}</span>
-        <span className="hidden md:block">Bureau of IMEI &amp; Server Operations</span>
+        <span className="hidden md:block">Unlock Service Portal Operations</span>
       </motion.div>
 
       {/* Hero content */}
@@ -99,7 +99,7 @@ export function Hero({ variant = 'ticket' }: { variant?: HeroVisualVariant }) {
               transition={{ delay: 1.0, duration: 0.8 }}
               className="mt-10 max-w-xl text-[17px] leading-relaxed text-ink/75"
             >
-              Nexus is a self-service bureau for resellers, technicians, and busy counters.
+              Nexus is a self-service unlock portal for resellers, technicians, and busy counters.
               You order an unlock, an iCloud removal, an FRP bypass — we hand it off to{' '}
               <span className="rounded bg-ink px-1.5 py-0.5 font-mono text-[12px] font-medium text-paper">
                 DhruFusion
@@ -126,11 +126,11 @@ export function Hero({ variant = 'ticket' }: { variant?: HeroVisualVariant }) {
                 />
               </Link>
               <Link
-                href="#method"
+                href="#how-to-order"
                 className="group inline-flex items-center gap-2 text-sm font-medium text-ink/75 hover:text-ink"
               >
                 <span className="border-b border-ink/30 pb-0.5 transition-colors group-hover:border-ink">
-                  How a job moves through the desk
+                  See how to order
                 </span>
                 <ArrowRight
                   weight="bold"
@@ -185,7 +185,7 @@ export function Hero({ variant = 'ticket' }: { variant?: HeroVisualVariant }) {
         <div className="border-t border-line">
           <div className="mx-auto flex max-w-[1400px] items-center justify-between px-6 py-3 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft lg:px-10">
             <span>↓ Continue</span>
-            <span className="hidden sm:block">Scroll for catalog, method, and notes from the desk</span>
+            <span className="hidden sm:block">Scroll for catalog, order steps, and notes from the desk</span>
             <span>p. 02</span>
           </div>
         </div>

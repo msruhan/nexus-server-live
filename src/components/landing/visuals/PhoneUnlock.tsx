@@ -170,7 +170,7 @@ export function PhoneUnlock() {
 function stageLabel(s: Stage): string {
   switch (s) {
     case 'scanning':
-      return 'Scanning IMEI · validating against upstream';
+      return 'Scanning device ID · validating against upstream';
     case 'submitting':
       return 'Submitting docket to DhruFusion';
     case 'processing':
@@ -237,7 +237,7 @@ function ScanningScreen() {
     <Screen className="bg-gradient-to-b from-[#1a1d2e] to-ink">
       <Lock weight="fill" size={36} className="text-paper/70" />
       <div className="mt-3 font-mono text-[9px] uppercase tracking-[0.18em] text-paper/50">
-        Scanning IMEI
+        Scanning device ID
       </div>
       <div className="mt-4 w-full overflow-hidden rounded-md bg-paper/10 px-2 py-2">
         <motion.div
