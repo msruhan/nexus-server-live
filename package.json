@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "postinstall": "prisma generate",
     "predev": "node scripts/kill-port.mjs 3000",
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "vercel-build": "prisma generate && next build",
     "kill-port": "node scripts/kill-port.mjs 3000",
     "prestart": "node scripts/kill-port.mjs 3000",
     "start": "node scripts/check-db.mjs && next start",
@@ -18,6 +20,7 @@
     "db:migrate-order-codes": "tsx scripts/migrate-order-codes.ts",
     "db:studio": "prisma studio",
     "db:setup": "npm run db:up && sleep 3 && npm run db:push && npm run db:seed",
+    "db:setup:supabase": "node --env-file=.env.supabase scripts/setup-supabase.mjs",
     "db:status": "node scripts/check-db.mjs"
   },
   "dependencies": {

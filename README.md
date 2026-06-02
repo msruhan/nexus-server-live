@@ -127,6 +127,8 @@ npm run db:push && npm run db:seed
 
 Supabase: salin connection string dari dashboard → `.env` → `npm run db:push`.
 
+**Deploy marketing (Vercel + Supabase):** lihat [docs/DEPLOY-VERCEL-SUPABASE.md](./docs/DEPLOY-VERCEL-SUPABASE.md).
+
 ## Design system
 
 The look is intentionally not generic-SaaS:
