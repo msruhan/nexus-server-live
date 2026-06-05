@@ -47,7 +47,7 @@ export function RegisterForm() {
       redirect: false,
     });
 
-    toast.success('Account created', { description: 'Welcome to the bureau.' });
+    toast.success('Account created', { description: 'Welcome to the platform.' });
     router.push('/user/dashboard');
     router.refresh();
   }

@@ -141,7 +141,7 @@ export function defaultContent(type: SectionType): unknown {
         eyebrow: 'Vol. 01 · The Reseller Edition',
         heading: 'A quiet desk for {italic:loud, urgent} {italic:phone problems.}',
         subhead:
-          'Self-service bureau for IMEI unlocks, iCloud removals, FRP bypass, and server flashing.',
+          'Self-service platform for IMEI unlocks, iCloud removals, FRP bypass, and server flashing.',
         ctaText: 'Browse the catalog',
         ctaHref: '/services',
         secondaryText: 'How to order',

@@ -6,6 +6,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { hasPermission } from '@/lib/sub-admin';
 import { applyUpdate, isUpdateInProgress } from '@/lib/license/updater';
+import { requireUpdatesLicense } from '@/lib/license-guard';
 
 async function requireAccess() {
   const session = await auth();
@@ -34,13 +35,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'targetVersion and downloadUrl required' }, { status: 400 });
   }
 
-  // Verify license is active
+  const updatesDenied = await requireUpdatesLicense();
+  if (updatesDenied) return updatesDenied;
+
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
     select: { licenseKey: true, licenseStatus: true, licenseDomain: true },
   });
-  if (settings?.licenseStatus !== 'active' || !settings.licenseKey) {
-    return NextResponse.json({ error: 'Active license required to apply updates' }, { status: 403 });
+  if (!settings?.licenseKey) {
+    return NextResponse.json({ error: 'License required to apply updates' }, { status: 403 });
   }
 
   // Fire-and-forget — the update runs in background

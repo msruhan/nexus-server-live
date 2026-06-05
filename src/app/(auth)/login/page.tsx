@@ -11,7 +11,7 @@ export default function LoginPage() {
         Welcome <span className="font-serif italic font-normal">back</span>.
       </h1>
       <p className="mt-3 font-serif text-base italic text-ink-muted">
-        Sign in to continue your work at the desk.
+        Sign in to continue on the platform.
       </p>
 
       <div className="mt-10">

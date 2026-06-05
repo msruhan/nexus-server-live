@@ -1,6 +1,6 @@
 # Nexus Server
 
-Self-service bureau for IMEI &amp; Server services with DhruFusion integration.
+Self-service platform for IMEI &amp; Server services with DhruFusion integration.
 
 Built per [PRD-IMEI-SERVER-SERVICES.md](./PRD-IMEI-SERVER-SERVICES.md).
 
@@ -48,7 +48,7 @@ The seeded user already has `$100.00` in the wallet.
 - `/user/settings` — profile + password
 
 ### Admin dashboard
-- `/admin/dashboard` — bureau KPIs (revenue, success rate, in-flight)
+- `/admin/dashboard` — control center KPIs (revenue, success rate, in-flight)
 - `/admin/orders`, `/admin/orders/[id]` — monitor + cancel/refund
 - `/admin/providers`, `/admin/providers/[id]`, `/admin/providers/new` — Dhru CRUD + test/sync actions
 - `/admin/services/imei`, `/admin/services/server` — inline price + status edit

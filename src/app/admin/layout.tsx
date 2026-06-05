@@ -11,6 +11,7 @@ import { getPermissions } from '@/lib/sub-admin';
 import { resolveRoutePermission } from '@/lib/admin-route-permissions';
 import { getBranding } from '@/lib/branding';
 import { revalidateIfStale } from '@/lib/license/client';
+import { getLicenseEnforcementState, shouldRedirectToLicenseSuspended } from '@/lib/license-state';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -30,6 +31,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // validation is stale (>15 min), re-check with the License Server in the
   // background so a vendor-side revoke surfaces across the dashboard.
   void revalidateIfStale();
+
+  const pathname = (await headers()).get('x-pathname') ?? '';
+  const licenseState = await getLicenseEnforcementState();
+  if (shouldRedirectToLicenseSuspended(licenseState, pathname)) {
+    redirect('/license-suspended');
+  }
 
   if (settings?.enforceAdmin2FA) {
     const fresh = await prisma.user.findUnique({

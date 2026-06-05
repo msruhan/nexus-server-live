@@ -14,6 +14,7 @@ import { extractRequestContext, logOrderEvent } from '@/lib/activity-log'
 import { notifyTelegramOrderCreated, notifyTelegramAdminNewOrder } from '@/lib/telegram/notify'
 import { generateOrderCode } from '@/lib/generate-order-code'
 import type { Prisma } from '@prisma/client'
+import { requireRuntimeLicense } from '@/lib/license-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,6 +93,9 @@ export async function GET(req: Request) {
  * Deducts price from user wallet (debit) and creates order with PENDING status.
  */
 export async function POST(req: Request) {
+  const licenseDenied = await requireRuntimeLicense()
+  if (licenseDenied) return licenseDenied
+
   const { session, error } = await requireApiAuth()
   if (error) return error
 

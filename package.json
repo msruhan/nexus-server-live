@@ -22,7 +22,8 @@
     "db:setup": "npm run db:up && sleep 3 && npm run db:push && npm run db:seed",
     "db:setup:supabase": "node --env-file=.env.supabase scripts/setup-supabase.mjs",
     "db:status": "node scripts/check-db.mjs",
-    "db:seed:marketplace": "tsx scripts/seed-marketplace-services.ts"
+    "db:seed:marketplace": "tsx scripts/seed-marketplace-services.ts",
+    "db:seed:demo": "tsx scripts/seed-demo-presentation.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",

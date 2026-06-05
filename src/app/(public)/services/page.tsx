@@ -28,12 +28,12 @@ export default async function ServicesIndexPage() {
           § Catalog
         </span>
         <h1 className="mt-3 font-display text-4xl font-extrabold tracking-tight text-ink sm:text-5xl lg:text-[64px] lg:leading-[1.04]">
-          The bureau&rsquo;s <span className="font-serif italic font-normal">complete</span>{' '}
+          The platform&rsquo;s <span className="font-serif italic font-normal">complete</span>{' '}
           register.
         </h1>
         <p className="mt-5 max-w-2xl font-serif text-lg italic leading-relaxed text-ink-muted">
           Two registers, {imeiCount + serverCount} active entries between them. Browse, pick, fund
-          your wallet, submit. The desk handles the rest.
+          your wallet, submit. The platform handles the rest.
         </p>
       </div>
 

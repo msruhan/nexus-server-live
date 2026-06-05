@@ -9,6 +9,11 @@ export default middlewareAuth((req) => {
   const isLoggedIn = !!req.auth;
   const role = (req.auth?.user as { role?: string } | undefined)?.role;
 
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-pathname', nextUrl.pathname);
+
+  const nextWithPath = () => NextResponse.next({ request: { headers: requestHeaders } });
+
   const isAdminRoute = nextUrl.pathname.startsWith('/admin');
   const isUserRoute = nextUrl.pathname.startsWith('/user');
   const isAuthPage =
@@ -23,9 +28,7 @@ export default middlewareAuth((req) => {
     if (role !== 'ADMIN' && role !== 'SUB_ADMIN') {
       return NextResponse.redirect(new URL('/user/dashboard', nextUrl));
     }
-    const requestHeaders = new Headers(req.headers);
-    requestHeaders.set('x-pathname', nextUrl.pathname);
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    return nextWithPath();
   }
 
   if (isUserRoute && !isLoggedIn) {
@@ -40,7 +43,7 @@ export default middlewareAuth((req) => {
     return NextResponse.redirect(new URL(target, nextUrl));
   }
 
-  return NextResponse.next();
+  return nextWithPath();
 });
 
 export const config = {

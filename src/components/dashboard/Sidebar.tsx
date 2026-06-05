@@ -324,7 +324,11 @@ export function Sidebar({
           <div className="leading-tight">
             <div className="font-display text-sm font-extrabold text-ink">{brand?.siteName ?? 'Nexus Server'}</div>
             <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-ink-muted">
-              {variant === 'admin' ? (isSubAdmin ? 'Sub-admin · Bureau' : 'Admin · Bureau') : 'Member desk'}
+              {variant === 'admin'
+                ? isSubAdmin
+                  ? 'Sub-admin · Control center'
+                  : 'Admin · Control center'
+                : 'Member area'}
             </div>
             <div className="mt-0.5 font-mono text-[9px] tabular-nums tracking-wide text-ink-soft">
               {formatAppVersion()}

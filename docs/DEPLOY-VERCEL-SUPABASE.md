@@ -1,6 +1,6 @@
 # Deploy NexusServer — Vercel + Supabase (marketing / demo)
 
-Environment untuk **landing page, CMS, dan login demo**. Production bureau penuh tetap di VPS (Contabo + Coolify).
+Environment untuk **landing page, CMS, dan login demo**. Production platform penuh tetap di VPS (Contabo + Coolify).
 
 ## Ringkasan
 
@@ -91,6 +91,6 @@ Setiap push ke branch production (biasanya `main`) → Vercel build otomatis.
 | Supabase project paused | Buka dashboard Supabase → Resume (Free tier pause setelah 1 minggu idle) |
 | Tabel tidak ada | Jalankan `npm run db:setup:supabase` lagi |
 
-## 8. Production bureau (nanti)
+## 8. Production platform (nanti)
 
 Gunakan **Contabo Cloud VPS 10 + Coolify** (atau PM2). Lihat diskusi deploy production terpisah; jangan mengandalkan Vercel untuk order/wallet/backup production.

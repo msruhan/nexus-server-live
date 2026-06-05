@@ -4,6 +4,8 @@ out
 .env
 .env.local
 .env.supabase
+.env.vercel.setup
+tsconfig.tsbuildinfo
 dev.db
 dev.db-journal
 .DS_Store
@@ -12,3 +14,4 @@ dev.db-journal
 # Database backups (local dumps)
 /storage/backups
 *.sql.gz
+.vercel

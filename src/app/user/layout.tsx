@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { MobileBar } from '@/components/dashboard/MobileBar';
 import { AccountThemeShell } from '@/components/appearance/AccountThemeShell';
 import { getBranding } from '@/lib/branding';
+import { getLicenseEnforcementState, shouldRedirectToLicenseSuspended } from '@/lib/license-state';
 
 export default async function UserLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -19,6 +21,12 @@ export default async function UserLayout({ children }: { children: React.ReactNo
     where: { id: 'singleton' },
     select: { maintenanceMode: true },
   });
+  const pathname = (await headers()).get('x-pathname') ?? '';
+  const licenseState = await getLicenseEnforcementState();
+  if (shouldRedirectToLicenseSuspended(licenseState, pathname)) {
+    redirect('/license-suspended');
+  }
+
   if (settings?.maintenanceMode) {
     redirect('/maintenance');
   }

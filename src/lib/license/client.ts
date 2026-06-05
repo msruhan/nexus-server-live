@@ -21,6 +21,10 @@ const LICENSE_CLEAR_DATA = {
   licenseExpiresAt: null,
   licenseLastValidated: null,
   licenseReason: null,
+  licensePortalStatus: null,
+  licenseTier: null,
+  licenseRuntimeAllowed: true,
+  licenseUpdatesAllowed: true,
 };
 
 /** Remove license fields from this installation (does not call License Server). */
@@ -78,8 +82,19 @@ export async function activateLicense(rawKey: string): Promise<{ ok: true; info:
         licenseExpiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
         licenseLastValidated: new Date(),
         licenseReason: null,
+        licensePortalStatus: 'active',
+        licenseTier: data.tier ?? null,
+        licenseRuntimeAllowed: true,
+        licenseUpdatesAllowed: true,
       },
-      create: { id: 'singleton', licenseKey: key, licenseStatus: 'active', licenseDomain: domain },
+      create: {
+        id: 'singleton',
+        licenseKey: key,
+        licenseStatus: 'active',
+        licenseDomain: domain,
+        licenseRuntimeAllowed: true,
+        licenseUpdatesAllowed: true,
+      },
     });
 
     return {
@@ -108,7 +123,13 @@ export async function validateLicense(
 
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
-    select: { licenseKey: true, licenseDomain: true, licenseStatus: true, licenseLastValidated: true },
+    select: {
+      licenseKey: true,
+      licenseDomain: true,
+      licenseStatus: true,
+      licenseLastValidated: true,
+      licenseTier: true,
+    },
   });
 
   if (!settings?.licenseKey) {
@@ -132,26 +153,41 @@ export async function validateLicense(
       const reason = data.reason ?? data.error ?? 'validation_failed';
       await prisma.siteSettings.update({
         where: { id: 'singleton' },
-        data: { licenseStatus: 'inactive', licenseReason: reason, licenseLastValidated: new Date() },
+        data: {
+          licenseStatus: 'inactive',
+          licenseReason: reason,
+          licenseLastValidated: new Date(),
+          licenseRuntimeAllowed: false,
+          licenseUpdatesAllowed: false,
+          licensePortalStatus: null,
+        },
       });
       return { ok: false, error: reason };
     }
 
+    const runtime = data.entitlements?.runtime ?? true;
+    const updates = data.entitlements?.updates ?? true;
+    const portalStatus = typeof data.status === 'string' ? data.status : 'active';
+
     await prisma.siteSettings.update({
       where: { id: 'singleton' },
       data: {
-        licenseStatus: 'active',
-        licenseReason: null,
+        licenseStatus: runtime ? 'active' : 'inactive',
+        licenseReason: runtime ? null : (data.reason ?? portalStatus),
         licenseLastValidated: new Date(),
         licenseExpiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
         licensePlan: data.plan ?? undefined,
+        licensePortalStatus: portalStatus,
+        licenseTier: data.tier ?? undefined,
+        licenseRuntimeAllowed: runtime,
+        licenseUpdatesAllowed: updates,
       },
     });
 
     return {
       ok: true,
       info: {
-        status: 'active',
+        status: runtime ? 'active' : 'inactive',
         key: '••••••' + settings.licenseKey.slice(-8),
         domain: settings.licenseDomain ?? domain,
         plan: data.plan ?? null,
@@ -164,7 +200,9 @@ export async function validateLicense(
     if (isSigningConfigError(msg)) return { ok: false, error: msg };
 
     const lastValidated = settings.licenseLastValidated;
-    const graceDays = 7;
+    const monthlyGrace = Number(process.env.LICENSE_GRACE_DAYS_MONTHLY ?? '2');
+    const defaultGrace = Number(process.env.LICENSE_GRACE_DAYS ?? '7');
+    const graceDays = settings.licenseTier === 'monthly' ? monthlyGrace : defaultGrace;
     if (lastValidated) {
       const daysSince = (Date.now() - lastValidated.getTime()) / (1000 * 60 * 60 * 24);
       if (daysSince > graceDays) {
@@ -247,11 +285,23 @@ export async function checkForUpdate(): Promise<{ ok: true; info: UpdateInfo } |
 
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
-    select: { licenseKey: true, licenseStatus: true, licenseDomain: true },
+    select: {
+      licenseKey: true,
+      licenseStatus: true,
+      licenseDomain: true,
+      licenseUpdatesAllowed: true,
+    },
   });
 
-  if (settings?.licenseStatus !== 'active' || !settings.licenseKey) {
+  if (!settings?.licenseKey || settings.licenseStatus === 'not_activated') {
     return { ok: false, error: 'Valid license required to check for updates' };
+  }
+
+  if (!settings.licenseUpdatesAllowed) {
+    return {
+      ok: false,
+      error: 'Updates not available for this license (expired or on hold). Renew with your vendor.',
+    };
   }
 
   const domain = resolveLicenseDomain(settings.licenseDomain);

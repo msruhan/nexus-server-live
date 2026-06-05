@@ -12,10 +12,14 @@ import {
 import { validateImeiOrderDeviceInput } from '@/lib/imei-order-input';
 import { generateOrderCode } from '@/lib/generate-order-code';
 import { extractFeedbackInput } from '@/lib/feedback/input';
+import { requireRuntimeLicense } from '@/lib/license-guard';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
+  const licenseDenied = await requireRuntimeLicense();
+  if (licenseDenied) return licenseDenied;
+
   const auth = await requireApiKeyAuth(req, 'orders:write');
   if (!auth.ok) return auth.error;
 

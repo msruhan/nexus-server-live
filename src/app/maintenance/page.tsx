@@ -29,7 +29,7 @@ export default async function MaintenancePage() {
   const title = settings.maintenanceTitle?.trim() || 'Back in a moment.';
   const message =
     settings.maintenanceMessage?.trim() ||
-    'We are performing scheduled maintenance to improve your experience. The bureau will be back online shortly.';
+    'We are performing scheduled maintenance to improve your experience. The platform will be back online shortly.';
   const template = (settings.maintenanceTemplate || 'aurora') as MaintenanceTemplateId;
   const endsAt = settings.maintenanceEndsAt ? settings.maintenanceEndsAt.toISOString() : null;
 

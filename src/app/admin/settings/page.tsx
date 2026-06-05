@@ -13,7 +13,7 @@ export default async function AdminSettingsPage() {
         section="§ Admin · Settings"
         title={
           <>
-            Bureau <span className="font-serif italic font-normal">configuration</span>.
+            Control center <span className="font-serif italic font-normal">configuration</span>.
           </>
         }
         subtitle="Global site settings, feature flags, and brand."

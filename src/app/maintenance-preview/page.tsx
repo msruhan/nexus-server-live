@@ -43,7 +43,7 @@ export default async function MaintenancePreviewPage({
       title={s?.maintenanceTitle?.trim() || 'Back in a moment.'}
       message={
         s?.maintenanceMessage?.trim() ||
-        'We are performing scheduled maintenance to improve your experience. The bureau will be back online shortly.'
+        'We are performing scheduled maintenance to improve your experience. The platform will be back online shortly.'
       }
       endsAt={s?.maintenanceEndsAt ? s.maintenanceEndsAt.toISOString() : null}
     />

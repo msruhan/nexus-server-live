@@ -120,7 +120,7 @@ export default async function CmsHub() {
         section="§ Admin · CMS"
         title={
           <>
-            Edit the bureau&rsquo;s <span className="font-serif italic font-normal">storefront</span>.
+            Edit your <span className="font-serif italic font-normal">storefront</span>.
           </>
         }
         subtitle="Everything visible to the public — landing sections, banners, navigation, FAQ, testimonials, custom pages, media."

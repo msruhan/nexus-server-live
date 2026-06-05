@@ -591,7 +591,11 @@ model SiteSettings {
   licensePlan            String?
   licenseExpiresAt       DateTime?
   licenseLastValidated   DateTime?
-  licenseReason          String?  // reason if inactive (e.g. "expired", "revoked", "grace_period_exceeded")
+  licenseReason          String?  // reason if inactive (e.g. "hold", "expired", "grace_period_exceeded")
+  licensePortalStatus    String?  // last Portal status: active | hold | expired | …
+  licenseTier            String?  // monthly | yearly | lifetime
+  licenseRuntimeAllowed  Boolean  @default(true)
+  licenseUpdatesAllowed  Boolean  @default(true)
   lastUpdateVersion      String?
   lastUpdateAt           DateTime?
 

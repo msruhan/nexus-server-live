@@ -61,7 +61,7 @@ export default async function AdminDashboardPage() {
         section="§ Dashboard"
         title={
           <>
-            The bureau&rsquo;s <span className="font-serif italic font-normal">vital</span> signs.
+            Control center · <span className="font-serif italic font-normal">vital</span> signs.
           </>
         }
         subtitle="Real-time view across orders, revenue, providers, and pending actions."

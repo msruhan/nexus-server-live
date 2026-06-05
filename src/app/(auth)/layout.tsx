@@ -10,7 +10,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             href="/"
             className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted hover:text-ink"
           >
-            ← Back to bureau
+            ← Back to site
           </Link>
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
             Nexus Server
@@ -33,12 +33,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         />
         <div className="relative flex h-full flex-col justify-between p-12">
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-paper/60">
-            § The bureau · admissions
+            § The hub · admissions
           </span>
 
           <div>
             <h2 className="font-display text-[clamp(2rem,4vw,4rem)] font-black leading-[0.95] tracking-tightest text-paper">
-              Open the desk.{' '}
+              Open the platform.{' '}
               <span className="font-serif italic font-normal text-primary-300">
                 The kettle&rsquo;s on.
               </span>

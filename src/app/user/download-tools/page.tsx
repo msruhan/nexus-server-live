@@ -19,7 +19,7 @@ export default async function UserDownloadToolsPage() {
             Download <span className="font-serif italic font-normal">tools</span>.
           </>
         }
-        subtitle={`${tools.length} published tools · find drivers, utilities, and software published by the bureau.`}
+        subtitle={`${tools.length} published tools · find drivers, utilities, and software published on the platform.`}
       />
       <DownloadToolsLibrary
         tools={tools.map((t) => ({

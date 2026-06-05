@@ -17,6 +17,7 @@ import {
   recordAttempt,
   recordFailure,
 } from '@/lib/api-key-security';
+import { requireRuntimeLicense } from '@/lib/license-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -497,6 +498,14 @@ export async function POST(req: Request) {
   const auth = await authClassic(username, apiaccesskey);
   if (!auth.ok) {
     return auth.response;
+  }
+
+  if (action === 'placeimeiorder' || action === 'placeserverorder') {
+    const licenseDenied = await requireRuntimeLicense();
+    if (licenseDenied) {
+      const payload = (await licenseDenied.json()) as { reason?: string };
+      return err(payload.reason ?? 'License inactive — storefront locked');
+    }
   }
 
   // ─── Security policy (opt-in, non-breaking) ──────────────────

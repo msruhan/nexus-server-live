@@ -7,10 +7,14 @@ import { parseServerFieldDefs, validateServerOrderFields } from '@/lib/server-fi
 import { createServerOrderSchema } from '@/lib/validations/server';
 import { generateOrderCode } from '@/lib/generate-order-code';
 import { extractFeedbackInput } from '@/lib/feedback/input';
+import { requireRuntimeLicense } from '@/lib/license-guard';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
+  const licenseDenied = await requireRuntimeLicense();
+  if (licenseDenied) return licenseDenied;
+
   const auth = await requireApiKeyAuth(req, 'orders:write');
   if (!auth.ok) return auth.error;
 

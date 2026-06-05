@@ -30,7 +30,7 @@ export default async function AdminWalletPage() {
         section="§ Admin · Wallet"
         title={
           <>
-            Top-up <span className="font-serif italic font-normal">desk</span>.
+            Top-up <span className="font-serif italic font-normal">control center</span>.
           </>
         }
         subtitle="Approve or reject pending top-ups · review history."

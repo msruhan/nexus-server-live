@@ -14,7 +14,7 @@ async function main() {
     where: { email: 'admin@nexus.id' },
     update: {},
     create: {
-      name: 'Admin Bureau',
+      name: 'Admin Hub',
       email: 'admin@nexus.id',
       password: adminPwd,
       role: 'ADMIN',

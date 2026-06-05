@@ -27,7 +27,7 @@ export type Branding = {
 
 const DEFAULTS: Branding = {
   siteName: 'Nexus Server',
-  tagline: 'IMEI & Server Bureau',
+  tagline: 'IMEI & Server Hub',
   logoUrl: null,
   faviconUrl: null,
   primaryColor: '#2f63ff',
