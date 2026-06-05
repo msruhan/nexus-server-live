@@ -4,6 +4,8 @@ out
 .env
 .env.local
 .env.supabase
+.env.production
+.env.coolify
 .env.vercel.setup
 tsconfig.tsbuildinfo
 dev.db

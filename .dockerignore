@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+.git
+.env
+.env.*
+!.env.coolify.example
+!.env.example
+storage/backups
+*.sql.gz
+.DS_Store
+*.log
+.vercel
+coverage

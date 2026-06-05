@@ -1,6 +1,9 @@
 # Nexus Server
 
-Self-service platform for IMEI &amp; Server services with DhruFusion integration.
+Self-service platform for IMEI & Server services with DhruFusion integration.
+
+> **Production (Coolify / customer VPS):** this repo — see [README-LIVE.md](./README-LIVE.md) and [docs/DEPLOY-COOLIFY.md](./docs/DEPLOY-COOLIFY.md).  
+> **Marketing demo (Vercel):** use [nexusserver](https://github.com/msruhan/nexusserver) instead.
 
 Built per [PRD-IMEI-SERVER-SERVICES.md](./PRD-IMEI-SERVER-SERVICES.md).
 
