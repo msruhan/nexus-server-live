@@ -17,3 +17,6 @@ dev.db-journal
 /storage/backups
 *.sql.gz
 .vercel
+
+# Generated on VPS during provision
+deploy/Caddyfile
