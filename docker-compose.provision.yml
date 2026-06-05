@@ -1,0 +1,24 @@
+# Overlay for automated white-glove installs (Hermes / provision scripts).
+# Usage: docker compose -f docker-compose.production.yml -f docker-compose.provision.yml up -d
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_started
+
+  app:
+    ports: []
+
+volumes:
+  caddy_data:
+  caddy_config:

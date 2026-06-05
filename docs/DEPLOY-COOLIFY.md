@@ -116,12 +116,12 @@ open http://localhost:3000
 | License activate fails | Match `LICENSE_API_SIGNING_SECRET` with Portal; HTTPS URLs |
 | Uploads lost on redeploy | Mount volume `/app/public/uploads` |
 
-## 8. Hermes / NexusPortal automation (next)
+## 8. Hermes / NexusPortal automation
 
-This repo is structured for automated install:
+Provision scripts live in [`scripts/provision/`](../scripts/provision/README.md):
 
-- Dockerfile + health endpoint + `.env.coolify.example`
-- Postgres on same VPS (option A)
-- Documented volumes and `db:setup:production`
+- `run-pipeline.sh` — clone repo, generate `.env.production` on VPS (D3), deploy via docker compose + Caddy HTTPS, run `db:setup:production`, health check
+- Default `PROVISION_MODE=compose`; set `PROVISION_MODE=coolify` to run the Coolify installer first
+- NexusPortal **Start install** → Hermes SSH → runs pipeline on customer VPS
 
-NexusPortal provisioning queue → Hermes SSH → Coolify API/CLI is a separate integration phase.
+See NexusPortal [design spec](https://github.com/msruhan/nexus-portal/blob/main/docs/superpowers/specs/2026-06-05-portal-hermes-install-design.md).
