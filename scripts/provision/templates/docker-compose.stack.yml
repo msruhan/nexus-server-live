@@ -1,0 +1,36 @@
+# Customer VPS stack — pre-built image only (no source / no build on VPS).
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      POSTGRES_DB: nexus
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nexus']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    image: ${NEXUS_IMAGE:?Set NEXUS_IMAGE to vendor registry image}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/nexus?schema=public
+      DIRECT_URL: postgresql://nexus:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/nexus?schema=public
+    volumes:
+      - uploads:/app/public/uploads
+      - backups:/app/storage/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
+  backups:

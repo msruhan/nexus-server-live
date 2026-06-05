@@ -31,9 +31,18 @@ normalize_domain() {
   printf '%s' "$d"
 }
 
-export INSTALL_DIR="${INSTALL_DIR:-/opt/nexus-server-live}"
-export REPO_URL="${REPO_URL:-https://github.com/msruhan/nexus-server-live.git}"
-export REPO_BRANCH="${REPO_BRANCH:-main}"
+registry_login() {
+  if [[ -z "${REGISTRY_TOKEN:-}" || -z "${REGISTRY_USERNAME:-}" ]]; then
+    return 0
+  fi
+  local host="${REGISTRY_HOST:-ghcr.io}"
+  need_cmd docker
+  log "Logging in to container registry ($host)..."
+  echo "$REGISTRY_TOKEN" | docker login "$host" -u "$REGISTRY_USERNAME" --password-stdin
+}
+
+export INSTALL_DIR="${INSTALL_DIR:-/opt/nexus-server}"
+export NEXUS_IMAGE="${NEXUS_IMAGE:-ghcr.io/msruhan/nexus-server:latest}"
 export PROVISION_MODE="${PROVISION_MODE:-compose}"
 
 # Directory containing provision scripts (scripts/provision)

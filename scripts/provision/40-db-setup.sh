@@ -13,7 +13,12 @@ else
   COMPOSE=(docker-compose)
 fi
 
+COMPOSE_FILES=(-f docker-compose.stack.yml)
+if [[ -f docker-compose.caddy.yml ]]; then
+  COMPOSE_FILES+=(-f docker-compose.caddy.yml)
+fi
+
 log "Running npm run db:setup:production inside app container..."
-"${COMPOSE[@]}" -f docker-compose.production.yml -f docker-compose.provision.yml exec -T app npm run db:setup:production
+"${COMPOSE[@]}" "${COMPOSE_FILES[@]}" exec -T app npm run db:setup:production
 
 log "Database schema + seed complete"

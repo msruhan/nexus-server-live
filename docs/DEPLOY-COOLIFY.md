@@ -2,14 +2,16 @@
 
 Production platform for **white-glove customer installs**: full IMEI/server orders, wallet, webhooks, backups, CMS uploads, and in-process schedulers.
 
-> **Repo split:** [nexusserver](https://github.com/msruhan/nexusserver) = Vercel marketing demo. **This repo** (`nexus-server-live`) = customer VPS via Coolify.
+> **Repo split:** [nexusserver](https://github.com/msruhan/nexusserver) = Vercel marketing demo. **This repo** (`nexus-server-live`) = customer VPS via pre-built Docker image.
+
+> **Security:** Customers deploy from **vendor container registry** (GHCR) — no Git clone of this repo on their VPS. Source stays on vendor CI only.
 
 ## Ringkasan
 
 | Komponen | Layanan |
 |----------|---------|
-| App (Next.js) | Coolify — Dockerfile in repo root |
-| Database | PostgreSQL 16 (Coolify managed service on same VPS) |
+| App (Next.js) | Pre-built image `ghcr.io/msruhan/nexus-server` |
+| Database | PostgreSQL 16 (Coolify service or compose stack) |
 | Uploads | Volume → `/app/public/uploads` |
 | Backups | Volume → `/app/storage/backups` + `pg_dump` in container |
 | License | NexusPortal production URL + shared `LICENSE_API_SIGNING_SECRET` |
@@ -17,20 +19,33 @@ Production platform for **white-glove customer installs**: full IMEI/server orde
 ## Prerequisites
 
 - VPS Ubuntu 22.04+ (4 GB RAM recommended)
-- [Coolify](https://coolify.io) installed on VPS (or customer VPS with SSH access for Hermes)
-- Domain pointed to Coolify reverse proxy (HTTPS)
+- [Coolify](https://coolify.io) on VPS (optional — Hermes can use compose+Caddy instead)
+- Domain pointed to VPS (HTTPS)
 - NexusPortal production URL and license key for customer
+- Vendor publishes image: see [`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml)
 
-## 1. Coolify — PostgreSQL
+## 1. Vendor — build & push image
+
+On release tag `v*` (or manual workflow dispatch):
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+Image: `ghcr.io/msruhan/nexus-server:latest` and `ghcr.io/msruhan/nexus-server:1.0.0`
+
+For **private** GHCR: grant customer VPS read-only `REGISTRY_TOKEN` on Hermes runner (never commit tokens).
+
+## 2. Coolify — PostgreSQL
 
 1. Add **PostgreSQL 16** service in Coolify.
 2. Note internal hostname (e.g. `postgres-xxxxx`) and credentials.
 3. Create database `nexus` if not auto-created.
 
-## 2. Coolify — Application
+## 3. Coolify — Application (Docker image, no Git)
 
-1. **New Resource → Application → GitHub** → `msruhan/nexus-server-live` (branch `main`).
-2. **Build pack:** Dockerfile (auto-detected from repo root).
+1. **New Resource → Application → Docker Image** (not GitHub).
+2. **Image:** `ghcr.io/msruhan/nexus-server:latest` (+ registry credentials if private).
 3. **Port:** `3000`.
 4. **Health check:** `GET /api/health` (expects JSON `{ "ok": true }`).
 5. **Persistent volumes:**
@@ -57,9 +72,23 @@ NEXUS_LICENSE_SERVER_URL=https://your-nexus-portal.vercel.app
 LICENSE_API_SIGNING_SECRET=...   # same as NexusPortal
 ```
 
-7. Deploy. First deploy may fail until DB schema exists — run setup (step 3).
+7. Deploy. First deploy may fail until DB schema exists — run setup (step 4).
 
-## 3. Database schema + seed
+### Hermes automated Coolify deploy
+
+Set on Hermes runner:
+
+```bash
+PROVISION_MODE=coolify
+COOLIFY_API_TOKEN=...
+COOLIFY_PROJECT_UUID=...
+COOLIFY_SERVER_UUID=...
+NEXUS_IMAGE=ghcr.io/msruhan/nexus-server:latest
+```
+
+Pipeline calls `POST /api/v1/applications/dockerimage` — see [`scripts/provision/30-deploy-coolify.sh`](../scripts/provision/30-deploy-coolify.sh).
+
+## 4. Database schema + seed
 
 **One-off** after first deploy (Coolify → Execute Command / SSH exec into app container):
 
@@ -67,17 +96,9 @@ LICENSE_API_SIGNING_SECRET=...   # same as NexusPortal
 npm run db:setup:production
 ```
 
-Or from a machine with network access to Postgres:
-
-```bash
-cp .env.coolify.example .env.production
-# edit DATABASE_URL / DIRECT_URL
-npm run db:setup:production
-```
-
 Change admin password immediately after first login.
 
-## 4. License activation
+## 5. License activation
 
 1. Customer receives license key from NexusPortal checkout.
 2. Admin → **System** → enter key → activate against `NEXUS_LICENSE_SERVER_URL`.
@@ -85,17 +106,21 @@ Change admin password immediately after first login.
 
 See [LICENSE_PORTAL.md](./LICENSE_PORTAL.md).
 
-## 5. Local smoke test (docker compose)
+## 6. Local smoke test (vendor machine — builds image locally)
 
 ```bash
 cp .env.coolify.example .env.production
-# set POSTGRES_PASSWORD in shell or .env.production
-docker compose -f docker-compose.production.yml up -d --build
+docker build -t nexus-server:local .
+export NEXUS_IMAGE=nexus-server:local
+export POSTGRES_PASSWORD=devpass
+docker compose -f docker-compose.production.yml up -d --build   # dev only
 docker compose -f docker-compose.production.yml exec app npm run db:setup:production
 open http://localhost:3000
 ```
 
-## 6. Vercel vs Coolify (this repo)
+Customer VPS uses **image pull only** — see [`scripts/provision/`](../scripts/provision/README.md).
+
+## 7. Vercel vs Coolify (this repo)
 
 | Feature | Vercel (`nexusserver`) | Coolify (this repo) |
 |---------|------------------------|---------------------|
@@ -105,23 +130,21 @@ open http://localhost:3000
 | CMS uploads persist | ❌ | ✅ volume |
 | One-click Portal updates | Limited | ✅ with disk |
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Masalah | Solusi |
 |---------|--------|
-| Build fails Prisma | Dockerfile runs `prisma generate` before `next build` |
+| `pull access denied` | Set `REGISTRY_USERNAME` + `REGISTRY_TOKEN` on Hermes; `docker login ghcr.io` on VPS |
 | `DATA_ENCRYPTION_KEY is required` | Set in Coolify env, redeploy |
 | Health check failing | Wait 90s start period; check logs |
 | `check-db` missing tables | Run `npm run db:setup:production` |
 | License activate fails | Match `LICENSE_API_SIGNING_SECRET` with Portal; HTTPS URLs |
 | Uploads lost on redeploy | Mount volume `/app/public/uploads` |
 
-## 8. Hermes / NexusPortal automation
+## 9. Hermes / NexusPortal automation
 
-Provision scripts live in [`scripts/provision/`](../scripts/provision/README.md):
-
-- `run-pipeline.sh` — clone repo, generate `.env.production` on VPS (D3), deploy via docker compose + Caddy HTTPS, run `db:setup:production`, health check
-- Default `PROVISION_MODE=compose`; set `PROVISION_MODE=coolify` to run the Coolify installer first
-- NexusPortal **Start install** → Hermes SSH → runs pipeline on customer VPS
+- Hermes SCPs [`scripts/provision/`](../scripts/provision/) to customer VPS (no app repo)
+- Pulls `NEXUS_IMAGE` from vendor registry
+- NexusPortal **Start install** → Hermes SSH → `run-pipeline.sh`
 
 See NexusPortal [design spec](https://github.com/msruhan/nexus-portal/blob/main/docs/superpowers/specs/2026-06-05-portal-hermes-install-design.md).

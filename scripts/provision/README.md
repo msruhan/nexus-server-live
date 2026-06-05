@@ -1,6 +1,10 @@
 # NexusServer provision scripts (Hermes / white-glove)
 
-Deterministic bash pipeline for customer VPS installs. Hermes job runner SSHs to the customer server, exports env vars from the Portal job payload, and runs `run-pipeline.sh`.
+Deterministic bash pipeline for customer VPS installs. Hermes job runner SCPs these scripts to the customer server (no app source), exports env vars from the Portal job payload, and runs `run-pipeline.sh`.
+
+## Distribution model
+
+**Customer VPS receives a pre-built Docker image only** — no Git clone of `nexus-server-live`. Vendor CI builds and pushes to GHCR (or private registry); Hermes passes `NEXUS_IMAGE` and optional registry credentials.
 
 ## Required environment
 
@@ -9,17 +13,21 @@ Deterministic bash pipeline for customer VPS installs. Hermes job runner SSHs to
 | `CUSTOMER_DOMAIN` | Portal provisioning form |
 | `PORTAL_URL` | Portal job API (`portalUrl`) |
 | `LICENSE_API_SIGNING_SECRET` | Hermes runner env (same as NexusPortal) |
-| `LICENSE_KEY` | Portal job API (optional; activate in admin UI) |
+| `NEXUS_IMAGE` | Hermes runner / Portal (`nexusImage`), e.g. `ghcr.io/msruhan/nexus-server:latest` |
 
 ## Optional
 
 | Variable | Default |
 |----------|---------|
 | `PROVISION_MODE` | `compose` — docker compose + Caddy HTTPS |
-| | `coolify` — installs Coolify; API deploy requires `COOLIFY_API_TOKEN` |
-| `INSTALL_DIR` | `/opt/nexus-server-live` |
-| `REPO_URL` | `https://github.com/msruhan/nexus-server-live.git` |
-| `REPO_BRANCH` | `main` |
+| | `coolify` — Coolify installer + API deploy when UUIDs set |
+| `INSTALL_DIR` | `/opt/nexus-server` |
+| `REGISTRY_USERNAME` / `REGISTRY_TOKEN` | For private GHCR pulls on customer VPS |
+| `REGISTRY_HOST` | `ghcr.io` |
+| `COOLIFY_API_TOKEN` | Coolify UI → Keys & Tokens |
+| `COOLIFY_PROJECT_UUID` / `COOLIFY_SERVER_UUID` | Required for Coolify API deploy |
+| `COOLIFY_ENVIRONMENT_NAME` | `production` |
+| `COOLIFY_API_URL` | `http://127.0.0.1:8000/api/v1` |
 
 Secrets (`AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `CRON_SECRET`, `POSTGRES_PASSWORD`) are **generated on the VPS** (design D3) and written to `.env.production`.
 
@@ -27,19 +35,14 @@ Secrets (`AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `CRON_SECRET`, `POSTGRES_PASSWORD
 
 | Step | Script |
 |------|--------|
-| 0 | `00-preflight.sh` — Ubuntu/RAM checks |
+| 0 | `00-preflight.sh` — Ubuntu/RAM/image checks |
 | 0b | `05-install-docker.sh` — Docker + Compose if missing |
 | 1 | `10-install-coolify.sh` — only when `PROVISION_MODE=coolify` |
-| 2 | `20-clone-and-env.sh` — clone repo + `.env.production` |
-| 3 | `30-deploy-compose.sh` — postgres + app + Caddy (Let's Encrypt) |
+| 2 | `20-setup-env.sh` — compose templates + `.env.production` (no git) |
+| 3 | `30-deploy-compose.sh` — pull image, postgres + app + Caddy |
+| 3b | `30-deploy-coolify.sh` — when Coolify API UUIDs configured |
 | 4 | `40-db-setup.sh` — `npm run db:setup:production` |
 | 5 | `50-healthcheck.sh` — `GET https://{domain}/api/health` |
-
-## Prerequisites (customer VPS)
-
-- Ubuntu 22.04+, 4 GB RAM recommended
-- **DNS:** `CUSTOMER_DOMAIN` A record → VPS IP **before** health check
-- Docker Engine + Compose plugin (installed by `05-install-docker.sh` if missing)
 
 ## Manual smoke test
 
@@ -47,23 +50,21 @@ Secrets (`AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `CRON_SECRET`, `POSTGRES_PASSWORD
 export CUSTOMER_DOMAIN=shop.example.com
 export PORTAL_URL=https://nexus-portal-pied.vercel.app
 export LICENSE_API_SIGNING_SECRET=your-shared-secret
+export NEXUS_IMAGE=ghcr.io/msruhan/nexus-server:latest
 sudo -E bash scripts/provision/run-pipeline.sh
 ```
 
 ## Hermes runner contract
 
-Runner should:
-
 1. Fetch job from Portal `GET /api/hermes/jobs/{token}`
-2. SSH to customer VPS with fetched credentials
-3. Export env from JSON payload + `LICENSE_API_SIGNING_SECRET` from runner
-4. Upload or `git clone` this repo's `scripts/provision` (or clone full repo in step 20)
-5. Run `bash run-pipeline.sh`; capture stdout/stderr
-6. On failure → `POST /api/hermes/callback` with `status: failed`
+2. SCP this `scripts/provision/` directory to customer VPS (bundled in `hermes-job-runner/provision/`)
+3. SSH with env: `NEXUS_IMAGE`, registry creds, domain, portal URL
+4. Run `bash run-pipeline.sh`
+5. On failure → `POST /api/hermes/callback` with `status: failed`
 
 ## Compose vs Coolify
 
-- **`compose` (default):** Production stack via `docker-compose.production.yml` + `docker-compose.provision.yml` (Caddy on 80/443). Matches [DEPLOY-COOLIFY.md](../../docs/DEPLOY-COOLIFY.md) local smoke test pattern with automatic HTTPS.
-- **`coolify`:** Runs official Coolify installer. Full Coolify API deploy needs per-instance `COOLIFY_API_TOKEN` and project/server UUIDs — configure on Hermes when ready; until then installer completes and compose fallback may apply.
+- **`compose` (default):** Pull vendor image + `docker-compose.stack.yml` + Caddy (Let's Encrypt). No Coolify UI required.
+- **`coolify`:** Installs Coolify, then uses Coolify API (`POST /applications/dockerimage`) when `COOLIFY_*` UUIDs are set; otherwise compose+image fallback.
 
-See [Portal ↔ Hermes design](https://github.com/msruhan/nexus-portal/blob/main/docs/superpowers/specs/2026-06-05-portal-hermes-install-design.md) (NexusPortal repo).
+See [DEPLOY-COOLIFY.md](../../docs/DEPLOY-COOLIFY.md) and NexusPortal [design spec](https://github.com/msruhan/nexus-portal/blob/main/docs/superpowers/specs/2026-06-05-portal-hermes-install-design.md).

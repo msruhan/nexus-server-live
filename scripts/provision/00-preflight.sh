@@ -10,11 +10,14 @@ need_cmd free
 need_cmd openssl
 
 need_env CUSTOMER_DOMAIN
+need_env NEXUS_IMAGE
 export CUSTOMER_DOMAIN="$(normalize_domain "$CUSTOMER_DOMAIN")"
 [[ -n "$CUSTOMER_DOMAIN" ]] || die "CUSTOMER_DOMAIN is invalid"
+
+if [[ -n "${PORTAL_URL:-}" && -n "${LICENSE_API_SIGNING_SECRET:-}" ]]; then
   log "Portal env present"
 else
-  log "WARN: PORTAL_URL or LICENSE_API_SIGNING_SECRET unset — 20-clone-and-env will fail"
+  log "WARN: PORTAL_URL or LICENSE_API_SIGNING_SECRET unset — 20-setup-env will fail"
 fi
 
 if [[ -r /etc/os-release ]]; then
@@ -31,4 +34,4 @@ if [[ "${mem_mb:-0}" -lt 3500 ]]; then
   log "WARN: RAM ${mem_mb}MB — 4GB+ recommended"
 fi
 
-log "Preflight OK — domain=$CUSTOMER_DOMAIN mode=$PROVISION_MODE"
+log "Preflight OK — domain=$CUSTOMER_DOMAIN image=$NEXUS_IMAGE mode=$PROVISION_MODE"
