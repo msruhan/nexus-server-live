@@ -46,7 +46,7 @@ export default async function LicenseSuspendedPage() {
     );
   }
 
-  const siteName = settings?.siteName?.trim() || 'Nexus Server';
+  const siteName = settings?.siteName?.trim() || 'Recovero';
   const title = settings?.maintenanceTitle?.trim() || 'Back in a moment.';
   const message =
     settings?.maintenanceMessage?.trim() ||

@@ -26,7 +26,7 @@ export type Branding = {
 };
 
 const DEFAULTS: Branding = {
-  siteName: 'Nexus Server',
+  siteName: 'Recovero',
   tagline: 'IMEI & Server Hub',
   logoUrl: null,
   faviconUrl: null,

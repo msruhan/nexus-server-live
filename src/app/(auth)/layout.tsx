@@ -13,7 +13,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             ← Back to site
           </Link>
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
-            Nexus Server
+            Recovero
           </span>
         </div>
         <div className="flex flex-1 items-center justify-center px-6 pb-12 pt-4 lg:px-12">

@@ -39,7 +39,7 @@ export default async function MaintenancePreviewPage({
   return (
     <MaintenanceView
       template={template}
-      siteName={s?.siteName || 'Nexus Server'}
+      siteName={s?.siteName || 'Recovero'}
       title={s?.maintenanceTitle?.trim() || 'Back in a moment.'}
       message={
         s?.maintenanceMessage?.trim() ||

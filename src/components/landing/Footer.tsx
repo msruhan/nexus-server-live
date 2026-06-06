@@ -20,7 +20,7 @@ export async function Footer() {
     prisma.siteSettings.findUnique({ where: { id: 'singleton' } }),
   ]);
 
-  const siteName = settings?.siteName ?? 'Nexus Server';
+  const siteName = settings?.siteName ?? 'Recovero';
   const tagline = settings?.siteTagline ?? 'Unlock Service Portal';
   const footerText =
     settings?.footerText ?? 'A self-service unlock operations portal for resellers and technicians.';
@@ -176,7 +176,7 @@ export async function Footer() {
           <span>{copyright}</span>
           {settings?.brandShowPoweredBy !== false && (
             <span className="text-ink-soft">
-              Powered by Nexus Server
+              Powered by Recovero
             </span>
           )}
         </div>

@@ -33,7 +33,7 @@ export async function Navbar() {
   return (
     <NavbarClient
       items={baseItems}
-      siteName={settings?.siteName ?? 'Nexus Server'}
+      siteName={settings?.siteName ?? 'Recovero'}
       tagline={settings?.siteTagline ?? 'Unlock Service Portal'}
       logoUrl={settings?.logoUrl ?? null}
     />

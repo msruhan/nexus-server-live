@@ -26,7 +26,7 @@ async function loadSiteName(): Promise<string> {
     where: { id: 'singleton' },
     select: { siteName: true },
   });
-  return row?.siteName ?? 'Nexus Server';
+  return row?.siteName ?? 'Recovero';
 }
 
 function resolveBaseUrl(): string {

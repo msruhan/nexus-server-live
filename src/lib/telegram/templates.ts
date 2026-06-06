@@ -205,7 +205,7 @@ export function channelPriceUpdateTemplate(p: {
 
 export function welcomeTemplate(botUsername: string): string {
   return [
-    `👋 <b>Welcome to Nexus Server Bot!</b>`,
+    `👋 <b>Welcome to Recovero Bot!</b>`,
     ``,
     `I can help you with:`,
     `• /balance — Check your wallet balance`,

@@ -33,7 +33,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       currency: invoice.currency,
       description: invoice.description,
       orderCode: invoice.orderCode,
-      sellerName: invoice.sellerName ?? 'Nexus Server',
+      sellerName: invoice.sellerName ?? 'Recovero',
       sellerEmail: invoice.sellerEmail,
       buyerName: invoice.buyerName,
       buyerEmail: invoice.buyerEmail,

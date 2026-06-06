@@ -33,7 +33,7 @@ export async function generateMetadata({
   const page = await getPage(slug);
   if (!page) return {};
   return {
-    title: page.metaTitle ?? `${page.title} · Nexus Server`,
+    title: page.metaTitle ?? `${page.title} · Recovero`,
     description: page.metaDescription ?? undefined,
   };
 }

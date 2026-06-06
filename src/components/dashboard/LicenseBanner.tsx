@@ -16,7 +16,7 @@ const REASON_LABELS: Record<string, string> = {
   invalid_key: 'The stored license key is no longer recognized.',
   grace_period_exceeded:
     'The License Server has been unreachable for over 7 days, so this installation is now locked.',
-  hold: 'Subscription on hold — renew with your vendor, then release hold in Nexus Portal.',
+  hold: 'Subscription on hold — renew with your vendor, then release hold in Recovero Portal.',
   validation_failed: 'License validation failed.',
 };
 

@@ -322,7 +322,7 @@ export function Sidebar({
             </span>
           )}
           <div className="leading-tight">
-            <div className="font-display text-sm font-extrabold text-ink">{brand?.siteName ?? 'Nexus Server'}</div>
+            <div className="font-display text-sm font-extrabold text-ink">{brand?.siteName ?? 'Recovero'}</div>
             <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-ink-muted">
               {variant === 'admin'
                 ? isSubAdmin

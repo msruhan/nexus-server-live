@@ -29,7 +29,7 @@ export function MobileBar({ user }: { user: { name: string; email: string; role:
           </span>
           <div className="min-w-0 leading-tight">
             <span className="block truncate font-display text-sm font-extrabold tracking-tight text-ink">
-              Nexus
+              Recovero
             </span>
             <span className="block font-mono text-[9px] tabular-nums text-ink-soft">{formatAppVersion()}</span>
           </div>

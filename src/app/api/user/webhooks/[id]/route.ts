@@ -53,7 +53,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       id: `test_${Date.now()}`,
       event: 'order.success',
       createdAt: new Date().toISOString(),
-      data: { test: true, message: 'This is a test event from Nexus Server', orderCode: 'TEST-0000' },
+      data: { test: true, message: 'This is a test event from Recovero', orderCode: 'TEST-0000' },
     };
     const body = JSON.stringify(payload);
     const signature = signPayload(body, ep.secret);

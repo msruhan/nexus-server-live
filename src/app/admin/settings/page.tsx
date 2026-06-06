@@ -21,7 +21,7 @@ export default async function AdminSettingsPage() {
 
       <SettingsForm
         initial={{
-          siteName: settings?.siteName ?? 'Nexus Server',
+          siteName: settings?.siteName ?? 'Recovero',
           siteTagline: settings?.siteTagline ?? '',
           primaryColor: settings?.primaryColor ?? '#2f63ff',
           logoUrl: settings?.logoUrl ?? '',

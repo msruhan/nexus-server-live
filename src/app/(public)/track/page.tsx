@@ -6,7 +6,7 @@ import { TrackResult } from './TrackResult';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Track order — Nexus Server',
+  title: 'Track order — Recovero',
   description: 'Look up your IMEI or server order status using its order code.',
 };
 

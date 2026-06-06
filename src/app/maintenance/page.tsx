@@ -25,7 +25,7 @@ export default async function MaintenancePage() {
     );
   }
 
-  const siteName = settings.siteName || 'Nexus Server';
+  const siteName = settings.siteName || 'Recovero';
   const title = settings.maintenanceTitle?.trim() || 'Back in a moment.';
   const message =
     settings.maintenanceMessage?.trim() ||

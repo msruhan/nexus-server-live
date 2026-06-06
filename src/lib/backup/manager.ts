@@ -626,7 +626,7 @@ export async function emailBackup(input: {
   }
 
   const { sendEmail } = await import('@/lib/email/mailer');
-  const siteName = settings.siteName || 'Nexus Server';
+  const siteName = settings.siteName || 'Recovero';
   const sizeLabel = size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`;
   const when = backup.completedAt ?? backup.startedAt;
 

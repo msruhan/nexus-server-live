@@ -30,7 +30,7 @@ export default async function UserWebhooksPage() {
             Outgoing <span className="font-serif italic font-normal">webhooks</span>.
           </>
         }
-        subtitle="Receive real-time POST callbacks when your orders complete or payments are credited — integrate Nexus into your own system."
+        subtitle="Receive real-time POST callbacks when your orders complete or payments are credited — integrate Recovero into your own system."
       />
       <WebhooksManager
         initialEndpoints={endpoints.map((e) => ({

@@ -11,7 +11,7 @@ import { ScrollProgress } from '@/components/landing/ScrollProgress';
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettingsSafe();
   return {
-    title: settings?.metaTitle ?? `${settings?.siteName ?? 'Nexus Server'} — ${settings?.siteTagline ?? 'Unlock Service Portal'}`,
+    title: settings?.metaTitle ?? `${settings?.siteName ?? 'Recovero'} — ${settings?.siteTagline ?? 'Unlock Service Portal'}`,
     description: settings?.metaDescription ?? undefined,
   };
 }

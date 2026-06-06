@@ -99,7 +99,7 @@ export function Hero({ variant = 'ticket' }: { variant?: HeroVisualVariant }) {
               transition={{ delay: 1.0, duration: 0.8 }}
               className="mt-10 max-w-xl text-[17px] leading-relaxed text-ink/75"
             >
-              Nexus is a self-service unlock portal for resellers, technicians, and busy counters.
+              Recovero is a self-service unlock portal for resellers, technicians, and busy counters.
               You order an unlock, an iCloud removal, an FRP bypass — we hand it off to{' '}
               <span className="rounded bg-ink px-1.5 py-0.5 font-mono text-[12px] font-medium text-paper">
                 DhruFusion

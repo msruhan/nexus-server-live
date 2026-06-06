@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
     const result = await sendMessage(
       {
         chatId: settings.telegramAdminChatId,
-        text: '✅ <b>Test message from Nexus Server</b>\n\nTelegram bot is configured correctly!',
+        text: '✅ <b>Test message from Recovero</b>\n\nTelegram bot is configured correctly!',
         parseMode: 'HTML',
       },
       settings.telegramBotToken,
@@ -217,7 +217,7 @@ export async function POST(req: NextRequest) {
     const result = await sendMessage(
       {
         chatId: settings.telegramChannelId,
-        text: '✅ <b>Test message from Nexus Server</b>\n\nChannel integration is working!',
+        text: '✅ <b>Test message from Recovero</b>\n\nChannel integration is working!',
         parseMode: 'HTML',
       },
       settings.telegramBotToken,

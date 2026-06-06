@@ -215,7 +215,7 @@ export function SettingsForm({ initial }: { initial: Initial }) {
           </div>
 
           <Toggle
-            label='Show "Powered by Nexus Server"'
+            label='Show "Powered by Recovero"'
             description="Turn off to fully white-label the footer credit."
             checked={state.brandShowPoweredBy}
             onChange={(v) => patch('brandShowPoweredBy', v)}

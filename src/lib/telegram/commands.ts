@@ -101,7 +101,7 @@ async function handleStart(chatId: number, message: TelegramMessage) {
   });
 
   const settings = await loadSettings();
-  const botUsername = settings?.botUsername ?? 'NexusBot';
+  const botUsername = settings?.botUsername ?? 'RecoveroBot';
 
   if (user) {
     await sendMessage({

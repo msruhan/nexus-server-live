@@ -487,7 +487,7 @@ model ActivityLog {
 // ─── CMS ────────────────────────────────────────────────────────
 model SiteSettings {
   id                  String   @id @default("singleton")
-  siteName            String   @default("Nexus Server")
+  siteName            String   @default("Recovero")
   siteTagline         String   @default("IMEI & Server Bureau")
   logoUrl             String?
   faviconUrl          String?

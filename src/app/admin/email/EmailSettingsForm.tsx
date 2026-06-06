@@ -176,7 +176,7 @@ export function EmailSettingsForm({
           />
           <Input
             label="From name"
-            placeholder="Nexus Server"
+            placeholder="Recovero"
             value={state.smtpFromName}
             onChange={(e) => patch('smtpFromName', e.target.value)}
           />

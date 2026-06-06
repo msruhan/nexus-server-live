@@ -102,10 +102,10 @@ export async function PATCH(req: Request) {
     if (!to) return apiError('Recipient required');
     const result = await sendEmail({
       to,
-      subject: 'Nexus Server — SMTP test',
+      subject: 'Recovero — SMTP test',
       text: 'This is a test email. If you can read this, your SMTP settings work.',
       html:
-        '<p>This is a test email. If you can read this, your SMTP settings work. — <em>Nexus Server</em></p>',
+        '<p>This is a test email. If you can read this, your SMTP settings work. — <em>Recovero</em></p>',
       event: 'auth.password_changed', // any event OK; we whitelist 'auth.password_changed' by default
     });
     return result.ok ? apiSuccess({ ok: true, logId: result.logId }) : apiError(result.reason ?? 'send_failed');

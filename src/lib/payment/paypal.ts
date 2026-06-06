@@ -144,7 +144,7 @@ export async function createPaypalIntent(
       },
     ],
     application_context: {
-      brand_name: 'Nexus Server',
+      brand_name: 'Recovero',
       shipping_preference: 'NO_SHIPPING',
       user_action: 'PAY_NOW',
       return_url: `${base}/api/payment/paypal/return?intent=${intent.id}`,
