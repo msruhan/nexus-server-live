@@ -163,12 +163,6 @@ export function LoginForm() {
               Forgot password?
             </Link>
           </div>
-
-          <div className="rounded-lg border border-line bg-paper-100 px-4 py-3 font-mono text-[11px] text-ink-muted">
-            <div className="font-bold text-ink">Demo credentials</div>
-            <div className="mt-1">admin@nexus.id · admin123</div>
-            <div>reseller@demo.id · user1234</div>
-          </div>
         </>
       )}
     </form>

@@ -59,5 +59,10 @@ run('npx tsx prisma/seed.ts', {
 });
 
 console.log('[setup-production] Done.');
-console.log('  Admin: admin@nexus.id / admin123  (change password after first login)');
-console.log('  User:  reseller@demo.id / user1234');
+const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim();
+if (adminEmail) {
+  console.log(`  Admin: ${adminEmail} (password set at provisioning — not logged)`);
+} else {
+  console.log('  Admin: admin@nexus.id / admin123  (local default — set SEED_ADMIN_* for production)');
+  console.log('  User:  reseller@demo.id / user1234');
+}
