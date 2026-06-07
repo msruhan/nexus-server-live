@@ -17,7 +17,15 @@ import {
   type HeroVisualVariant,
 } from './visuals';
 
-export function Hero({ variant = 'ticket' }: { variant?: HeroVisualVariant }) {
+export function Hero({
+  variant = 'ticket',
+  siteName = 'Recovero',
+  host = 'localhost',
+}: {
+  variant?: HeroVisualVariant;
+  siteName?: string;
+  host?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -170,7 +178,7 @@ export function Hero({ variant = 'ticket' }: { variant?: HeroVisualVariant }) {
             className="col-span-12 lg:col-span-5 lg:pt-12"
           >
             {variant === 'console' ? (
-              <ConsoleLog />
+              <ConsoleLog siteName={siteName} host={host} />
             ) : variant === 'dashboard' ? (
               <StatsDashboard />
             ) : variant === 'phone' ? (

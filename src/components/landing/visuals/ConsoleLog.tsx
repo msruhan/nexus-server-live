@@ -10,28 +10,60 @@ type Line =
   | { type: 'success'; text: string }
   | { type: 'json'; text: string };
 
-const SCRIPT: Line[] = [
-  { type: 'cmd', text: '$ nexus order:place --service=A.101 --imei=353456789012345' },
-  { type: 'log', text: 'validating input · idempotency check · OK', tag: 'INFO' },
-  { type: 'log', text: 'wallet.debit $5.99 · ledger entry #2841', tag: 'WALLET' },
-  { type: 'cmd', text: '$ POST {host}/api/index.php action=placeorder' },
-  { type: 'json', text: '{ "STATUS": "SUCCESS", "ID": "987654" }' },
-  { type: 'log', text: 'order#A1B2C3 → SUBMITTED · external 987654', tag: 'OK' },
-  { type: 'cmd', text: '$ cron.poll-imei-orders · cycle=42' },
-  { type: 'log', text: 'GET getstatus id=987654 → "Completed"', tag: 'POLL' },
-  { type: 'success', text: 'Result delivered · UNLK-7341-289X-22' },
-];
+/** CLI alias from site name — e.g. "Recovero" → "recovero", "ACME Unlock" → "acme-unlock". */
+export function toCliAlias(siteName: string): string {
+  const slug = siteName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return slug || 'portal';
+}
+
+function buildScript(cliAlias: string, host: string): Line[] {
+  return [
+    { type: 'cmd', text: `$ ${cliAlias} order:place --service=A.101 --imei=353456789012345` },
+    { type: 'log', text: 'validating input · idempotency check · OK', tag: 'INFO' },
+    { type: 'log', text: 'wallet.debit $5.99 · ledger entry #2841', tag: 'WALLET' },
+    { type: 'cmd', text: `$ POST ${host}/api/index.php action=placeorder` },
+    { type: 'json', text: '{ "STATUS": "SUCCESS", "ID": "987654" }' },
+    { type: 'log', text: 'order#A1B2C3 → SUBMITTED · external 987654', tag: 'OK' },
+    { type: 'cmd', text: `$ ${cliAlias} poll-imei-orders · cycle=42` },
+    { type: 'log', text: 'GET getstatus id=987654 → "Completed"', tag: 'POLL' },
+    { type: 'success', text: 'Result delivered · UNLK-7341-289X-22' },
+  ];
+}
 
 const TYPE_SPEED = 12; // ms per char
 const LINE_GAP = 250; // ms between lines
 
-export function ConsoleLog() {
+type ConsoleLogProps = {
+  siteName: string;
+  host?: string;
+};
+
+export function ConsoleLog({ siteName, host }: ConsoleLogProps) {
+  const cliAlias = toCliAlias(siteName);
+  const consoleTitle = `${cliAlias} · production`;
+  const script = React.useMemo(
+    () => buildScript(cliAlias, host ?? 'localhost'),
+    [cliAlias, host],
+  );
+
   const [visibleLines, setVisibleLines] = React.useState(0);
   const [typedChars, setTypedChars] = React.useState(0);
   const [done, setDone] = React.useState(false);
 
   React.useEffect(() => {
-    if (visibleLines >= SCRIPT.length) {
+    setVisibleLines(0);
+    setTypedChars(0);
+    setDone(false);
+  }, [script]);
+
+  React.useEffect(() => {
+    if (visibleLines >= script.length) {
       setDone(true);
       // Loop after a pause
       const restart = setTimeout(() => {
@@ -41,7 +73,7 @@ export function ConsoleLog() {
       }, 4000);
       return () => clearTimeout(restart);
     }
-    const current = SCRIPT[visibleLines];
+    const current = script[visibleLines];
     if (typedChars < current.text.length) {
       const t = setTimeout(() => setTypedChars((c) => c + 1), TYPE_SPEED);
       return () => clearTimeout(t);
@@ -52,7 +84,7 @@ export function ConsoleLog() {
       }, LINE_GAP);
       return () => clearTimeout(t);
     }
-  }, [visibleLines, typedChars]);
+  }, [visibleLines, typedChars, script]);
 
   return (
     <motion.div
@@ -78,10 +110,10 @@ export function ConsoleLog() {
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
           </div>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-paper/50">
-            unlock-portal · production
+            {consoleTitle}
           </span>
           <span className="font-mono text-[10px] tabular-nums text-paper/50">
-            {String(visibleLines).padStart(2, '0')} / {SCRIPT.length}
+            {String(visibleLines).padStart(2, '0')} / {script.length}
           </span>
         </div>
 
@@ -96,7 +128,7 @@ export function ConsoleLog() {
           />
 
           <AnimatePresence>
-            {SCRIPT.slice(0, visibleLines + 1).map((line, idx) => {
+            {script.slice(0, visibleLines + 1).map((line, idx) => {
               const isActive = idx === visibleLines && !done;
               const display = isActive ? line.text.slice(0, typedChars) : line.text;
               return (

@@ -27,9 +27,11 @@ type Props = {
   };
   /** Resolved layout variant (from settings). Falls back to content.visualVariant, then 'ticket'. */
   variant?: string | null;
+  siteName: string;
+  host: string;
 };
 
-export function DynamicHero({ content, variant }: Props) {
+export function DynamicHero({ content, variant, siteName, host }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -263,7 +265,7 @@ export function DynamicHero({ content, variant }: Props) {
 
           <motion.div style={{ y: yRight }} className="col-span-12 lg:col-span-5 lg:pt-12">
             {visual === 'console' ? (
-              <ConsoleLog />
+              <ConsoleLog siteName={siteName} host={host} />
             ) : visual === 'dashboard' ? (
               <StatsDashboard />
             ) : visual === 'phone' ? (

@@ -36,13 +36,13 @@ export function CTA() {
             {Array.from({ length: 6 }).map((_, i) => (
               <span key={i} className="mx-8 inline-flex items-center gap-3 whitespace-nowrap">
                 <span className="live-dot" />
-                Andre · iCloud removal · 12s ago
+                James · FRP bypass · 12s ago
                 <span className="text-paper/30">·</span>
-                Sari · T-Mobile USA unlock · 38s ago
+                Maria · T-Mobile USA unlock · 38s ago
                 <span className="text-paper/30">·</span>
-                Rudi · FRP bypass · 1m ago
+                David · iCloud removal · 1m ago
                 <span className="text-paper/30">·</span>
-                Dimas · Mi account removal · 2m ago
+                Emily · Mi account removal · 2m ago
               </span>
             ))}
           </div>

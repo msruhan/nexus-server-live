@@ -1,4 +1,6 @@
+import { headers } from 'next/headers';
 import { prisma } from '@/lib/db';
+import { getBranding } from '@/lib/branding';
 import { Catalog } from './Catalog';
 import { HowToOrder } from './HowToOrder';
 import { Voices } from './Voices';
@@ -43,7 +45,8 @@ function parseJson<T>(s: string, fallback: T): T {
 }
 
 export async function SectionRenderer({ sections }: { sections: StoredSection[] }) {
-  const [faq, testimonials, banners] = await Promise.all([
+  const host = (await headers()).get('host') ?? 'localhost';
+  const [faq, testimonials, banners, brand] = await Promise.all([
     prisma.faqItem.findMany({
       where: { isVisible: true },
       orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
@@ -56,6 +59,7 @@ export async function SectionRenderer({ sections }: { sections: StoredSection[] 
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     }),
+    getBranding(),
   ]);
 
   return (
@@ -69,6 +73,8 @@ export async function SectionRenderer({ sections }: { sections: StoredSection[] 
           faq,
           testimonials,
           banners,
+          siteName: brand.siteName,
+          host,
         });
         if (!inner) return null;
 
@@ -105,6 +111,8 @@ type Shared = {
     linkUrl: string | null;
     position: string;
   }>;
+  siteName: string;
+  host: string;
 };
 
 function renderSection(
@@ -114,10 +122,10 @@ function renderSection(
   variant: string | null,
   shared: Shared,
 ): React.ReactNode {
-  const { faq, testimonials, banners } = shared;
+  const { faq, testimonials, banners, siteName, host } = shared;
   switch (sectionType) {
     case 'hero':
-      return <DynamicHero key={key} content={content} variant={variant} />;
+      return <DynamicHero key={key} content={content} variant={variant} siteName={siteName} host={host} />;
     case 'stats':
       return <DynamicStats key={key} content={content} variant={variant} />;
     case 'features':

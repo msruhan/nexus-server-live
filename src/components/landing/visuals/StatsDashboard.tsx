@@ -131,15 +131,17 @@ function SuccessRing() {
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-3 gap-2 sm:max-w-[200px]">
+        <div className="grid w-full grid-cols-3 gap-2 sm:max-w-[240px]">
           {[
-            { label: 'Total', value: '4,128' },
-            { label: 'Success', value: '4,074' },
+            { label: 'Total', value: '4.1K' },
+            { label: 'Success', value: '4.0K' },
             { label: 'Refund', value: '54' },
           ].map((s) => (
             <div key={s.label} className="rounded-lg bg-paper-100 px-2 py-2 text-center">
               <div className="font-display text-sm font-extrabold tabular-nums text-ink">{s.value}</div>
-              <div className="font-mono text-[8px] uppercase tracking-wider text-ink-muted">{s.label}</div>
+              <div className="whitespace-nowrap font-mono text-[8px] uppercase tracking-wider text-ink-muted">
+                {s.label}
+              </div>
             </div>
           ))}
         </div>
@@ -149,8 +151,8 @@ function SuccessRing() {
 }
 
 function RevenueTile() {
-  const target = 12_400_000;
-  const [display, setDisplay] = React.useState('0');
+  const target = 12_400;
+  const [display, setDisplay] = React.useState('$0');
 
   React.useEffect(() => {
     const controls = animate(0, target, {
@@ -159,10 +161,12 @@ function RevenueTile() {
       ease: [0.16, 1, 0.3, 1],
       onUpdate: (v) => {
         setDisplay(
-          new Intl.NumberFormat('id-ID', {
+          new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
             notation: 'compact',
             maximumFractionDigits: 1,
-          }).format(Math.round(v)),
+          }).format(v),
         );
       },
     });
@@ -190,14 +194,13 @@ function RevenueTile() {
       </div>
 
       <div className="mt-3 min-w-0">
-        <div className="font-serif text-xs italic text-paper/70">Rp</div>
         <div
           className="font-display text-2xl font-black leading-tight tabular-nums sm:text-3xl"
-          title="Rp 12.400.000"
+          title="$12,400.00"
         >
           {display}
         </div>
-        <div className="mt-0.5 font-mono text-[9px] text-paper/60">12.400.000 full</div>
+        <div className="mt-0.5 font-mono text-[9px] text-paper/60">$12,400.00 full</div>
       </div>
 
       <div className="mt-auto pt-3">
@@ -237,12 +240,12 @@ function RevenueTile() {
 }
 
 const ACTIVITY = [
-  { name: 'Andre', service: 'iCloud removal', delta: 12 },
-  { name: 'Sari', service: 'T-Mobile unlock', delta: 38 },
-  { name: 'Rudi', service: 'FRP bypass', delta: 64 },
-  { name: 'Dimas', service: 'Mi Account remove', delta: 102 },
-  { name: 'Rina', service: 'Premium check', delta: 145 },
-  { name: 'Budi', service: 'Sprint unlock', delta: 188 },
+  { name: 'James', service: 'FRP bypass', delta: 12 },
+  { name: 'Maria', service: 'T-Mobile unlock', delta: 38 },
+  { name: 'David', service: 'iCloud removal', delta: 64 },
+  { name: 'Emily', service: 'Mi Account remove', delta: 102 },
+  { name: 'Ryan', service: 'Premium check', delta: 145 },
+  { name: 'Chris', service: 'Sprint unlock', delta: 188 },
 ];
 
 function ActivityFeed() {
