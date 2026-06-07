@@ -13,6 +13,15 @@ need_env NEXUS_IMAGE
 export CUSTOMER_DOMAIN="$(normalize_domain "$CUSTOMER_DOMAIN")"
 APP_URL="https://${CUSTOMER_DOMAIN}"
 
+ENV_FILE="$INSTALL_DIR/.env.production"
+if [[ -f "$ENV_FILE" ]]; then
+  log "Reusing secrets from existing $ENV_FILE (safe for retries with existing pgdata volume)"
+  export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(grep '^DATABASE_URL=' "$ENV_FILE" | sed -n 's/.*nexus:\([^@]*\)@.*/\1/p')}"
+  export AUTH_SECRET="${AUTH_SECRET:-$(env_value_from_file "$ENV_FILE" AUTH_SECRET || true)}"
+  export DATA_ENCRYPTION_KEY="${DATA_ENCRYPTION_KEY:-$(env_value_from_file "$ENV_FILE" DATA_ENCRYPTION_KEY || true)}"
+  export CRON_SECRET="${CRON_SECRET:-$(env_value_from_file "$ENV_FILE" CRON_SECRET || true)}"
+fi
+
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(gen_hex_32)}"
 export AUTH_SECRET="${AUTH_SECRET:-$(gen_b64_32)}"
 export DATA_ENCRYPTION_KEY="${DATA_ENCRYPTION_KEY:-$(gen_b64_32)}"
@@ -27,7 +36,6 @@ sudo cp "$TEMPLATES/docker-compose.stack.yml" "$INSTALL_DIR/docker-compose.stack
 sudo cp "$TEMPLATES/docker-compose.caddy.yml" "$INSTALL_DIR/docker-compose.caddy.yml"
 sudo chown -R "${SUDO_USER:-root}:$(id -gn "${SUDO_USER:-root}")" "$INSTALL_DIR" 2>/dev/null || true
 
-ENV_FILE="$INSTALL_DIR/.env.production"
 log "Writing $ENV_FILE"
 
 cat >"$ENV_FILE" <<EOF
