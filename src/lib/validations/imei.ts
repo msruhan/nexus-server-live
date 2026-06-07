@@ -61,6 +61,7 @@ export const createImeiServiceSchema = z.object({
   requiresMep: z.boolean().default(false),
   requiresPrd: z.boolean().default(false),
   requiresSn: z.boolean().default(false),
+  requiresEcid: z.boolean().default(false),
 })
 
 export const updateImeiServiceSchema = createImeiServiceSchema.partial()
@@ -85,6 +86,7 @@ export const createImeiOrderSchema = z.object({
   mep: z.string().max(100).optional().nullable(),
   prd: z.string().max(100).optional().nullable(),
   serialNumber: z.string().max(100).optional().nullable(),
+  ecid: z.string().max(100).optional().nullable(),
   note: z.string().max(2000).optional().nullable(),
 
   // ─── Dhru-compatible callback (optional, additive) ───────────────

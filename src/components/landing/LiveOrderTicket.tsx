@@ -177,7 +177,7 @@ function ScanningNumber({ digits }: { digits: string }) {
 
 function Timeline() {
   const steps = [
-    { time: '14:22:01', label: 'Submitted to upstream', state: 'done' as const },
+    { time: '14:22:01', label: 'Submitted to server', state: 'done' as const },
     { time: '14:22:09', label: 'Acknowledged · ID 987654', state: 'done' as const },
     { time: '14:23:44', label: 'In process', state: 'done' as const },
     { time: '14:24:15', label: 'Result delivered', state: 'active' as const },

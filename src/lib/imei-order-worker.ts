@@ -10,6 +10,11 @@ import {
   isImeiStressCredit,
   isImeiStressTimeout,
 } from '@/lib/imei-stress-mock'
+import {
+  getOrderSubmitWindowMs,
+  isOrderSubmitWindowExpired,
+  STALE_SUBMIT_REJECT_MESSAGE,
+} from '@/lib/order-submit-policy'
 import { isStressTestMode } from '@/lib/stress-mode'
 import type { ImeiOrder, ImeiOrderStatus, Prisma } from '@prisma/client'
 
@@ -85,6 +90,7 @@ export function buildDhruOrderFields(order: Pick<
   | 'mep'
   | 'prd'
   | 'serialNumber'
+  | 'ecid'
 >): Record<string, string> {
   const fields: Record<string, string> = { IMEI: order.imei }
   if (order.network?.trim()) fields.NETWORK = order.network.trim()
@@ -95,6 +101,7 @@ export function buildDhruOrderFields(order: Pick<
   if (order.mep?.trim()) fields.MEP = order.mep.trim()
   if (order.prd?.trim()) fields.PRD = order.prd.trim()
   if (order.serialNumber?.trim()) fields.SN = order.serialNumber.trim()
+  if (order.ecid?.trim()) fields.ECID = order.ecid.trim()
   return fields
 }
 
@@ -150,21 +157,84 @@ function getDhruClient(order: OrderWithService): DhruFusionClient | null {
   })
 }
 
-/** Send a PENDING order to the supplier API. */
+async function claimImeiOrderForSupplierSubmit(
+  orderId: string,
+): Promise<OrderWithService | null> {
+  const claimed = await prisma.imeiOrder.updateMany({
+    where: {
+      id: orderId,
+      status: 'PENDING',
+      referenceId: null,
+      processedAt: null,
+    },
+    data: { processedAt: new Date() },
+  })
+
+  if (claimed.count === 0) return null
+
+  return prisma.imeiOrder.findUnique({
+    where: { id: orderId },
+    include: { service: { include: { api: true } } },
+  })
+}
+
+async function rejectExpiredPendingImeiOrder(
+  order: Pick<ImeiOrder, 'id' | 'orderCode' | 'userId' | 'price' | 'createdAt' | 'status' | 'referenceId'>,
+): Promise<boolean> {
+  if (order.status !== 'PENDING' || order.referenceId) return false
+  if (!isOrderSubmitWindowExpired(order.createdAt)) return false
+
+  await prisma.$transaction(async (tx) => {
+    await refundImeiOrder(tx, order, STALE_SUBMIT_REJECT_MESSAGE)
+  })
+  return true
+}
+
+/** Send a PENDING order to the supplier API (at most once per order). */
 export async function submitImeiOrderToSupplier(orderId: string): Promise<{
   ok: boolean
   error?: string
   referenceId?: string
 }> {
-  const order = await prisma.imeiOrder.findUnique({
+  const snapshot = await prisma.imeiOrder.findUnique({
     where: { id: orderId },
-    include: { service: { include: { api: true } } },
+    select: {
+      id: true,
+      orderCode: true,
+      userId: true,
+      price: true,
+      createdAt: true,
+      referenceId: true,
+      status: true,
+      processedAt: true,
+    },
   })
 
-  if (!order) return { ok: false, error: 'Order not found' }
-  if (order.referenceId) return { ok: true, referenceId: order.referenceId }
-  if (order.status !== 'PENDING' && order.status !== 'IN_PROCESS') {
-    return { ok: false, error: `Order status: ${order.status}` }
+  if (!snapshot) return { ok: false, error: 'Order not found' }
+  if (snapshot.referenceId) return { ok: true, referenceId: snapshot.referenceId }
+  if (snapshot.status === 'REJECTED' || snapshot.status === 'CANCELLED' || snapshot.status === 'SUCCESS') {
+    return { ok: false, error: `Order status: ${snapshot.status}` }
+  }
+  if (snapshot.status !== 'PENDING') {
+    return { ok: false, error: `Order status: ${snapshot.status}` }
+  }
+
+  if (await rejectExpiredPendingImeiOrder(snapshot)) {
+    return { ok: false, error: STALE_SUBMIT_REJECT_MESSAGE }
+  }
+
+  if (snapshot.processedAt) {
+    return { ok: false, error: 'Submit already attempted for this order' }
+  }
+
+  const order = await claimImeiOrderForSupplierSubmit(orderId)
+  if (!order) {
+    const again = await prisma.imeiOrder.findUnique({
+      where: { id: orderId },
+      select: { referenceId: true },
+    })
+    if (again?.referenceId) return { ok: true, referenceId: again.referenceId }
+    return { ok: false, error: 'Submit already in progress or completed' }
   }
 
   const toolId = order.service.toolId
@@ -205,12 +275,12 @@ export async function submitImeiOrderToSupplier(orderId: string): Promise<{
 
   const client = getDhruClient(order)
   if (!client) {
-    await prisma.imeiOrder.update({
-      where: { id: orderId },
-      data: {
-        comments:
-          'Supplier API is inactive or not DhruFusion — requires manual processing by admin.',
-      },
+    await prisma.$transaction(async (tx) => {
+      await refundImeiOrder(
+        tx,
+        order,
+        'Supplier API is inactive or not DhruFusion — requires manual processing by admin.',
+      )
     })
     return { ok: false, error: 'Supplier API unavailable' }
   }
@@ -250,7 +320,6 @@ export async function submitImeiOrderToSupplier(orderId: string): Promise<{
     data: {
       referenceId: refId,
       status: 'IN_PROCESS',
-      processedAt: new Date(),
       comments: null,
     },
   })
@@ -271,10 +340,10 @@ export async function pollImeiOrderFromSupplier(orderId: string): Promise<{
 
   if (!order) return { ok: false, updated: false, error: 'Order not found' }
   if (!order.referenceId) {
-    if (order.status === 'PENDING') {
+    if (order.status === 'PENDING' && !order.processedAt) {
       return submitImeiOrderToSupplier(orderId).then((r) => ({
         ok: r.ok,
-        updated: r.ok,
+        updated: r.ok || r.error === STALE_SUBMIT_REJECT_MESSAGE,
         error: r.error,
       }))
     }
@@ -415,13 +484,44 @@ export async function pollImeiOrderFromSupplier(orderId: string): Promise<{
   return { ok: true, updated: true }
 }
 
+/** Reject PENDING backlog that never reached supplier within the submit window. */
+async function rejectStalePendingImeiOrders(limit = 50): Promise<number> {
+  const cutoff = new Date(Date.now() - getOrderSubmitWindowMs())
+  const stale = await prisma.imeiOrder.findMany({
+    where: {
+      status: 'PENDING',
+      referenceId: null,
+      createdAt: { lt: cutoff },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+    select: {
+      id: true,
+      orderCode: true,
+      userId: true,
+      price: true,
+      createdAt: true,
+      status: true,
+      referenceId: true,
+    },
+  })
+
+  let rejected = 0
+  for (const row of stale) {
+    if (await rejectExpiredPendingImeiOrder(row)) rejected += 1
+  }
+  return rejected
+}
+
 /** Batch: submit pending orders & poll in-flight orders (for cron). */
 export async function processImeiOrderQueue(options?: { submitLimit?: number; pollLimit?: number }) {
   const submitLimit = options?.submitLimit ?? 20
   const pollLimit = options?.pollLimit ?? 50
 
+  await rejectStalePendingImeiOrders(submitLimit)
+
   const toSubmit = await prisma.imeiOrder.findMany({
-    where: { status: 'PENDING', referenceId: null },
+    where: { status: 'PENDING', referenceId: null, processedAt: null },
     orderBy: { createdAt: 'asc' },
     take: submitLimit,
     select: { id: true },

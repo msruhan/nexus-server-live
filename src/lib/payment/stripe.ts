@@ -161,6 +161,24 @@ export async function createStripeIntent(
  * Verify the incoming webhook signature using the official Stripe SDK
  * helper. Returns the parsed event or null.
  */
+export function resolveIntentIdFromCheckoutSession(session: Stripe.Checkout.Session): string | null {
+  return (
+    session.metadata?.intent_id ??
+    session.client_reference_id ??
+    null
+  );
+}
+
+/** Fulfill wallet credit only when payment is confirmed. */
+export function shouldFulfillCheckoutWebhook(
+  eventType: string,
+  session: Stripe.Checkout.Session,
+): boolean {
+  if (eventType === 'checkout.session.async_payment_succeeded') return true;
+  if (eventType === 'checkout.session.completed') return session.payment_status === 'paid';
+  return false;
+}
+
 export async function verifyStripeWebhook(
   rawBody: string,
   signature: string | null,

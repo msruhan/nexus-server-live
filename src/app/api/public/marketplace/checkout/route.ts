@@ -103,6 +103,7 @@ export async function POST(req: Request) {
         requiresMep: true,
         requiresPrd: true,
         requiresSn: true,
+        requiresEcid: true,
       },
     });
     if (!service) return NextResponse.json({ ok: false, error: 'Service not found or inactive' }, { status: 404 });
@@ -130,6 +131,7 @@ export async function POST(req: Request) {
       { key: 'mep', label: 'MEP', flag: service.requiresMep },
       { key: 'prd', label: 'PRD', flag: service.requiresPrd },
       { key: 'serialNumber', label: 'Serial Number', flag: service.requiresSn },
+      { key: 'ecid', label: 'ECID', flag: service.requiresEcid },
     ];
     for (const r of required) {
       if (r.flag && !`${imeiParsed.data[r.key] ?? ''}`.trim()) {

@@ -30,6 +30,7 @@ export async function GET(req: Request) {
         title: true,
         requiresImei: true,
         requiresSn: true,
+        requiresEcid: true,
       },
     })
     if (!service) return apiError('Service not found or inactive', 404)
@@ -37,6 +38,7 @@ export async function GET(req: Request) {
     const deviceInput = validateImeiOrderDeviceInput(service, {
       imei: searchParams.get('imei') ?? '',
       serialNumber: searchParams.get('serialNumber') ?? searchParams.get('serialNubmer'),
+      ecid: searchParams.get('ecid'),
     })
     if (deviceInput.error) return apiError(deviceInput.error)
 
@@ -46,7 +48,7 @@ export async function GET(req: Request) {
       deviceKey: deviceInput.imei,
     })
 
-    const deviceLabel = deviceFieldLabel(service.requiresImei, service.requiresSn)
+    const deviceLabel = deviceFieldLabel(service.requiresImei, service.requiresSn, service.requiresEcid)
     return apiSuccess({
       duplicate: !!duplicate,
       deviceLabel,

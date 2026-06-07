@@ -43,6 +43,7 @@ export async function GET(req: Request) {
           requiresMep: true,
           requiresPrd: true,
           requiresSn: true,
+          requiresEcid: true,
           group: { select: { id: true, title: true } },
         },
       }),

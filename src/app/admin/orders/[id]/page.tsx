@@ -125,12 +125,17 @@ export default async function AdminOrderDetail({
 
 function imeiFields(o: Record<string, unknown>, service: Record<string, unknown>) {
   const requiresImei = Boolean(service.requiresImei);
+  const requiresSn = Boolean(service.requiresSn);
+  const requiresEcid = Boolean(service.requiresEcid);
   return [
     ...(requiresImei ? [{ label: 'IMEI', value: o.imei as string }] : []),
+    ...(requiresSn && !requiresImei ? [{ label: 'Serial Number', value: (o.serialNumber as string) ?? (o.imei as string) }] : []),
+    ...(requiresEcid && !requiresImei && !requiresSn ? [{ label: 'ECID', value: (o.ecid as string) ?? (o.imei as string) }] : []),
+    ...(requiresSn && requiresImei ? [{ label: 'Serial Number', value: (o.serialNumber as string) ?? null }] : []),
+    ...(requiresEcid && (requiresImei || requiresSn) ? [{ label: 'ECID', value: (o.ecid as string) ?? null }] : []),
     { label: 'Network', value: (o.network as string) ?? null },
     { label: 'Model', value: (o.model as string) ?? null },
     { label: 'Provider', value: (o.provider as string) ?? null },
-    { label: 'Serial', value: (o.serialNumber as string) ?? null },
     { label: 'Email', value: (o.email as string) ?? null },
     { label: 'Note', value: (o.note as string) ?? null },
     { label: 'Upstream ID', value: (o.referenceId as string) ?? null },

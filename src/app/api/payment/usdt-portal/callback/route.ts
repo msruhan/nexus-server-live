@@ -107,7 +107,7 @@ export async function POST(req: Request) {
 
   const orderId = get('order_id');
   const transactionId = get('transaction_id');
-  const amount = get('amount');
+  const amount = get('amount') || get('amount_with_commission');
   const txnHash = get('txn_hash');
 
   // Idempotency: refuse if this txn_hash already credited a different intent.

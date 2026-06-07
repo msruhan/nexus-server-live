@@ -342,6 +342,7 @@ model ImeiService {
   requiresMep      Boolean @default(false)
   requiresPrd      Boolean @default(false)
   requiresSn       Boolean @default(false)
+  requiresEcid     Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -371,6 +372,7 @@ model ImeiOrder {
   mep          String?
   prd          String?
   serialNumber String?
+  ecid         String?
   note         String? @db.Text
 
   code        String? @db.Text

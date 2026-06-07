@@ -6,6 +6,11 @@ import { formatUSD, formatDate } from '@/lib/format';
 import { OrderStatus } from '@/lib/constants';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { CopyButton } from '@/components/dashboard/CopyButton';
+import {
+  buildImeiOrderSubmittedFields,
+  formatSupplierResponseDisplay,
+} from '@/lib/imei-order-input';
+import { labelForFieldKey, parseServerFieldDefs } from '@/lib/server-fields';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,33 +39,67 @@ export default async function OrderDetailPage({
 
   if (!order) notFound();
 
-  const imeiOrder = order as {
-    imei: string;
-    network?: string | null;
-    model?: string | null;
-    provider?: string | null;
-    serialNumber?: string | null;
-    email?: string | null;
-    service?: { requiresImei?: boolean };
-  };
-  const showImeiField = Boolean(imeiOrder.service?.requiresImei ?? true);
+  const filledFields = isImei
+    ? (() => {
+        const imeiOrder = order as {
+          imei: string;
+          network?: string | null;
+          model?: string | null;
+          provider?: string | null;
+          pin?: string | null;
+          kbh?: string | null;
+          mep?: string | null;
+          prd?: string | null;
+          serialNumber?: string | null;
+          ecid?: string | null;
+          service: {
+            requiresImei: boolean;
+            requiresSn: boolean;
+            requiresEcid: boolean;
+            requiresNetwork: boolean;
+            requiresModel: boolean;
+            requiresProvider: boolean;
+            requiresPin: boolean;
+            requiresKbh: boolean;
+            requiresMep: boolean;
+            requiresPrd: boolean;
+          };
+        };
+        return buildImeiOrderSubmittedFields(imeiOrder, imeiOrder.service);
+      })()
+    : (() => {
+        const serverOrder = order as {
+          requiredFields?: string | null;
+          service: { requiredFields?: string | null };
+        };
+        try {
+          const parsed = serverOrder.requiredFields
+            ? (JSON.parse(serverOrder.requiredFields) as Record<string, string>)
+            : {};
+          const fieldDefs = parseServerFieldDefs(serverOrder.service.requiredFields);
+          if (fieldDefs.length > 0) {
+            return fieldDefs
+              .map((def) => {
+                const value = (parsed[def.key] ?? '').trim();
+                return value ? { label: def.label, value } : null;
+              })
+              .filter((row): row is { label: string; value: string } => row !== null);
+          }
+          return Object.entries(parsed)
+            .filter(([, v]) => typeof v === 'string' && v.trim())
+            .map(([key, value]) => ({
+              label: labelForFieldKey(key),
+              value: value.trim(),
+            }));
+        } catch {
+          return [];
+        }
+      })();
 
-  const fields: Array<{ label: string; value?: string | null }> = isImei
-    ? [
-        ...(showImeiField ? [{ label: 'IMEI', value: imeiOrder.imei }] : []),
-        { label: 'Network', value: (order as { network?: string | null }).network },
-        { label: 'Model', value: (order as { model?: string | null }).model },
-        { label: 'Provider', value: (order as { provider?: string | null }).provider },
-        { label: 'Serial', value: (order as { serialNumber?: string | null }).serialNumber },
-        { label: 'Email', value: (order as { email?: string | null }).email },
-      ]
-    : [
-        { label: 'IMEI', value: (order as { imei?: string | null }).imei },
-        { label: 'Model', value: (order as { modelNo?: string | null }).modelNo },
-        { label: 'Network', value: (order as { network?: string | null }).network },
-        { label: 'Serial', value: (order as { serialNumber?: string | null }).serialNumber },
-      ];
-  const filledFields = fields.filter((f) => !!f.value);
+  const supplierResponse =
+    order.status === OrderStatus.REJECTED
+      ? formatSupplierResponseDisplay(order.comments, order.code)
+      : null;
 
   return (
     <div className="max-w-4xl">
@@ -86,7 +125,6 @@ export default async function OrderDetailPage({
         </div>
       </div>
 
-      {/* Result code if successful */}
       {order.status === OrderStatus.SUCCESS && order.code && (
         <section className="mt-8 rounded-2xl border-2 border-dashed border-emerald-200/80 bg-emerald-50/50 p-6 lg:p-8">
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-800/85">
@@ -106,7 +144,6 @@ export default async function OrderDetailPage({
         </section>
       )}
 
-      {/* Rejected: refund + supplier response as separate blocks */}
       {order.status === OrderStatus.REJECTED && (
         <div className="mt-8 space-y-4">
           <section className="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3">
@@ -118,17 +155,17 @@ export default async function OrderDetailPage({
             </p>
           </section>
 
-          {(order.comments || order.code) && (
+          {supplierResponse?.primary && (
             <section className="rounded-2xl border-2 border-dashed border-rose-200/75 bg-rose-50/45 p-6 lg:p-8">
               <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-rose-800/80">
                 Supplier response
               </span>
               <p className="mt-4 whitespace-pre-line break-words font-sans text-base font-medium leading-relaxed text-rose-950/90 md:text-lg">
-                {order.comments || order.code}
+                {supplierResponse.primary}
               </p>
-              {order.code && order.comments && order.code.trim() !== order.comments.trim() && (
+              {supplierResponse.secondary && (
                 <code className="mt-4 block break-all rounded-md border border-rose-100/90 bg-white/55 px-4 py-3 font-mono text-sm text-rose-900/75">
-                  {order.code}
+                  {supplierResponse.secondary}
                 </code>
               )}
             </section>
@@ -136,7 +173,6 @@ export default async function OrderDetailPage({
         </div>
       )}
 
-      {/* Two-column: input fields + timeline */}
       <section className="mt-10 grid gap-8 lg:grid-cols-2">
         <div>
           <h2 className="mb-4 border-b border-ink/15 pb-2 font-display text-base font-extrabold tracking-tight text-ink">
@@ -170,7 +206,7 @@ export default async function OrderDetailPage({
           </h2>
           <ul className="space-y-3">
             <TimelineItem when={order.createdAt} label="Created" done />
-            <TimelineItem when={order.processedAt} label="Submitted to upstream" done={!!order.processedAt} />
+            <TimelineItem when={order.processedAt} label="Submitted to server" done={!!order.processedAt} />
             <TimelineItem when={order.processedAt} label="In process" done={!!order.processedAt} />
             <TimelineItem
               when={order.completedAt}
@@ -187,7 +223,7 @@ export default async function OrderDetailPage({
 
           {order.referenceId && (
             <div className="mt-6 rounded-md border border-line bg-paper-100 px-3 py-2 font-mono text-[11px] text-ink-muted">
-              Upstream ref · {order.referenceId}
+              Server ref · {order.referenceId}
             </div>
           )}
         </div>

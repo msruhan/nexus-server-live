@@ -19,6 +19,7 @@ type ImeiOrderPayload = {
   model?: string | null;
   provider?: string | null;
   serialNumber?: string | null;
+  ecid?: string | null;
   note?: string | null;
   code?: string | null;
   comments?: string | null;
@@ -30,6 +31,8 @@ type ImeiOrderPayload = {
   service: {
     title: string;
     requiresImei?: boolean;
+    requiresSn?: boolean;
+    requiresEcid?: boolean;
     group?: { title: string } | null;
   };
 };
@@ -182,10 +185,21 @@ export function LinkedOrderDetailButton({
                   {(imeiOrder.service.requiresImei ?? true) && (
                     <DetailRow label="IMEI" value={<span className="font-mono">{imeiOrder.imei}</span>} />
                   )}
+                  {imeiOrder.service.requiresSn && !(imeiOrder.service.requiresImei ?? true) && (
+                    <DetailRow label="Serial Number" value={<span className="font-mono">{imeiOrder.serialNumber ?? imeiOrder.imei}</span>} />
+                  )}
+                  {imeiOrder.service.requiresEcid && !(imeiOrder.service.requiresImei ?? true) && !imeiOrder.service.requiresSn && (
+                    <DetailRow label="ECID" value={<span className="font-mono">{imeiOrder.ecid ?? imeiOrder.imei}</span>} />
+                  )}
                   <DetailRow label="Network" value={imeiOrder.network} />
                   <DetailRow label="Model" value={imeiOrder.model} />
                   <DetailRow label="Provider" value={imeiOrder.provider} />
-                  <DetailRow label="Serial" value={imeiOrder.serialNumber} />
+                  {imeiOrder.service.requiresSn && (imeiOrder.service.requiresImei ?? true) && (
+                    <DetailRow label="Serial Number" value={imeiOrder.serialNumber} />
+                  )}
+                  {imeiOrder.service.requiresEcid && ((imeiOrder.service.requiresImei ?? true) || imeiOrder.service.requiresSn) && (
+                    <DetailRow label="ECID" value={imeiOrder.ecid} />
+                  )}
                   <DetailRow label="Note" value={imeiOrder.note} />
                   <DetailRow label="Upstream ID" value={imeiOrder.referenceId} />
                   {imeiOrder.code && (

@@ -26,6 +26,7 @@ function toPlainText(html: string | null): string | null {
 const IMEI_BADGES: Array<[keyof ImeiRequireFlags, string]> = [
   ['requiresImei', 'IMEI'],
   ['requiresSn', 'Serial'],
+  ['requiresEcid', 'ECID'],
   ['requiresNetwork', 'Network'],
   ['requiresModel', 'Model'],
   ['requiresProvider', 'Provider'],
@@ -45,6 +46,7 @@ type ImeiRequireFlags = {
   requiresMep: boolean;
   requiresPrd: boolean;
   requiresSn: boolean;
+  requiresEcid: boolean;
 };
 
 export default async function MarketplaceDetailPage({
@@ -97,6 +99,7 @@ export default async function MarketplaceDetailPage({
           mep: s.requiresMep,
           prd: s.requiresPrd,
           sn: s.requiresSn,
+          ecid: s.requiresEcid,
           email: false,
           note: false,
         },

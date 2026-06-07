@@ -26,6 +26,7 @@ type Row = {
   description: string;
   requiresImei: boolean;
   requiresSn: boolean;
+  requiresEcid: boolean;
 };
 
 export function ServicesTable({
@@ -186,8 +187,13 @@ function EditImeiServiceDialog({
 }) {
   const [title, setTitle] = React.useState(row.title);
   const [description, setDescription] = React.useState(row.description || '');
+  const [price, setPrice] = React.useState(String(row.price));
   const [requiresImei, setRequiresImei] = React.useState(Boolean(row.requiresImei));
   const [requiresSn, setRequiresSn] = React.useState(Boolean(row.requiresSn));
+  const [requiresEcid, setRequiresEcid] = React.useState(Boolean(row.requiresEcid));
+
+  const priceNum = Number(price);
+  const priceValid = Number.isFinite(priceNum) && priceNum >= 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -227,6 +233,17 @@ function EditImeiServiceDialog({
             </div>
           </div>
           <div className="lg:col-span-4 space-y-4">
+            <Input
+              label="Retail price"
+              type="number"
+              min={0}
+              step={1}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              hint="Catalog price debited from the customer wallet (same as table column)."
+              required
+            />
+
             <div className="rounded-xl border border-line bg-paper-50 p-4">
               <div className="border-b border-line pb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
                 Required fields
@@ -248,21 +265,31 @@ function EditImeiServiceDialog({
                     onChange={(e) => setRequiresSn(e.target.checked)}
                   />
                 </label>
+                <label className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-ink">ECID</span>
+                  <input
+                    type="checkbox"
+                    checked={requiresEcid}
+                    onChange={(e) => setRequiresEcid(e.target.checked)}
+                  />
+                </label>
                 <p className="mt-2 font-serif text-xs italic text-ink-muted">
-                  For IMEI services, only two options: IMEI and Serial Number.
+                  Device identifiers: enable IMEI, Serial Number, and/or ECID as required by the supplier.
                 </p>
               </div>
             </div>
 
             <button
               type="button"
-              disabled={busy || title.trim().length < 2}
+              disabled={busy || title.trim().length < 2 || !priceValid}
               onClick={() =>
                 onSave({
                   title: title.trim(),
                   description,
+                  price: priceNum,
                   requiresImei,
                   requiresSn,
+                  requiresEcid,
                 })
               }
               className="w-full rounded-full bg-ink px-4 py-2 text-xs font-bold text-paper disabled:opacity-60"

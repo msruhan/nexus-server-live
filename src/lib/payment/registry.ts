@@ -17,6 +17,7 @@ export async function listEnabledGateways(): Promise<
       paymentPaypalEnabled: true,
       paymentPaypalClientId: true,
       paymentPaypalClientSecret: true,
+      paymentPaypalWebhookId: true,
       paymentStripeEnabled: true,
       paymentStripePublishableKey: true,
       paymentStripeSecretKey: true,
@@ -48,7 +49,8 @@ export async function listEnabledGateways(): Promise<
       description: 'Cards via PayPal Checkout',
       ready:
         !!settings.paymentPaypalClientId &&
-        !!settings.paymentPaypalClientSecret,
+        !!settings.paymentPaypalClientSecret &&
+        !!settings.paymentPaypalWebhookId,
     });
   }
   if (settings?.paymentStripeEnabled) {

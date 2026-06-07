@@ -20,6 +20,7 @@ const importSchema = z.object({
       requiresMep: z.boolean().default(false),
       requiresPrd: z.boolean().default(false),
       requiresSn: z.boolean().default(false),
+      requiresEcid: z.boolean().default(false),
     }),
   ).min(1, 'Select at least one service'),
 })
@@ -86,7 +87,6 @@ export async function POST(
       price: svc.price,
       deliveryTime: svc.deliveryTime || null,
       status: 'ACTIVE' as const,
-      requiresImei: true,
       requiresNetwork: svc.requiresNetwork,
       requiresModel: svc.requiresModel,
       requiresProvider: svc.requiresProvider,
@@ -95,6 +95,8 @@ export async function POST(
       requiresMep: svc.requiresMep,
       requiresPrd: svc.requiresPrd,
       requiresSn: svc.requiresSn,
+      requiresEcid: svc.requiresEcid,
+      requiresImei: !(svc.requiresSn || svc.requiresEcid),
     }))
 
     await prisma.imeiService.createMany({ data: createData })

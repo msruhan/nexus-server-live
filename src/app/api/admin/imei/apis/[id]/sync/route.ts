@@ -60,6 +60,7 @@ export async function POST(
           requiresMep: fieldNames.some((n) => n.includes('mep')),
           requiresPrd: fieldNames.some((n) => n.includes('prd')),
           requiresSn: fieldNames.some((n) => n.includes('serial')),
+          requiresEcid: fieldNames.some((n) => n.includes('ecid')),
           alreadyImported: importedToolIds.has(p.uuid),
         }
       })

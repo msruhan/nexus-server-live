@@ -320,6 +320,7 @@ export interface ParsedImeiService {
   requiresMep: boolean
   requiresPrd: boolean
   requiresSn: boolean
+  requiresEcid: boolean
 }
 
 export interface ParsedServerService {
@@ -423,6 +424,7 @@ function parseGroupedListToImeiServices(
         requiresMep: svc['Requires.MEP'] === 'Required',
         requiresPrd: svc['Requires.PRD'] === 'Required',
         requiresSn: svc['Requires.SN'] === 'Required',
+        requiresEcid: svc['Requires.ECID'] === 'Required',
       })
     }
   }
@@ -450,6 +452,48 @@ function isDhruLegacyActionUnavailable(msg: string): boolean {
 function isDhruImeiFieldRequiredError(msg: string): boolean {
   const m = msg.toLowerCase()
   return m.includes('imei') && m.includes('required')
+}
+
+/** Dhru Fusion Pro product UUID (toolId from Pro /products sync). */
+export function isDhruProProductId(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    id.trim(),
+  )
+}
+
+/** Supplier rejected the service/product id (Classic ID vs SERVICE_ID vs Pro uuid). */
+export function isDhruInvalidServiceIdError(msg: string): boolean {
+  const m = msg.toLowerCase()
+  return (
+    (m.includes('id') && m.includes('invalid')) ||
+    m.includes('invalid service') ||
+    m.includes('service not found') ||
+    m.includes('product not found') ||
+    m.includes('product_uuid')
+  )
+}
+
+/** Map Pro REST order status string to Classic numeric STATUS for shared mappers. */
+export function mapProOrderStatusToDhruNumber(status: string | undefined): number {
+  const s = (status ?? '').toLowerCase()
+  if (s.includes('success') || s.includes('complete')) return 4
+  if (s.includes('reject') || s.includes('fail') || s.includes('cancel')) return 3
+  if (s.includes('process') || s.includes('pending') || s.includes('queue')) return 1
+  return 0
+}
+
+function extractDhruPlaceReference(row: Record<string, unknown> | undefined): string {
+  if (!row) return ''
+  const ref = row.REFERENCEID ?? row.referenceid ?? row.ID ?? row.id
+  return String(ref ?? '').trim()
+}
+
+function mapClassicServerStatusString(status: string): number {
+  const s = status.toLowerCase()
+  if (s.includes('complete') || s.includes('success')) return 4
+  if (s.includes('reject') || s.includes('fail') || s.includes('cancel')) return 3
+  if (s.includes('process') || s.includes('pending')) return 1
+  return 0
 }
 
 function withDhruQuantity(
@@ -802,7 +846,12 @@ export class DhruFusionClient {
   async placeServerOrder(
     serviceId: string,
     fields: Record<string, string>,
-    options?: { quantity?: string; alternateFields?: Record<string, string> },
+    options?: {
+      quantity?: string
+      alternateFields?: Record<string, string>
+      /** Requires.Custom casing (Username, Password, …) for CUSTOMFIELD JSON. */
+      customFields?: Record<string, string>
+    },
   ): Promise<{
     success: boolean
     referenceId?: string
@@ -828,72 +877,111 @@ export class DhruFusionClient {
 
     try {
       const qnt = options?.quantity
+      const customFields = options?.customFields ?? {}
       const fieldVariants: Record<string, string>[] = [fields]
       if (options?.alternateFields && Object.keys(options.alternateFields).length > 0) {
         fieldVariants.push(options.alternateFields)
       }
-
       const attempts: Array<{ action: 'placeserverorder' | 'placeimeiorder'; params: Record<string, string> }> =
         []
 
-      for (const variant of fieldVariants) {
-        attempts.push({
-          action: 'placeserverorder',
-          params: withDhruQuantity({ ID: serviceId, ...variant }, qnt),
-        })
+      const pushServerAttempts = (idKey: 'ID' | 'SERVICE_ID', variant: Record<string, string>) => {
         attempts.push({
           action: 'placeserverorder',
           params: withDhruQuantity(
-            { ID: serviceId, CUSTOMFIELD: encodeDhruCustomField(variant) },
-            qnt,
-          ),
-        })
-      }
-
-      for (const variant of fieldVariants) {
-        attempts.push({
-          action: 'placeimeiorder',
-          params: withDhruQuantity(
-            { ID: serviceId, CUSTOMFIELD: encodeDhruCustomField(variant) },
+            { [idKey]: serviceId, CUSTOMFIELD: encodeDhruCustomField(variant) },
             qnt,
           ),
         })
         attempts.push({
-          action: 'placeimeiorder',
-          params: withDhruQuantity({ ID: serviceId, ...variant }, qnt),
+          action: 'placeserverorder',
+          params: withDhruQuantity({ [idKey]: serviceId, ...variant }, qnt),
         })
       }
 
-      let lastError = 'Order failed'
+      // Prefer ID + CUSTOMFIELD (Requires.Custom Title Case) — legitunlocks / luteam-style panels.
+      if (Object.keys(customFields).length > 0) {
+        pushServerAttempts('ID', customFields)
+      }
+
+      for (const variant of fieldVariants) {
+        pushServerAttempts('ID', variant)
+        pushServerAttempts('SERVICE_ID', variant)
+      }
+
+      let lastServerError = 'Order failed'
+      let lastImeiError = 'Order failed'
       let sawLegacyUnavailable = false
       let sawImeiRequired = false
+      let serverActionMissing = false
 
       for (const { action, params } of attempts) {
         const res = await this.request(action, params)
         if (!('ERROR' in res)) {
-          const refId = res.SUCCESS?.[0]?.REFERENCEID
-          return { success: true, referenceId: String(refId ?? '') }
+          const refId = extractDhruPlaceReference(
+            res.SUCCESS?.[0] as Record<string, unknown> | undefined,
+          )
+          if (refId) return { success: true, referenceId: refId }
         }
 
         const msg = dhruErrorMessage(res) || 'Order failed'
-        lastError = msg
-        if (isDhruLegacyActionUnavailable(msg)) sawLegacyUnavailable = true
-        if (isDhruImeiFieldRequiredError(msg)) sawImeiRequired = true
-
-        // Panel hanya punya satu action — lewati format lain yang sama action-nya
-        if (action === 'placeimeiorder' && sawImeiRequired && !sawLegacyUnavailable) {
-          break
+        if (action === 'placeserverorder') {
+          lastServerError = msg
+          if (isDhruLegacyActionUnavailable(msg)) {
+            sawLegacyUnavailable = true
+            serverActionMissing = true
+          }
+        } else {
+          lastImeiError = msg
+          if (isDhruImeiFieldRequiredError(msg)) sawImeiRequired = true
         }
       }
 
-      return { success: false, error: lastError }
+      // placeimeiorder only when placeserverorder action is unavailable (never for invalid server ID).
+      if (serverActionMissing || sawLegacyUnavailable) {
+        for (const variant of fieldVariants) {
+          for (const { action, params } of [
+            {
+              action: 'placeimeiorder' as const,
+              params: withDhruQuantity(
+                { ID: serviceId, CUSTOMFIELD: encodeDhruCustomField(variant) },
+                qnt,
+              ),
+            },
+            {
+              action: 'placeimeiorder' as const,
+              params: withDhruQuantity({ ID: serviceId, ...variant }, qnt),
+            },
+          ]) {
+            const res = await this.request(action, params)
+            if (!('ERROR' in res)) {
+              const refId = extractDhruPlaceReference(
+                res.SUCCESS?.[0] as Record<string, unknown> | undefined,
+              )
+              if (refId) return { success: true, referenceId: refId }
+            }
+            const msg = dhruErrorMessage(res) || 'Order failed'
+            lastImeiError = msg
+            if (isDhruImeiFieldRequiredError(msg) && !sawLegacyUnavailable) break
+          }
+        }
+      }
+
+      const preferServer =
+        lastServerError !== 'Order failed' &&
+        !isDhruInvalidServiceIdError(lastServerError) &&
+        !lastServerError.toLowerCase().includes('imei')
+      return {
+        success: false,
+        error: preferServer ? lastServerError : lastImeiError !== 'Order failed' ? lastImeiError : lastServerError,
+      }
     } catch (e) {
       return { success: false, error: e instanceof Error ? e.message : 'Order failed' }
     }
   }
 
   /**
-   * Check server order status (v6.1: same action as IMEI — `getimeiorder`).
+   * Check server order status — `getserverstatus` (legacy) then `getimeiorder` (v6.1).
    */
   async getServerOrderStatus(orderId: string): Promise<{
     success: boolean
@@ -902,6 +990,21 @@ export class DhruFusionClient {
     comments?: string
     error?: string
   }> {
+    try {
+      const res = await this.request('getserverstatus', { ID: orderId })
+      if (!('ERROR' in res)) {
+        const data = res.SUCCESS?.[0] as Record<string, unknown> | undefined
+        const orderStatus = String(data?.ORDER_STATUS ?? data?.STATUS ?? '')
+        return {
+          success: true,
+          status: mapClassicServerStatusString(orderStatus),
+          code: String(data?.CODE ?? data?.FILE_URL ?? ''),
+          comments: String(data?.COMMENTS ?? data?.MESSAGE ?? ''),
+        }
+      }
+    } catch {
+      // fall through to getimeiorder
+    }
     return this.getOrderStatus(orderId)
   }
 }

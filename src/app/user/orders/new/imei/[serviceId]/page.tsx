@@ -95,6 +95,8 @@ export default async function NewImeiOrderPage({
         <div className="mt-8">
           <ImeiOrderForm
             serviceId={service.id}
+            unitPrice={Number(service.price)}
+            walletBalance={Number(balance)}
             requires={{
               imei: service.requiresImei,
               network: service.requiresNetwork,
@@ -105,6 +107,7 @@ export default async function NewImeiOrderPage({
               mep: service.requiresMep,
               prd: service.requiresPrd,
               sn: service.requiresSn,
+              ecid: service.requiresEcid,
               email: false,
               note: false,
             }}

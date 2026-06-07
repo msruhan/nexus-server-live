@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { creditWalletForIntent } from '@/lib/payment/credit';
-import { verifyStripeWebhook } from '@/lib/payment/stripe';
+import {
+  resolveIntentIdFromCheckoutSession,
+  shouldFulfillCheckoutWebhook,
+  verifyStripeWebhook,
+} from '@/lib/payment/stripe';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,11 +32,13 @@ export async function POST(req: Request) {
     case 'checkout.session.completed':
     case 'checkout.session.async_payment_succeeded': {
       const session = event.data.object as Stripe.Checkout.Session;
-      const intentId = (session.metadata?.intent_id ?? session.client_reference_id) || null;
+      if (!shouldFulfillCheckoutWebhook(event.type, session)) {
+        return NextResponse.json({ ok: true, ignored: 'payment_not_paid_yet' });
+      }
+      const intentId = resolveIntentIdFromCheckoutSession(session);
       if (!intentId) {
         return NextResponse.json({ ok: false, reason: 'no_intent_ref' }, { status: 200 });
       }
-      // Credit. Idempotent if already CONFIRMED.
       const result = await creditWalletForIntent({
         intentId,
         txHash: session.payment_intent?.toString() ?? session.id,

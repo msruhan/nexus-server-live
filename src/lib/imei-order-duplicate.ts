@@ -61,10 +61,19 @@ export async function findActiveDeviceDuplicate(params: {
   }
 }
 
-export function deviceFieldLabel(requiresImei: boolean, requiresSn: boolean): string {
-  if (requiresSn && !requiresImei) return 'Serial Number'
-  if (requiresImei && requiresSn) return 'IMEI / Serial Number'
-  return 'IMEI'
+export function deviceFieldLabel(
+  requiresImei: boolean,
+  requiresSn: boolean,
+  requiresEcid = false,
+): string {
+  const parts = [
+    requiresImei && 'IMEI',
+    requiresSn && 'Serial Number',
+    requiresEcid && 'ECID',
+  ].filter(Boolean) as string[]
+  if (parts.length === 0) return 'Device identifier'
+  if (parts.length === 1) return parts[0]
+  return parts.join(' / ')
 }
 
 export function isSupplierDuplicateError(raw: string | null | undefined): boolean {

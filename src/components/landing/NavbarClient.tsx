@@ -8,16 +8,87 @@ import { cn } from '@/lib/cn';
 
 type Item = { id: string; label: string; href: string; isExternal: boolean };
 
+export type NavbarAuth =
+  | { kind: 'guest' }
+  | { kind: 'authenticated'; href: string; label: string; name?: string | null };
+
+function firstName(name?: string | null): string | null {
+  if (!name?.trim()) return null;
+  return name.trim().split(/\s+/)[0] ?? null;
+}
+
+function AuthActions({
+  authNav,
+  className,
+  onNavigate,
+}: {
+  authNav: NavbarAuth;
+  className?: string;
+  onNavigate?: () => void;
+}) {
+  if (authNav.kind === 'guest') {
+    return (
+      <div className={className}>
+        <Link
+          href="/login"
+          onClick={onNavigate}
+          className="hidden text-sm font-medium text-ink/80 transition-colors hover:text-ink sm:inline-block"
+        >
+          Sign in
+        </Link>
+        <Link
+          href="/register"
+          onClick={onNavigate}
+          className="group hidden items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-xs font-semibold text-paper transition-colors hover:bg-primary-600 sm:inline-flex"
+        >
+          Open account
+          <ArrowUpRight
+            weight="bold"
+            size={12}
+            className="transition-transform duration-200 group-hover:rotate-45"
+          />
+        </Link>
+      </div>
+    );
+  }
+
+  const greeting = firstName(authNav.name);
+
+  return (
+    <div className={className}>
+      {greeting ? (
+        <span className="hidden text-sm font-medium text-ink/70 sm:inline-block">
+          Hi, {greeting}
+        </span>
+      ) : null}
+      <Link
+        href={authNav.href}
+        onClick={onNavigate}
+        className="group inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-xs font-semibold text-paper transition-colors hover:bg-primary-600"
+      >
+        {authNav.label}
+        <ArrowUpRight
+          weight="bold"
+          size={12}
+          className="transition-transform duration-200 group-hover:rotate-45"
+        />
+      </Link>
+    </div>
+  );
+}
+
 export function NavbarClient({
   items,
   siteName,
   tagline,
   logoUrl,
+  authNav = { kind: 'guest' },
 }: {
   items: Item[];
   siteName: string;
   tagline: string;
   logoUrl?: string | null;
+  authNav?: NavbarAuth;
 }) {
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = React.useState(false);
@@ -71,23 +142,7 @@ export function NavbarClient({
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="hidden text-sm font-medium text-ink/80 transition-colors hover:text-ink sm:inline-block"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="group hidden items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-xs font-semibold text-paper transition-colors hover:bg-primary-600 sm:inline-flex"
-            >
-              Open account
-              <ArrowUpRight
-                weight="bold"
-                size={12}
-                className="transition-transform duration-200 group-hover:rotate-45"
-              />
-            </Link>
+            <AuthActions authNav={authNav} className="hidden items-center gap-3 sm:flex" />
             <button
               onClick={() => setOpen(true)}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line text-ink lg:hidden"
@@ -137,18 +192,39 @@ export function NavbarClient({
                 </Link>
               ))}
               <div className="mt-4 grid gap-2">
-                <Link
-                  href="/login"
-                  className="rounded-full border border-line py-2.5 text-center text-sm font-medium"
-                >
-                  Sign in
-                </Link>
-                <Link
-                  href="/register"
-                  className="rounded-full bg-ink py-2.5 text-center text-sm font-semibold text-paper"
-                >
-                  Open account
-                </Link>
+                {authNav.kind === 'guest' ? (
+                  <>
+                    <Link
+                      href="/login"
+                      onClick={() => setOpen(false)}
+                      className="rounded-full border border-line py-2.5 text-center text-sm font-medium"
+                    >
+                      Sign in
+                    </Link>
+                    <Link
+                      href="/register"
+                      onClick={() => setOpen(false)}
+                      className="rounded-full bg-ink py-2.5 text-center text-sm font-semibold text-paper"
+                    >
+                      Open account
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    {firstName(authNav.name) ? (
+                      <p className="py-1 text-center text-sm text-ink-muted">
+                        Signed in as {firstName(authNav.name)}
+                      </p>
+                    ) : null}
+                    <Link
+                      href={authNav.href}
+                      onClick={() => setOpen(false)}
+                      className="rounded-full bg-ink py-2.5 text-center text-sm font-semibold text-paper"
+                    >
+                      {authNav.label}
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>

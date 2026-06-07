@@ -27,6 +27,7 @@ export async function GET(
         requiresMep: true,
         requiresPrd: true,
         requiresSn: true,
+        requiresEcid: true,
         group: { select: { id: true, title: true } },
       },
     })

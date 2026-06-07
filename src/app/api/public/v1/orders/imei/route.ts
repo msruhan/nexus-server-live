@@ -54,6 +54,7 @@ export async function POST(req: Request) {
         requiresMep: true,
         requiresPrd: true,
         requiresSn: true,
+        requiresEcid: true,
       },
     });
     if (!service) return apiError('Service not found or inactive', 404);
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
     const deviceInput = validateImeiOrderDeviceInput(service, parsed.data);
     if (deviceInput.error) return apiError(deviceInput.error);
 
-    const deviceLabel = deviceFieldLabel(service.requiresImei, service.requiresSn);
+    const deviceLabel = deviceFieldLabel(service.requiresImei, service.requiresSn, service.requiresEcid);
     const duplicate = await findActiveDeviceDuplicate({
       apiId: service.apiId,
       serviceId: service.id,
@@ -83,6 +84,7 @@ export async function POST(req: Request) {
       { key: 'mep', label: 'MEP', flag: service.requiresMep },
       { key: 'prd', label: 'PRD', flag: service.requiresPrd },
       { key: 'serialNumber', label: 'Serial Number', flag: service.requiresSn },
+      { key: 'ecid', label: 'ECID', flag: service.requiresEcid },
     ];
     for (const r of required) {
       if (r.flag && (!parsed.data[r.key] || `${parsed.data[r.key]}`.trim() === '')) {
@@ -133,6 +135,7 @@ export async function POST(req: Request) {
           mep: parsed.data.mep ?? null,
           prd: parsed.data.prd ?? null,
           serialNumber: deviceInput.serialNumber,
+          ecid: deviceInput.ecid,
           note: parsed.data.note ?? null,
           // Dhru-compatible callback (all optional; defaults preserve old behavior).
           callerReference: feedback.callerReference,

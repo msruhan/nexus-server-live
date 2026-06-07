@@ -43,6 +43,7 @@ export default async function AdminImeiServicesPage() {
           description: s.description ?? '',
           requiresImei: s.requiresImei,
           requiresSn: s.requiresSn,
+          requiresEcid: s.requiresEcid,
         }))}
       />
     </div>

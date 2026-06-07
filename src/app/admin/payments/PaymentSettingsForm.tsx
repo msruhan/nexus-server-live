@@ -63,14 +63,14 @@ export function PaymentSettingsForm({ initial }: { initial: Initial }) {
     router.refresh();
   }
 
-  const callbackUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/api/payment/usdt-portal/callback`
-      : '/api/payment/usdt-portal/callback';
   const paypalWebhookUrl =
     typeof window !== 'undefined'
       ? `${window.location.origin}/api/payment/paypal/webhook`
       : '/api/payment/paypal/webhook';
+  const usdtCallbackPathForPanel =
+    typeof window !== 'undefined'
+      ? `${window.location.host.replace(/^www\./i, '')}/api/payment/usdt-portal/callback`
+      : 'yourdomain.com/api/payment/usdt-portal/callback';
   const stripeWebhookUrl =
     typeof window !== 'undefined'
       ? `${window.location.origin}/api/payment/stripe/webhook`
@@ -80,7 +80,7 @@ export function PaymentSettingsForm({ initial }: { initial: Initial }) {
     <div className="space-y-8">
       <Section
         title="USDT Portal (hosted)"
-        description="Auto-credit via usdtportal.com hosted checkout. Drop-in compatible with their Dhru gateway protocol — supports BEP20, TRC20, ERC20, Binance C2C."
+        description="Website type: DHRU FUSION / PHP / OTHER. Each deployment uses its own USDT Portal merchant account (same as PayPal). Supports BEP20, TRC20, ERC20, Binance C2C."
       >
         <Toggle
           label="Enable USDT Portal"
@@ -120,16 +120,24 @@ export function PaymentSettingsForm({ initial }: { initial: Initial }) {
         </div>
         <div className="mt-4 rounded-xl border border-line bg-paper p-4 text-xs">
           <div className="font-mono uppercase tracking-[0.18em] text-ink-muted">
-            Configure in your USDT Portal merchant panel
+            Configure in USDT Portal → Connection Settings
           </div>
           <div className="mt-2 space-y-1">
             <div>
-              <span className="font-semibold">Callback URL:</span>{' '}
-              <code className="font-mono break-all">{callbackUrl}</code>
+              <span className="font-semibold">Website type:</span>{' '}
+              <code className="font-mono">DHRU FUSION / PHP / OTHER</code>
             </div>
             <div>
-              <span className="font-semibold">Whitelist your server IP</span> in the merchant panel
-              — otherwise place-order requests return 403.
+              <span className="font-semibold">Callback URL</span> (no https or www):{' '}
+              <code className="font-mono break-all">{usdtCallbackPathForPanel}</code>
+            </div>
+            <div>
+              <span className="font-semibold">Website security:</span> https ·{' '}
+              <span className="font-semibold">URL version:</span> without www
+            </div>
+            <div>
+              Whitelist USDT Portal IP <code className="font-mono">161.97.165.102</code> and your
+              server public IP — otherwise place-order requests return 403.
             </div>
             <div className="text-ink-muted">
               Wallet is USD-native. The USDT rate converts USD → USDT for the hosted checkout.
@@ -140,7 +148,7 @@ export function PaymentSettingsForm({ initial }: { initial: Initial }) {
 
       <Section
         title="PayPal"
-        description="Hosted PayPal Checkout. Cards + PayPal balance + Pay Later. Wallet credits when capture completes (browser return + webhook fallback)."
+        description="Hosted PayPal Checkout for this deployment only. Create a separate PayPal app per NexusServer instance — do not reuse NexusPortal credentials. Wallet credits when capture completes (browser return + webhook fallback)."
       >
         <Toggle
           label="Enable PayPal"
@@ -202,7 +210,7 @@ export function PaymentSettingsForm({ initial }: { initial: Initial }) {
 
       <Section
         title="Stripe"
-        description="Hosted Stripe Checkout — cards, Apple Pay, Google Pay, link. Wallet credits on webhook checkout.session.completed."
+        description="Checkout Sessions API (hosted redirect). Each deployment uses its own Stripe account — do not reuse NexusPortal keys. Wallet credits on webhook when payment_status is paid."
       >
         <Toggle
           label="Enable Stripe"
@@ -242,7 +250,10 @@ export function PaymentSettingsForm({ initial }: { initial: Initial }) {
             </div>
             <div>
               <span className="font-semibold">Subscribe to:</span>{' '}
-              <code className="font-mono">checkout.session.completed, checkout.session.async_payment_succeeded</code>
+              <code className="font-mono">
+                checkout.session.completed, checkout.session.async_payment_succeeded
+              </code>
+              <span className="text-ink-muted"> (fulfill when paid)</span>
             </div>
             <div className="text-ink-muted">
               Copy the resulting whsec_… into the field above. Currency is USD.

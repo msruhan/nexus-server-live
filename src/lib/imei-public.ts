@@ -24,6 +24,7 @@ export interface PublicImeiService {
   requiresMep: boolean
   requiresPrd: boolean
   requiresSn: boolean
+  requiresEcid: boolean
 }
 
 export interface PublicImeiServiceGroup {
@@ -140,6 +141,7 @@ export function mapApiService(raw: {
   requiresMep?: boolean
   requiresPrd?: boolean
   requiresSn?: boolean
+  requiresEcid?: boolean
   group: { id: string; title: string }
 }): PublicImeiService {
   return {
@@ -159,6 +161,7 @@ export function mapApiService(raw: {
     requiresMep: raw.requiresMep ?? false,
     requiresPrd: raw.requiresPrd ?? false,
     requiresSn: raw.requiresSn ?? false,
+    requiresEcid: raw.requiresEcid ?? false,
   }
 }
 

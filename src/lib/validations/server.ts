@@ -41,6 +41,8 @@ export function resolveRequiredFieldsFromUpdate(
 
 export const createServerOrderSchema = z.object({
   serviceId: z.string().min(1),
+  /** Skip local duplicate block after user confirms in UI. */
+  acknowledgeDuplicate: z.boolean().optional().default(false),
   requiredFields: z.record(z.string(), z.string()).optional().default({}),
 
   // ─── Dhru-compatible callback (optional, additive) ───────────────

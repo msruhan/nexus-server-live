@@ -7,6 +7,11 @@ import {
   submitServerOrderToSupplier,
 } from '@/lib/server-order-worker'
 import { parseServerFieldDefs, validateServerOrderFields } from '@/lib/server-fields'
+import {
+  findActiveServerOrderDuplicate,
+  formatServerDuplicateWarning,
+  serializeServerOrderFields,
+} from '@/lib/server-order-duplicate'
 import { createServerOrderSchema } from '@/lib/validations/server'
 import { extractRequestContext, logOrderEvent } from '@/lib/activity-log'
 import { notifyTelegramOrderCreated, notifyTelegramAdminNewOrder } from '@/lib/telegram/notify'
@@ -106,6 +111,19 @@ export async function POST(req: Request) {
     const validation = validateServerOrderFields(fieldDefs, parsed.data.requiredFields)
     if (!validation.ok) return apiError(validation.error ?? 'Invalid order data', 400)
 
+    const requiredFieldsJson = serializeServerOrderFields(validation.fields)
+    const duplicate = await findActiveServerOrderDuplicate({
+      userId,
+      serviceId: service.id,
+      requiredFieldsJson,
+    })
+    if (duplicate && !parsed.data.acknowledgeDuplicate) {
+      return apiError(formatServerDuplicateWarning(duplicate), 409, {
+        code: 'DUPLICATE_ORDER',
+        duplicate,
+      })
+    }
+
     const wallet = await prisma.wallet.findUnique({ where: { userId } })
     if (!wallet) return apiError('Wallet not found', 400)
 
@@ -140,10 +158,7 @@ export async function POST(req: Request) {
           status: 'PENDING',
           email: validation.email,
           notes: validation.notes,
-          requiredFields:
-            Object.keys(validation.fields).length > 0
-              ? JSON.stringify(validation.fields)
-              : null,
+          requiredFields: requiredFieldsJson || null,
         },
         include: { service: { select: { id: true, title: true } } },
       })

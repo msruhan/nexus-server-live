@@ -163,6 +163,7 @@ export async function createPaypalIntent(
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
+        'PayPal-Request-Id': intent.id,
       },
       body: JSON.stringify(orderBody),
     });

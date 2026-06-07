@@ -182,6 +182,7 @@ async function buildClassicImeiListPayload() {
       'Requires.MEP': svc.requiresMep ? 'Required' : 'Optional',
       'Requires.PRD': svc.requiresPrd ? 'Required' : 'Optional',
       'Requires.SN': svc.requiresSn ? 'Required' : 'Optional',
+      'Requires.ECID': svc.requiresEcid ? 'Required' : 'Optional',
     };
   }
 
@@ -261,6 +262,7 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
   const custom = decodeCustomField(params.CUSTOMFIELD);
   const merged = { ...params, ...custom };
   const serial = String(merged.SN ?? merged.SERIALNUMBER ?? '').trim();
+  const ecid = String(merged.ECID ?? '').trim();
 
   // Optional Dhru-compatible callback inputs (SSRF-validated, additive).
   // Drawn from top-level params and/or the decoded CUSTOMFIELD payload.
@@ -273,8 +275,10 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
     // Respect service-specific input requirements:
     // - SN-only services accept SN/SERIALNUMBER (alphanumeric)
     // - IMEI services require 15-17 numeric IMEI
-    if (imeiSvc.requiresSn && !imeiSvc.requiresImei) {
+    if (imeiSvc.requiresSn && !imeiSvc.requiresImei && !imeiSvc.requiresEcid) {
       if (!serial) return err('Serial Number is required');
+    } else if (imeiSvc.requiresEcid && !imeiSvc.requiresImei && !imeiSvc.requiresSn) {
+      if (!ecid) return err('ECID is required');
     } else if (!imei || !/^\d{15,17}$/.test(imei)) {
       return err('IMEI must be 15-17 digits');
     }
@@ -310,7 +314,7 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
           orderCode: generateOrderCode(),
           userId,
           serviceId: imeiSvc.id,
-          imei: imei || serial,
+          imei: imei || serial || ecid,
           price: effectivePrice,
           status: 'PENDING',
           network: merged.NETWORK ?? null,
@@ -321,6 +325,7 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
           mep: merged.MEP ?? null,
           prd: merged.PRD ?? null,
           serialNumber: serial || null,
+          ecid: ecid || null,
           // Dhru-compatible callback (all optional; defaults preserve old behavior).
           callerReference: feedback.callerReference,
           feedbackUrl: feedback.feedbackUrl,

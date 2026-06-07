@@ -61,6 +61,7 @@ export async function finalizeMarketplaceCheckoutByIntent(intentId: string): Pro
         requiresMep: true,
         requiresPrd: true,
         requiresSn: true,
+        requiresEcid: true,
       },
     });
     if (!service) {
@@ -89,6 +90,7 @@ export async function finalizeMarketplaceCheckoutByIntent(intentId: string): Pro
       { key: 'mep', label: 'MEP', flag: service.requiresMep },
       { key: 'prd', label: 'PRD', flag: service.requiresPrd },
       { key: 'serialNumber', label: 'Serial Number', flag: service.requiresSn },
+      { key: 'ecid', label: 'ECID', flag: service.requiresEcid },
     ];
     for (const r of required) {
       if (r.flag && !`${payload[r.key] ?? ''}`.trim()) {
@@ -128,6 +130,7 @@ export async function finalizeMarketplaceCheckoutByIntent(intentId: string): Pro
           mep: payload.mep || null,
           prd: payload.prd || null,
           serialNumber: deviceInput.serialNumber,
+          ecid: deviceInput.ecid,
           note: payload.note || null,
         },
       });

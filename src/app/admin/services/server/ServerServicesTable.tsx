@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/Input';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import {
   parseServerFieldDefs,
-  serializeServerFieldDefs,
   SERVER_FIELD_PRESETS,
   normalizeFieldKey,
 } from '@/lib/server-fields';
@@ -195,9 +194,12 @@ function EditServerServiceDialog({
 }) {
   const [title, setTitle] = React.useState(row.title);
   const [description, setDescription] = React.useState(row.description || '');
+  const [price, setPrice] = React.useState(String(row.price));
   const [fieldDefs, setFieldDefs] = React.useState<FieldRow[]>(
     () => parseServerFieldDefs(row.requiredFields).map((d) => ({ ...d })),
   );
+  const priceNum = Number(price);
+  const priceValid = Number.isFinite(priceNum) && priceNum >= 0;
   const [newKey, setNewKey] = React.useState('');
   const [newLabel, setNewLabel] = React.useState('');
   const [newType, setNewType] = React.useState<FieldRow['type']>('text');
@@ -278,6 +280,17 @@ function EditServerServiceDialog({
           </div>
 
           <div className="lg:col-span-5 space-y-4">
+            <Input
+              label="Retail price"
+              type="number"
+              min={0}
+              step={1}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              hint="Catalog price debited from the customer wallet (same as table column)."
+              required
+            />
+
             <div className="rounded-xl border border-line bg-paper-50 p-4">
               <div className="border-b border-line pb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
                 Required fields (server)
@@ -425,20 +438,17 @@ function EditServerServiceDialog({
                     </tbody>
                   </table>
                 </div>
-
-                <div className="font-mono text-[10px] text-ink-muted">
-                  Will be saved as JSON: {serializeServerFieldDefs(fieldDefs)}
-                </div>
               </div>
             </div>
 
             <button
               type="button"
-              disabled={busy || title.trim().length < 2}
+              disabled={busy || title.trim().length < 2 || !priceValid}
               onClick={() =>
                 onSave({
                   title: title.trim(),
                   description,
+                  price: priceNum,
                   fieldDefs,
                 })
               }
