@@ -46,3 +46,29 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+
+      - name: Register release draft in NexusPortal
+        if: github.event_name == 'push'
+        env:
+          PORTAL_RELEASE_SYNC_URL: ${{ secrets.PORTAL_RELEASE_SYNC_URL }}
+          RELEASE_SYNC_SECRET: ${{ secrets.RELEASE_SYNC_SECRET }}
+        run: |
+          if [[ -z "$PORTAL_RELEASE_SYNC_URL" || -z "$RELEASE_SYNC_SECRET" ]]; then
+            echo "Skipping Portal release sync (secrets not configured)."
+            exit 0
+          fi
+          VERSION="${{ steps.meta.outputs.tag }}"
+          IMAGE="${{ env.IMAGE_NAME }}:${VERSION}"
+          CHANGELOG=$(git tag -l --format='%(contents)' "v${VERSION}" 2>/dev/null | head -c 4000)
+          if [[ -z "$CHANGELOG" ]]; then
+            CHANGELOG="Docker release ${VERSION}"
+          fi
+          BODY=$(jq -n \
+            --arg version "$VERSION" \
+            --arg image "$IMAGE" \
+            --arg changelog "$CHANGELOG" \
+            '{version:$version,dockerImage:$image,changelog:$changelog}')
+          curl -fsS -X POST "$PORTAL_RELEASE_SYNC_URL" \
+            -H "Authorization: Bearer $RELEASE_SYNC_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "$BODY"
