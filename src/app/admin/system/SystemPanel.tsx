@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { RenewalCtas, showRenewalCtas } from '@/components/dashboard/RenewalCtas';
 
 type LicenseData = {
   status: 'active' | 'inactive' | 'not_activated';
@@ -11,6 +12,8 @@ type LicenseData = {
   expiresAt: string | null;
   lastValidatedAt: string | null;
   reason: string | null;
+  renewalCheckoutUrl: string | null;
+  renewalDeskUrl: string | null;
 };
 
 type UpdateHistoryEntry = {
@@ -288,6 +291,13 @@ export function SystemPanel({ initial }: Props) {
                 Reason: {license.reason}
               </div>
             )}
+            {license.status === 'inactive' &&
+            showRenewalCtas(license.reason, license.renewalCheckoutUrl) ? (
+              <RenewalCtas
+                checkoutUrl={license.renewalCheckoutUrl}
+                deskUrl={license.renewalDeskUrl}
+              />
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={handleRevalidate}

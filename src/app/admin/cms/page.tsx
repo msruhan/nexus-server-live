@@ -10,6 +10,7 @@ import {
   Folders,
   FilePlus,
   Palette,
+  Rows,
 } from '@phosphor-icons/react/dist/ssr';
 import { prisma } from '@/lib/db';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -79,6 +80,14 @@ export default async function CmsHub() {
       desc: 'Header, footer, mobile · drag-reorder.',
       count: menuCount,
       countLabel: 'items',
+    },
+    {
+      href: '/admin/cms/footer',
+      icon: Rows,
+      title: 'Footer',
+      desc: 'Wordmark intro, newsletter, link columns, socials, copyright.',
+      count: 1,
+      countLabel: 'layout',
     },
     {
       href: '/admin/cms/faq',

@@ -10,6 +10,7 @@ import {
   YoutubeLogo,
 } from '@phosphor-icons/react/dist/ssr';
 import type { Icon } from '@phosphor-icons/react';
+import { parseFooterContent, resolveFooterForRender } from '@/lib/footer-content';
 
 export async function Footer() {
   const [menus, settings] = await Promise.all([
@@ -21,44 +22,43 @@ export async function Footer() {
   ]);
 
   const siteName = settings?.siteName ?? 'Recovero';
-  const tagline = settings?.siteTagline ?? 'Unlock Service Portal';
-  const footerText =
-    settings?.footerText ?? 'A self-service unlock operations portal for resellers and technicians.';
-  const copyright =
-    settings?.copyrightText ?? `© ${new Date().getFullYear()} ${siteName} · All rights reserved`;
+  const footerContent = parseFooterContent(settings?.footerContent);
+  const resolved = resolveFooterForRender(footerContent, {
+    siteName,
+    siteTagline: settings?.siteTagline ?? 'Unlock Service Portal',
+    footerText: settings?.footerText ?? null,
+    copyrightText: settings?.copyrightText ?? null,
+    brandShowPoweredBy: settings?.brandShowPoweredBy ?? true,
+    socialInstagram: settings?.socialInstagram ?? null,
+    socialTiktok: settings?.socialTiktok ?? null,
+    socialWhatsapp: settings?.socialWhatsapp ?? null,
+    socialTelegram: settings?.socialTelegram ?? null,
+    socialFacebook: settings?.socialFacebook ?? null,
+    socialYoutube: settings?.socialYoutube ?? null,
+  });
 
   const socials: Array<{ icon: Icon; href: string; label: string }> = [];
-  if (settings?.socialInstagram) socials.push({ icon: InstagramLogo, href: settings.socialInstagram, label: 'Instagram' });
-  if (settings?.socialTiktok) socials.push({ icon: TiktokLogo, href: settings.socialTiktok, label: 'TikTok' });
-  if (settings?.socialWhatsapp) socials.push({ icon: WhatsappLogo, href: settings.socialWhatsapp, label: 'WhatsApp' });
-  if (settings?.socialTelegram) socials.push({ icon: TelegramLogo, href: settings.socialTelegram, label: 'Telegram' });
-  if (settings?.socialFacebook) socials.push({ icon: FacebookLogo, href: settings.socialFacebook, label: 'Facebook' });
-  if (settings?.socialYoutube) socials.push({ icon: YoutubeLogo, href: settings.socialYoutube, label: 'YouTube' });
+  if (resolved.socials.instagram) {
+    socials.push({ icon: InstagramLogo, href: resolved.socials.instagram, label: 'Instagram' });
+  }
+  if (resolved.socials.tiktok) {
+    socials.push({ icon: TiktokLogo, href: resolved.socials.tiktok, label: 'TikTok' });
+  }
+  if (resolved.socials.whatsapp) {
+    socials.push({ icon: WhatsappLogo, href: resolved.socials.whatsapp, label: 'WhatsApp' });
+  }
+  if (resolved.socials.telegram) {
+    socials.push({ icon: TelegramLogo, href: resolved.socials.telegram, label: 'Telegram' });
+  }
+  if (resolved.socials.facebook) {
+    socials.push({ icon: FacebookLogo, href: resolved.socials.facebook, label: 'Facebook' });
+  }
+  if (resolved.socials.youtube) {
+    socials.push({ icon: YoutubeLogo, href: resolved.socials.youtube, label: 'YouTube' });
+  }
 
-  // Default footer columns when no CMS menus exist
-  const fallbackSections = [
-    {
-      title: 'Catalog',
-      links: [
-        { label: 'Unlock services', href: '/services/imei' },
-        { label: 'Remote services', href: '/services/server' },
-      ],
-    },
-    {
-      title: 'The desk',
-      links: [
-        { label: 'How it works', href: '#how-to-order' },
-        { label: 'Voices', href: '#voices' },
-      ],
-    },
-    {
-      title: 'Help',
-      links: [
-        { label: 'FAQ', href: '#notes' },
-        { label: 'System status', href: '#' },
-      ],
-    },
-  ];
+  const useMenuLinks = resolved.linkMode === 'menus' && menus.length > 0;
+  const columns = resolved.columns;
 
   return (
     <footer className="relative border-t border-line bg-paper">
@@ -67,42 +67,46 @@ export async function Footer() {
           {siteName}<span className="text-primary-500">.</span>
         </h2>
         <p className="mt-4 max-w-2xl font-serif text-lg italic text-ink-muted lg:text-xl">
-          {footerText}
+          {resolved.introText}
         </p>
       </div>
 
       <div className="mx-auto max-w-[1400px] px-6 py-14 lg:px-10">
         <div className="grid gap-12 lg:grid-cols-12">
           <div className="lg:col-span-4">
-            <span className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-primary-700/70">
-              {tagline}
-            </span>
-            <p className="mt-3 max-w-sm font-display text-lg font-bold tracking-tight text-ink">
-              The dispatch — engineering notes, supplier updates, occasional essays.
-            </p>
-            <form
-              action="/api/newsletter"
-              method="post"
-              className="mt-5 flex w-full max-w-sm items-center border-b border-ink py-2 transition-colors focus-within:border-primary-500"
-            >
-              <input
-                type="email"
-                name="email"
-                placeholder="your@email.com"
-                className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-soft"
-              />
-              <button className="group flex items-center gap-1.5 text-xs font-semibold text-ink hover:text-primary-700">
-                Subscribe
-                <ArrowUpRight
-                  weight="bold"
-                  size={12}
-                  className="transition-transform group-hover:rotate-45"
-                />
-              </button>
-            </form>
+            {resolved.newsletter.enabled && (
+              <>
+                <span className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-primary-700/70">
+                  {resolved.newsletterEyebrow}
+                </span>
+                <p className="mt-3 max-w-sm font-display text-lg font-bold tracking-tight text-ink">
+                  {resolved.newsletter.heading}
+                </p>
+                <form
+                  action="/api/newsletter"
+                  method="post"
+                  className="mt-5 flex w-full max-w-sm items-center border-b border-ink py-2 transition-colors focus-within:border-primary-500"
+                >
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder={resolved.newsletter.emailPlaceholder}
+                    className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-soft"
+                  />
+                  <button className="group flex items-center gap-1.5 text-xs font-semibold text-ink hover:text-primary-700">
+                    {resolved.newsletter.buttonLabel}
+                    <ArrowUpRight
+                      weight="bold"
+                      size={12}
+                      className="transition-transform group-hover:rotate-45"
+                    />
+                  </button>
+                </form>
+              </>
+            )}
 
             {socials.length > 0 && (
-              <div className="mt-7 flex flex-wrap gap-2">
+              <div className={`flex flex-wrap gap-2 ${resolved.newsletter.enabled ? 'mt-7' : ''}`}>
                 {socials.map((s) => (
                   <a
                     key={s.label}
@@ -120,7 +124,7 @@ export async function Footer() {
           </div>
 
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:col-span-8">
-            {menus.length > 0 ? (
+            {useMenuLinks ? (
               <div className="col-span-full">
                 <div className="grid grid-cols-2 gap-x-8 gap-y-2 sm:grid-cols-3 lg:grid-cols-4">
                   {menus.map((m) => (
@@ -142,8 +146,8 @@ export async function Footer() {
                 </div>
               </div>
             ) : (
-              fallbackSections.map((sec, i) => (
-                <div key={sec.title}>
+              columns.map((sec, i) => (
+                <div key={`${sec.title}-${i}`}>
                   <div className="flex items-baseline gap-2">
                     <span className="font-mono text-[10px] tabular-nums text-ink-soft">
                       0{i + 1}
@@ -154,7 +158,7 @@ export async function Footer() {
                   </div>
                   <ul className="mt-4 space-y-2">
                     {sec.links.map((l) => (
-                      <li key={l.label}>
+                      <li key={`${l.label}-${l.href}`}>
                         <Link
                           href={l.href}
                           className="text-sm text-ink/70 transition-colors hover:text-ink"
@@ -173,11 +177,9 @@ export async function Footer() {
 
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-1 px-6 py-6 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted sm:flex-row sm:items-center sm:justify-between lg:px-10">
-          <span>{copyright}</span>
-          {settings?.brandShowPoweredBy !== false && (
-            <span className="text-ink-soft">
-              Powered by Recovero
-            </span>
+          <span>{resolved.copyright}</span>
+          {resolved.brandShowPoweredBy && (
+            <span className="text-ink-soft">Powered by Recovero</span>
           )}
         </div>
       </div>

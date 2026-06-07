@@ -43,6 +43,19 @@ export default middlewareAuth((req) => {
     return NextResponse.redirect(new URL(target, nextUrl));
   }
 
+  // License lockdown: keep primary admin on the system page only.
+  if (
+    isLoggedIn &&
+    role === 'ADMIN' &&
+    isAdminRoute &&
+    !nextUrl.pathname.startsWith('/admin/system')
+  ) {
+    const lockCookie = req.cookies.get('nexus_license_lock')?.value === '1';
+    if (lockCookie) {
+      return NextResponse.redirect(new URL('/admin/system', nextUrl));
+    }
+  }
+
   return nextWithPath();
 });
 

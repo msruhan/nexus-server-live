@@ -16,7 +16,6 @@ const LICENSE_LOCK_EXEMPT_PREFIXES = [
   '/license-suspended',
   '/admin/system',
   '/login',
-  '/register',
   '/2fa-required',
   '/api/auth',
 ];
@@ -62,7 +61,17 @@ export async function getLicenseEnforcementState(): Promise<LicenseEnforcementSt
   };
 }
 
-/** Hard lock: redirect storefront, user desk, and admin (except license system page). */
+/** Activated license with runtime denied (expired, revoked, hold, etc.). */
+export function isLicenseRuntimeLocked(state: LicenseEnforcementState): boolean {
+  return state.activated && !state.runtimeAllowed;
+}
+
+/** Only the primary admin may sign in while runtime is locked. */
+export function canSignInDuringLicenseLock(role: string): boolean {
+  return role === 'ADMIN';
+}
+
+/** Hard lock: redirect storefront, user desk, and non-admin sessions. */
 export function shouldRedirectToLicenseSuspended(
   state: LicenseEnforcementState,
   pathname: string,

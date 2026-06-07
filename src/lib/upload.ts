@@ -5,6 +5,7 @@
 
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
+import { UPLOAD_MAX_BYTES } from '@/lib/upload-limits';
 
 export type UploadResult = {
   url: string;
@@ -22,8 +23,6 @@ const ALLOWED_MIME = new Set([
   'application/pdf',
 ]);
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
-
 export async function saveUpload(
   file: File,
   folder = 'general',
@@ -31,8 +30,8 @@ export async function saveUpload(
   if (!ALLOWED_MIME.has(file.type)) {
     throw new Error(`Unsupported file type: ${file.type}`);
   }
-  if (file.size > MAX_BYTES) {
-    throw new Error(`File too large (max ${MAX_BYTES / 1024 / 1024} MB)`);
+  if (file.size > UPLOAD_MAX_BYTES) {
+    throw new Error(`File too large (max ${UPLOAD_MAX_BYTES / 1024 / 1024} MB)`);
   }
 
   const safeFolder = folder.replace(/[^a-z0-9_-]/gi, '').slice(0, 32) || 'general';

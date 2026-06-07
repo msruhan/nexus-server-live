@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Plus, Trash, Eye, EyeSlash, X, Upload } from '@phosphor-icons/react/dist/ssr';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { UPLOAD_MAX_LABEL } from '@/lib/upload-limits';
 
 type Banner = {
   id: string;
@@ -22,6 +23,22 @@ type Banner = {
 };
 
 const POSITIONS = ['home_top', 'home_middle', 'sidebar', 'service_page', 'popup'];
+
+function bannerImageGuide(position: string): string {
+  switch (position) {
+    case 'home_top':
+    case 'home_middle':
+      return `Carousel slot — use 1920 × 600 px (16:5) or 1600 × 500 px so the banner fills the frame with no empty bars. PNG, JPG, WebP, or GIF. Max ${UPLOAD_MAX_LABEL} per upload.`;
+    case 'sidebar':
+      return `Sidebar slot — recommended 800 × 600 px (4:3). PNG, JPG, WebP, or GIF. Max ${UPLOAD_MAX_LABEL} per upload.`;
+    case 'service_page':
+      return `Service page slot — recommended 1200 × 400 px (3:1). PNG, JPG, WebP, or GIF. Max ${UPLOAD_MAX_LABEL} per upload.`;
+    case 'popup':
+      return `Popup slot — recommended 600 × 600 px (1:1). PNG, JPG, WebP, or GIF. Max ${UPLOAD_MAX_LABEL} per upload.`;
+    default:
+      return `PNG, JPG, WebP, or GIF. Max ${UPLOAD_MAX_LABEL} per upload.`;
+  }
+}
 
 function resolveBannerImageUrl(url: string) {
   return url.startsWith('/uploads/') ? `/api${url}` : url;
@@ -82,9 +99,9 @@ export function BannerManager({ initial }: { initial: Banner[] }) {
                 b.isActive ? 'border-line' : 'border-line opacity-60'
               }`}
             >
-              <div className="relative aspect-[16/9] overflow-hidden bg-paper-200">
+              <div className="relative aspect-[16/5] overflow-hidden bg-paper-200">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={resolveBannerImageUrl(b.imageUrl)} alt={b.title} className="h-full w-full object-contain" />
+                <img src={resolveBannerImageUrl(b.imageUrl)} alt={b.title} className="h-full w-full object-cover" />
                 <div className="absolute left-2 top-2 flex gap-1">
                   <span className="rounded-md bg-ink/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-paper">
                     {b.position}
@@ -222,10 +239,15 @@ function BannerForm({
           <Input label="Title" value={state.title} onChange={(e) => setState((s) => ({ ...s, title: e.target.value }))} required />
           <div>
             <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">Image</label>
+            <p className="mt-1 font-serif text-xs italic text-ink-muted">{bannerImageGuide(state.position)}</p>
             {state.imageUrl ? (
               <div className="mt-2 overflow-hidden rounded-lg border border-line">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={resolveBannerImageUrl(state.imageUrl)} alt="" className="aspect-[16/9] w-full object-contain" />
+                <img
+                  src={resolveBannerImageUrl(state.imageUrl)}
+                  alt=""
+                  className="aspect-[16/5] w-full object-cover sm:aspect-[16/5]"
+                />
               </div>
             ) : (
               <div className="mt-2 rounded-lg border-2 border-dashed border-line bg-paper-50 p-8 text-center">
@@ -233,17 +255,18 @@ function BannerForm({
                 <p className="mt-2 font-serif text-sm italic text-ink-muted">No image yet.</p>
               </div>
             )}
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-bold hover:border-ink">
                 <Upload size={12} weight="bold" />
                 {uploading ? 'Uploading…' : 'Upload image'}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) handleUpload(f);
+                    e.target.value = '';
                   }}
                 />
               </label>
@@ -251,7 +274,7 @@ function BannerForm({
                 placeholder="…or paste image URL"
                 value={state.imageUrl}
                 onChange={(e) => setState((s) => ({ ...s, imageUrl: e.target.value }))}
-                className="flex-1"
+                className="min-w-[200px] flex-1"
               />
             </div>
           </div>

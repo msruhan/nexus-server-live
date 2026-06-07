@@ -26,6 +26,72 @@ export const ALIGNS: SectionAlign[] = ['left', 'center'];
 export const WIDTHS: SectionWidth[] = ['narrow', 'wide', 'full'];
 export const DIVIDERS: SectionDivider[] = ['none', 'line'];
 
+export type GradientPresetId =
+  | 'primary-wave'
+  | 'ink-glow'
+  | 'sunrise'
+  | 'ocean'
+  | 'velvet'
+  | 'paper-fade'
+  | 'custom';
+
+export const GRADIENT_PRESET_IDS: Exclude<GradientPresetId, 'custom'>[] = [
+  'primary-wave',
+  'ink-glow',
+  'sunrise',
+  'ocean',
+  'velvet',
+  'paper-fade',
+];
+
+export type GradientPreset = {
+  id: Exclude<GradientPresetId, 'custom'>;
+  label: string;
+  /** Full CSS background value for SectionFrame. Uses theme CSS variables. */
+  css: string;
+  isDark: boolean;
+};
+
+/** Six on-brand presets that follow the active palette / theme tokens. */
+export const GRADIENT_PRESETS: GradientPreset[] = [
+  {
+    id: 'primary-wave',
+    label: 'Primary wave',
+    css: 'linear-gradient(135deg, rgb(var(--primary-700)), rgb(var(--primary-500)), rgb(var(--accent-500)))',
+    isDark: true,
+  },
+  {
+    id: 'ink-glow',
+    label: 'Ink glow',
+    css: 'linear-gradient(135deg, rgb(var(--ink)), rgb(var(--primary-900)), rgb(var(--primary-600)))',
+    isDark: true,
+  },
+  {
+    id: 'sunrise',
+    label: 'Sunrise',
+    css: 'linear-gradient(140deg, rgb(var(--primary-950)), rgb(var(--primary-700)), rgb(var(--accent-500)))',
+    isDark: true,
+  },
+  {
+    id: 'ocean',
+    label: 'Ocean',
+    css: 'linear-gradient(135deg, rgb(var(--primary-900)), rgb(var(--accent-600)), rgb(var(--accent-400)))',
+    isDark: true,
+  },
+  {
+    id: 'velvet',
+    label: 'Velvet',
+    css: 'linear-gradient(160deg, rgb(var(--primary-800)), rgb(var(--primary-500)), rgb(var(--primary-300)))',
+    isDark: true,
+  },
+  {
+    id: 'paper-fade',
+    label: 'Paper fade',
+    css: 'linear-gradient(135deg, rgb(var(--paper-200)), rgb(var(--primary-100)), rgb(var(--primary-300)))',
+    isDark: false,
+  },
+];
+
 export type SectionStyle = {
   background: SectionBackground;
   padding: SectionPadding;
@@ -35,6 +101,10 @@ export type SectionStyle = {
   dividerBottom: SectionDivider;
   bgImageUrl: string | null;
   bgOverlay: number; // 0..100 integer
+  gradientPreset: GradientPresetId;
+  gradientFrom: string | null;
+  gradientTo: string | null;
+  gradientAngle: number;
 };
 
 export const DEFAULT_STYLE: SectionStyle = {
@@ -46,6 +116,10 @@ export const DEFAULT_STYLE: SectionStyle = {
   dividerBottom: 'none',
   bgImageUrl: null,
   bgOverlay: 0,
+  gradientPreset: 'primary-wave',
+  gradientFrom: '#1f48e6',
+  gradientTo: '#06b6d4',
+  gradientAngle: 135,
 };
 
 /**
@@ -144,6 +218,44 @@ function clampOverlay(value: unknown): number {
   return Math.min(100, Math.max(0, i));
 }
 
+function clampAngle(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_STYLE.gradientAngle;
+  return Math.min(360, Math.max(0, Math.round(n)));
+}
+
+const GRADIENT_PRESET_SET = new Set<string>([...GRADIENT_PRESET_IDS, 'custom']);
+
+/** Accept #RGB or #RRGGBB only (custom gradient stops). */
+export function safeHexColor(value: string | null | undefined): string | null {
+  if (!value || typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (/^#[0-9a-fA-F]{3}$/.test(trimmed) || /^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return null;
+}
+
+export function resolveGradientCss(style: SectionStyle): string | null {
+  if (style.background !== 'gradient') return null;
+  if (style.gradientPreset !== 'custom') {
+    const preset = GRADIENT_PRESETS.find((p) => p.id === style.gradientPreset);
+    return preset?.css ?? GRADIENT_PRESETS[0].css;
+  }
+  const from = safeHexColor(style.gradientFrom) ?? DEFAULT_STYLE.gradientFrom!;
+  const to = safeHexColor(style.gradientTo) ?? DEFAULT_STYLE.gradientTo!;
+  return `linear-gradient(${style.gradientAngle}deg, ${from}, ${to})`;
+}
+
+export function resolveGradientIsDark(style: SectionStyle): boolean {
+  if (style.background !== 'gradient') return false;
+  if (style.gradientPreset !== 'custom') {
+    const preset = GRADIENT_PRESETS.find((p) => p.id === style.gradientPreset);
+    return preset?.isDark ?? true;
+  }
+  return true;
+}
+
 export type ResolvedSettings = { style: SectionStyle; variant: string | null };
 
 /**
@@ -171,6 +283,12 @@ export function resolveSettings(raw: unknown, sectionType?: string): ResolvedSet
   const background = oneOf<SectionBackground>(styleRaw.background, BACKGROUNDS, DEFAULT_STYLE.background);
   const bgImageUrl = background === 'image' ? safeUrl(styleRaw.bgImageUrl as string) : null;
 
+  const gradientPreset = oneOf<GradientPresetId>(
+    styleRaw.gradientPreset,
+    [...GRADIENT_PRESET_SET] as GradientPresetId[],
+    DEFAULT_STYLE.gradientPreset,
+  );
+
   const style: SectionStyle = {
     background,
     padding: oneOf<SectionPadding>(styleRaw.padding, PADDINGS, DEFAULT_STYLE.padding),
@@ -180,6 +298,10 @@ export function resolveSettings(raw: unknown, sectionType?: string): ResolvedSet
     dividerBottom: oneOf<SectionDivider>(styleRaw.dividerBottom, DIVIDERS, DEFAULT_STYLE.dividerBottom),
     bgImageUrl,
     bgOverlay: clampOverlay(styleRaw.bgOverlay),
+    gradientPreset,
+    gradientFrom: safeHexColor(styleRaw.gradientFrom as string) ?? DEFAULT_STYLE.gradientFrom,
+    gradientTo: safeHexColor(styleRaw.gradientTo as string) ?? DEFAULT_STYLE.gradientTo,
+    gradientAngle: clampAngle(styleRaw.gradientAngle),
   };
 
   // Variant: validate against the section type when provided.
@@ -220,13 +342,11 @@ export function backgroundClasses(s: SectionStyle): { wrapper: string; isDark: b
       return { wrapper: 'bg-primary-500 text-paper', isDark: true };
     case 'gradient':
       return {
-        wrapper: 'bg-gradient-to-br from-primary-600 via-primary-500 to-accent-500 text-paper',
-        isDark: true,
+        wrapper: resolveGradientIsDark(s) ? 'text-paper' : 'text-ink',
+        isDark: resolveGradientIsDark(s),
       };
     case 'image':
-      // Background image is rendered by SectionFrame as layers; wrapper is the
-      // positioning context. Treat as dark for legibility.
-      return { wrapper: 'bg-ink text-paper', isDark: true };
+      return { wrapper: 'text-paper', isDark: true };
     case 'paper':
     default:
       return { wrapper: '', isDark: false };
@@ -272,6 +392,20 @@ export const sectionStyleSchema = z
     dividerBottom: z.enum(['none', 'line']).optional(),
     bgImageUrl: z.string().max(2048).nullable().optional(),
     bgOverlay: z.number().int().min(0).max(100).optional(),
+    gradientPreset: z
+      .enum([
+        'primary-wave',
+        'ink-glow',
+        'sunrise',
+        'ocean',
+        'velvet',
+        'paper-fade',
+        'custom',
+      ])
+      .optional(),
+    gradientFrom: z.string().max(7).nullable().optional(),
+    gradientTo: z.string().max(7).nullable().optional(),
+    gradientAngle: z.number().int().min(0).max(360).optional(),
   })
   .strict();
 

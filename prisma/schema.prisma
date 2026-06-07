@@ -513,6 +513,8 @@ model SiteSettings {
 
   footerText          String?
   copyrightText       String?
+  /// JSON: newsletter block, link columns, link mode (see lib/footer-content.ts)
+  footerContent       String?
 
   // ─── White-label / branding ────────────────────────────────────
   // Full rebrand controls. All optional & non-breaking. When
@@ -596,6 +598,8 @@ model SiteSettings {
   licenseTier            String?  // monthly | yearly | lifetime
   licenseRuntimeAllowed  Boolean  @default(true)
   licenseUpdatesAllowed  Boolean  @default(true)
+  licenseRenewalCheckoutUrl String?
+  licenseRenewalDeskUrl     String?
   lastUpdateVersion      String?
   lastUpdateAt           DateTime?
 

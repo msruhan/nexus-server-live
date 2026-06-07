@@ -5,6 +5,11 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { verifySecondFactor } from '@/lib/auth/verify-2fa';
 import { authConfig } from './auth.config';
+import {
+  canSignInDuringLicenseLock,
+  getLicenseEnforcementState,
+  isLicenseRuntimeLocked,
+} from '@/lib/license-state';
 
 const credsSchema = z.object({
   email: z.string().email(),
@@ -43,6 +48,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             totpSecret: user.twoFactorSecret,
           });
           if (!ok2fa) return null;
+        }
+
+        const licenseState = await getLicenseEnforcementState();
+        if (
+          isLicenseRuntimeLocked(licenseState) &&
+          !canSignInDuringLicenseLock(user.role)
+        ) {
+          return null;
         }
 
         return {

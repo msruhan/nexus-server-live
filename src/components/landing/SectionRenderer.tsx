@@ -1,13 +1,8 @@
 import { prisma } from '@/lib/db';
-import { Hero } from './Hero';
 import { Catalog } from './Catalog';
 import { HowToOrder } from './HowToOrder';
-import type { HowToOrderContent } from '@/lib/cms-types';
-import { Stats as DefaultStats } from './Stats';
-import { Bento } from './Bento';
 import { Voices } from './Voices';
 import { Notes } from './Notes';
-import { CTA as DefaultCta } from './CTA';
 import { Partners } from './Partners';
 import { DynamicHero } from './sections/DynamicHero';
 import { DynamicStats } from './sections/DynamicStats';
@@ -19,6 +14,14 @@ import { BannerSlider } from './sections/BannerSlider';
 import { Ticker } from './Ticker';
 import { SectionFrame } from './SectionFrame';
 import { resolveSettings } from '@/lib/cms-style';
+import { resolveSectionContent } from '@/lib/cms-content';
+import type {
+  ServiceCatalogContent,
+  PartnersContent,
+  RunningAdsContent,
+  HowToOrderContent,
+  RunningAdsTickerItem,
+} from '@/lib/cms-types';
 import { renderMarkdown } from '@/lib/markdown';
 
 type StoredSection = {
@@ -40,7 +43,6 @@ function parseJson<T>(s: string, fallback: T): T {
 }
 
 export async function SectionRenderer({ sections }: { sections: StoredSection[] }) {
-  // Pre-fetch shared data once
   const [faq, testimonials, banners] = await Promise.all([
     prisma.faqItem.findMany({
       where: { isVisible: true },
@@ -59,7 +61,8 @@ export async function SectionRenderer({ sections }: { sections: StoredSection[] 
   return (
     <>
       {sections.map((s) => {
-        const content = parseJson<Record<string, unknown>>(s.content, {});
+        const raw = parseJson<Record<string, unknown>>(s.content, {});
+        const content = resolveSectionContent(s.sectionType, raw);
         const { style, variant } = resolveSettings(s.settings, s.sectionType);
         const key = `${s.sectionType}-${s.id}`;
         const inner = renderSection(s.sectionType, key, content, variant, {
@@ -69,16 +72,12 @@ export async function SectionRenderer({ sections }: { sections: StoredSection[] 
         });
         if (!inner) return null;
 
-        // Apply per-section visual style. SectionFrame is a zero-overhead
-        // pass-through when the style is the per-type default, so existing
-        // sections render exactly as before.
         const node = (
           <SectionFrame key={key} style={style} sectionType={s.sectionType}>
             {inner}
           </SectionFrame>
         );
 
-        // If section is hidden, wrap with low-opacity + label badge so admins see it in preview.
         if (s.isVisible === false) {
           return (
             <div key={key} className="relative" data-hidden-section>
@@ -118,25 +117,13 @@ function renderSection(
   const { faq, testimonials, banners } = shared;
   switch (sectionType) {
     case 'hero':
-      return Object.keys(content).length > 0 ? (
-        <DynamicHero key={key} content={content} variant={variant} />
-      ) : (
-        <Hero key={key} />
-      );
+      return <DynamicHero key={key} content={content} variant={variant} />;
     case 'stats':
-      return Object.keys(content).length > 0 ? (
-        <DynamicStats key={key} content={content} variant={variant} />
-      ) : (
-        <DefaultStats key={key} />
-      );
+      return <DynamicStats key={key} content={content} variant={variant} />;
     case 'features':
-      return Object.keys(content).length > 0 ? (
-        <DynamicFeatures key={key} content={content} variant={variant} />
-      ) : (
-        <Bento key={key} />
-      );
+      return <DynamicFeatures key={key} content={content} variant={variant} />;
     case 'service_catalog':
-      return <Catalog key={key} />;
+      return <Catalog key={key} content={content as ServiceCatalogContent} />;
     case 'testimonials': {
       const items = testimonials.map((t) => ({
         id: t.id,
@@ -145,10 +132,13 @@ function renderSection(
         rating: t.rating,
         content: t.content,
       }));
-      return items.length > 0 ? (
-        <Voices key={key} items={items} heading={(content.heading as string) ?? undefined} />
-      ) : (
-        <Voices key={key} heading={(content.heading as string) ?? undefined} />
+      return (
+        <Voices
+          key={key}
+          items={items}
+          heading={(content.heading as string) ?? undefined}
+          emptyMessage={(content.emptyMessage as string) ?? undefined}
+        />
       );
     }
     case 'faq': {
@@ -158,10 +148,13 @@ function renderSection(
         question: f.question,
         answer: f.answer,
       }));
-      return items.length > 0 ? (
-        <Notes key={key} items={items} heading={(content.heading as string) ?? undefined} />
-      ) : (
-        <Notes key={key} heading={(content.heading as string) ?? undefined} />
+      return (
+        <Notes
+          key={key}
+          items={items}
+          heading={(content.heading as string) ?? undefined}
+          emptyMessage={(content.emptyMessage as string) ?? undefined}
+        />
       );
     }
     case 'banner_slider': {
@@ -181,20 +174,19 @@ function renderSection(
       ) : null;
     }
     case 'cta':
-      return Object.keys(content).length > 0 ? (
-        <DynamicCta key={key} content={content} variant={variant} />
-      ) : (
-        <DefaultCta key={key} />
-      );
+      return <DynamicCta key={key} content={content} variant={variant} />;
     case 'partners':
-      return <Partners key={key} />;
+      return <Partners key={key} content={content as PartnersContent} />;
     case 'running_ads':
-      return <Ticker key={key} />;
+      return (
+        <Ticker
+          key={key}
+          fallbackItems={(content as RunningAdsContent).fallbackItems as RunningAdsTickerItem[] | undefined}
+        />
+      );
     case 'how_to_order':
     case 'method':
-      return (
-        <HowToOrder key={key} content={content as HowToOrderContent} />
-      );
+      return <HowToOrder key={key} content={content as HowToOrderContent} />;
     case 'custom_html':
       return <CustomHtmlSection key={key} html={(content.html as string) ?? ''} />;
     case 'spacer':

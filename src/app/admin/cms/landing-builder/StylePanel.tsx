@@ -8,8 +8,10 @@ import {
   WIDTHS,
   DIVIDERS,
   VARIANTS,
+  GRADIENT_PRESETS,
   hasVariants,
   safeUrl,
+  safeHexColor,
   type SectionStyle,
   type SectionBackground,
   type SectionPadding,
@@ -75,6 +77,139 @@ function Segmented<T extends string>({
   );
 }
 
+function GradientPicker({
+  style,
+  onChange,
+}: {
+  style: StyleState;
+  onChange: (patch: Partial<StyleState>) => void;
+}) {
+  const isCustom = style.gradientPreset === 'custom';
+  const customPreview = `linear-gradient(${style.gradientAngle}deg, ${safeHexColor(style.gradientFrom) ?? '#1f48e6'}, ${safeHexColor(style.gradientTo) ?? '#06b6d4'})`;
+
+  return (
+    <div className="space-y-3 rounded-lg border border-line bg-paper-50 p-3">
+      <div>
+        <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+          Gradient preset
+        </label>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {GRADIENT_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              title={preset.label}
+              onClick={() => onChange({ gradientPreset: preset.id })}
+              className={`group relative overflow-hidden rounded-lg border p-2 text-left transition-all ${
+                style.gradientPreset === preset.id
+                  ? 'border-primary-500 ring-2 ring-primary-500/25'
+                  : 'border-line hover:border-ink/30'
+              }`}
+            >
+              <div
+                className="h-10 w-full rounded-md"
+                style={{ backgroundImage: preset.css }}
+                aria-hidden
+              />
+              <span className="mt-1.5 block font-mono text-[9px] uppercase tracking-wider text-ink-muted">
+                {preset.label}
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => onChange({ gradientPreset: 'custom' })}
+            className={`relative overflow-hidden rounded-lg border p-2 text-left transition-all ${
+              isCustom
+                ? 'border-primary-500 ring-2 ring-primary-500/25'
+                : 'border-line hover:border-ink/30'
+            }`}
+          >
+            <div
+              className="h-10 w-full rounded-md border border-dashed border-line"
+              style={{ backgroundImage: customPreview }}
+              aria-hidden
+            />
+            <span className="mt-1.5 block font-mono text-[9px] uppercase tracking-wider text-ink-muted">
+              Custom
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {isCustom && (
+        <div className="space-y-3 border-t border-line pt-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                From color
+              </label>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  type="color"
+                  value={safeHexColor(style.gradientFrom) ?? '#1f48e6'}
+                  onChange={(e) => onChange({ gradientFrom: e.target.value })}
+                  className="h-9 w-10 cursor-pointer rounded border border-line bg-paper"
+                />
+                <input
+                  type="text"
+                  value={style.gradientFrom ?? ''}
+                  maxLength={7}
+                  placeholder="#1f48e6"
+                  onChange={(e) => {
+                    const hex = safeHexColor(e.target.value);
+                    onChange({ gradientFrom: hex ?? e.target.value });
+                  }}
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-2 py-1.5 font-mono text-xs text-ink focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                To color
+              </label>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  type="color"
+                  value={safeHexColor(style.gradientTo) ?? '#06b6d4'}
+                  onChange={(e) => onChange({ gradientTo: e.target.value })}
+                  className="h-9 w-10 cursor-pointer rounded border border-line bg-paper"
+                />
+                <input
+                  type="text"
+                  value={style.gradientTo ?? ''}
+                  maxLength={7}
+                  placeholder="#06b6d4"
+                  onChange={(e) => {
+                    const hex = safeHexColor(e.target.value);
+                    onChange({ gradientTo: hex ?? e.target.value });
+                  }}
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-2 py-1.5 font-mono text-xs text-ink focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+              <span>Angle</span>
+              <span className="tabular-nums text-ink">{style.gradientAngle}°</span>
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={360}
+              step={1}
+              value={style.gradientAngle}
+              onChange={(e) => onChange({ gradientAngle: Number(e.target.value) })}
+              className="mt-2 w-full accent-primary-500"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function VariantPicker({
   sectionType,
   value,
@@ -127,7 +262,28 @@ export function StylePanel({
   onChange: (next: StyleState) => void;
 }) {
   const [urlError, setUrlError] = React.useState<string | null>(null);
+  const [imageDraft, setImageDraft] = React.useState(style.bgImageUrl ?? '');
   const patch = (p: Partial<StyleState>) => onChange({ ...style, ...p });
+
+  React.useEffect(() => {
+    setImageDraft(style.bgImageUrl ?? '');
+  }, [style.bgImageUrl]);
+
+  function commitImageUrl(raw: string) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      setUrlError(null);
+      patch({ bgImageUrl: null });
+      return;
+    }
+    const safe = safeUrl(trimmed);
+    if (!safe) {
+      setUrlError('Invalid URL — must be http(s) or a /relative path.');
+      return;
+    }
+    setUrlError(null);
+    patch({ bgImageUrl: safe });
+  }
 
   return (
     <div className="space-y-4">
@@ -139,6 +295,10 @@ export function StylePanel({
         onChange={(v) => patch({ background: v })}
       />
 
+      {style.background === 'gradient' && (
+        <GradientPicker style={style} onChange={patch} />
+      )}
+
       {style.background === 'image' && (
         <div className="space-y-3 rounded-lg border border-line bg-paper-50 p-3">
           <div>
@@ -147,27 +307,38 @@ export function StylePanel({
             </label>
             <input
               type="text"
-              defaultValue={style.bgImageUrl ?? ''}
+              value={imageDraft}
               maxLength={2048}
               placeholder="https://… or /uploads/…"
-              onBlur={(e) => {
-                const raw = e.target.value.trim();
-                if (!raw) {
+              onChange={(e) => {
+                const raw = e.target.value;
+                setImageDraft(raw);
+                if (!raw.trim()) {
                   setUrlError(null);
                   patch({ bgImageUrl: null });
                   return;
                 }
-                const safe = safeUrl(raw);
-                if (!safe) {
-                  setUrlError('Invalid URL — must be http(s) or a /relative path.');
-                  return;
+                const safe = safeUrl(raw.trim());
+                if (safe) {
+                  setUrlError(null);
+                  patch({ bgImageUrl: safe });
                 }
-                setUrlError(null);
-                patch({ bgImageUrl: safe });
               }}
+              onBlur={(e) => commitImageUrl(e.target.value)}
               className="mt-1.5 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-xs text-ink focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
             />
             {urlError && <p className="mt-1 text-[11px] font-medium text-red-600">{urlError}</p>}
+            {style.bgImageUrl && (
+              <div className="mt-3 overflow-hidden rounded-lg border border-line">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={style.bgImageUrl}
+                  alt=""
+                  className="aspect-[16/7] w-full object-cover"
+                  onError={() => setUrlError('Image failed to load — check the URL is reachable.')}
+                />
+              </div>
+            )}
           </div>
           <div>
             <label className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">

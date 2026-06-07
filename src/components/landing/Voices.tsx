@@ -12,50 +12,34 @@ type Voice = {
   content: string;
 };
 
-const FALLBACK: Voice[] = [
-  {
-    id: 'andre',
-    name: 'Andre Kurniawan',
-    role: 'Counter owner · Surabaya',
-    rating: 5,
-    content:
-      'The auto-refund is the part that surprised me. I&rsquo;ve had four rejections this month and the wallet credited every time before I even refreshed.',
-  },
-  {
-    id: 'siti',
-    name: 'Siti Nurhaliza',
-    role: 'Repair shop · Bandung',
-    rating: 5,
-    content: 'I trained a new staff in fifteen minutes. The dashboard reads itself.',
-  },
-  {
-    id: 'budi',
-    name: 'Budi Santoso',
-    role: 'Tech support · Jakarta',
-    rating: 5,
-    content: 'Sync from upstream is the underrated feature. No ghost listings, no embarrassed refunds.',
-  },
-  {
-    id: 'rina',
-    name: 'Rina Wijaya',
-    role: 'Service center · Yogyakarta',
-    rating: 5,
-    content: 'I run an iCloud-heavy shop. The success rate panel is what convinced my partner to migrate.',
-  },
-  {
-    id: 'dimas',
-    name: 'Dimas Pratama',
-    role: 'Reseller · 5 yrs · Medan',
-    rating: 5,
-    content: 'Every wallet transaction is in the ledger. I close my books on the 1st in twenty minutes.',
-  },
-];
-
-export function Voices({ items, heading }: { items?: Voice[]; heading?: string }) {
-  const list = items && items.length > 0 ? items : FALLBACK;
+export function Voices({
+  items,
+  heading,
+  emptyMessage,
+}: {
+  items?: Voice[];
+  heading?: string;
+  emptyMessage?: string;
+}) {
+  const list = items ?? [];
   const pull = list[0];
   const others = list.slice(1);
   const displayHeading = heading ?? 'What the {italic:resellers} say.';
+
+  if (list.length === 0) {
+    return (
+      <section id="voices" className="relative">
+        <div className="mx-auto max-w-[1400px] px-6 py-20 text-center lg:px-10 lg:py-32">
+          <h2 className="font-display text-3xl font-extrabold tracking-tight text-ink">
+            <RichText text={displayHeading} />
+          </h2>
+          <p className="mx-auto mt-6 max-w-md font-serif text-sm italic text-ink-muted">
+            {emptyMessage ?? 'No testimonials yet. Add items in Admin → Testimonials.'}
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="voices" className="relative">

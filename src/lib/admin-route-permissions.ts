@@ -46,6 +46,7 @@ const ROUTE_PERMISSIONS: Array<{ prefix: string; perm: PermissionKey }> = [
   { prefix: '/admin/cms/banners', perm: 'editCms' },
   { prefix: '/admin/cms/running-ads', perm: 'editCms' },
   { prefix: '/admin/cms/menus', perm: 'editCms' },
+  { prefix: '/admin/cms/footer', perm: 'editCms' },
   { prefix: '/admin/cms/faq', perm: 'editCms' },
   { prefix: '/admin/cms/testimonials', perm: 'editCms' },
   { prefix: '/admin/cms/pages', perm: 'editCms' },

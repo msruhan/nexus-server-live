@@ -6,6 +6,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { hasPermission } from '@/lib/sub-admin';
 import { getCurrentVersion } from '@/lib/license/client';
+import { canAccessSystemDuringLock } from '@/lib/license-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,7 @@ async function requireAccess() {
   const session = await auth();
   if (!session?.user?.id) return null;
   const role = (session.user as { role?: string }).role ?? 'USER';
-  if (role !== 'ADMIN' && role !== 'SUB_ADMIN') return null;
+  if (!(await canAccessSystemDuringLock(role))) return null;
   if (role === 'SUB_ADMIN') {
     const allowed = await hasPermission(session.user.id, role, 'manageSystem');
     if (!allowed) return null;

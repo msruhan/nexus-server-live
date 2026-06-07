@@ -2,7 +2,11 @@
  * API guards for license runtime / updates entitlements.
  */
 import { NextResponse } from 'next/server';
-import { getLicenseEnforcementState } from '@/lib/license-state';
+import {
+  canSignInDuringLicenseLock,
+  getLicenseEnforcementState,
+  isLicenseRuntimeLocked,
+} from '@/lib/license-state';
 
 export async function requireRuntimeLicense(): Promise<NextResponse | null> {
   const state = await getLicenseEnforcementState();
@@ -11,6 +15,15 @@ export async function requireRuntimeLicense(): Promise<NextResponse | null> {
     { error: 'license_inactive', reason: state.reason ?? 'runtime_denied' },
     { status: 403 },
   );
+}
+
+/** Admin system APIs: only primary admin when runtime is locked. */
+export async function canAccessSystemDuringLock(role: string): Promise<boolean> {
+  const state = await getLicenseEnforcementState();
+  if (isLicenseRuntimeLocked(state)) {
+    return canSignInDuringLicenseLock(role);
+  }
+  return role === 'ADMIN' || role === 'SUB_ADMIN';
 }
 
 export async function requireUpdatesLicense(): Promise<NextResponse | null> {

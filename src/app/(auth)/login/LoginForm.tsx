@@ -19,6 +19,8 @@ export function LoginForm() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [totp, setTotp] = React.useState('');
+  /** Survives 2FA step; React setState is async — routing must use this ref. */
+  const licenseLockdownRef = React.useRef(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -43,6 +45,10 @@ export function LoginForm() {
           description: checkJson.error ?? 'Check your credentials and try again.',
         });
         return;
+      }
+
+      if (checkJson.data?.licenseLockdown) {
+        licenseLockdownRef.current = true;
       }
 
       if (checkJson.data?.requires2FA) {
@@ -71,16 +77,25 @@ export function LoginForm() {
       return;
     }
 
+    const goLicenseSystem = licenseLockdownRef.current;
+
     let target = next;
-    if (!target) {
+    if (goLicenseSystem) {
+      target = '/admin/system';
+    } else if (!target) {
       const session = await getSession();
       const role = session?.user.role;
       target = role === 'ADMIN' || role === 'SUB_ADMIN' ? '/admin/dashboard' : '/user/dashboard';
     }
     setLoading(false);
     toast.success('Welcome back');
-    router.push(target);
-    router.refresh();
+
+    // Full navigation avoids RSC redirect loops during license lockdown.
+    if (goLicenseSystem) {
+      window.location.assign('/admin/system');
+      return;
+    }
+    router.replace(target);
   }
 
   return (

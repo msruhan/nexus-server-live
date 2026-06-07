@@ -20,6 +20,8 @@ export default async function AdminSystemPage() {
       licenseExpiresAt: true,
       licenseLastValidated: true,
       licenseReason: true,
+      licenseRenewalCheckoutUrl: true,
+      licenseRenewalDeskUrl: true,
       lastUpdateVersion: true,
       lastUpdateAt: true,
     },
@@ -61,6 +63,8 @@ export default async function AdminSystemPage() {
             expiresAt: settings?.licenseExpiresAt?.toISOString() ?? null,
             lastValidatedAt: settings?.licenseLastValidated?.toISOString() ?? null,
             reason: settings?.licenseReason ?? null,
+            renewalCheckoutUrl: settings?.licenseRenewalCheckoutUrl ?? null,
+            renewalDeskUrl: settings?.licenseRenewalDeskUrl ?? null,
           },
           lastUpdate: {
             version: settings?.lastUpdateVersion ?? null,

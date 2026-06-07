@@ -11,6 +11,12 @@ import {
   sweepLoginThrottleIfNeeded,
 } from '@/lib/auth/login-throttle';
 import { logActivity } from '@/lib/activity';
+import {
+  canSignInDuringLicenseLock,
+  getLicenseEnforcementState,
+  isLicenseRuntimeLocked,
+} from '@/lib/license-state';
+import { attachLicenseLockCookie } from '@/lib/license-lock-cookie';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,19 +99,39 @@ export async function POST(req: Request) {
       return apiError('Invalid email or password', 401);
     }
 
+    const licenseState = await getLicenseEnforcementState();
+    const licenseLockdown = isLicenseRuntimeLocked(licenseState);
+    if (licenseLockdown && !canSignInDuringLicenseLock(user.role)) {
+      await logActivity({
+        userId: user.id,
+        action: 'auth.login_license_locked',
+        ipAddress: ip,
+      });
+      return apiError(
+        'The site is temporarily unavailable. Only the system administrator can sign in.',
+        403,
+      );
+    }
+
     // Pre-flight passed. The actual session creation happens through
     // NextAuth credentials provider — we only reset the throttle here so
     // an honest user with a fat-fingered password earlier doesn't stay
     // locked once they finally type it right.
     recordLoginSuccess(ip, email);
 
-    return apiSuccess({
+    const adminLockdown =
+      licenseLockdown && canSignInDuringLicenseLock(user.role);
+
+    const res = apiSuccess({
       requires2FA: user.twoFactorEnabled,
       // Surface a forced-2FA hint for admins so the client can route to the
       // 2FA setup page instead of letting them sign in without it. This
       // only takes effect once the admin has 2FA enforced (see auth-policy).
       role: user.role,
+      licenseLockdown: adminLockdown,
     });
+
+    return attachLicenseLockCookie(res, !!adminLockdown);
   } catch (e) {
     console.error('[AUTH_CHECK_LOGIN_POST]', e);
     return apiError('Failed to verify login', 500);

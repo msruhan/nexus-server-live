@@ -3,6 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activity';
+import { getLicenseEnforcementState, isLicenseRuntimeLocked } from '@/lib/license-state';
 
 const schema = z.object({
   name: z.string().min(2),
@@ -15,6 +16,11 @@ export async function POST(req: Request) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+  }
+
+  const licenseState = await getLicenseEnforcementState();
+  if (isLicenseRuntimeLocked(licenseState)) {
+    return NextResponse.json({ error: 'Registration is temporarily unavailable' }, { status: 403 });
   }
 
   const settings = await prisma.siteSettings.findUnique({ where: { id: 'singleton' } });

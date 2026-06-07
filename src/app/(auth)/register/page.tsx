@@ -1,6 +1,12 @@
+import { redirect } from 'next/navigation';
 import { RegisterForm } from './RegisterForm';
+import { getLicenseEnforcementState, isLicenseRuntimeLocked } from '@/lib/license-state';
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
+  const licenseState = await getLicenseEnforcementState();
+  if (isLicenseRuntimeLocked(licenseState)) {
+    redirect('/license-suspended');
+  }
   return (
     <div>
       <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-muted">

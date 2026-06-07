@@ -135,7 +135,7 @@ function BannerSlide({
     <img
       src={resolveBannerImageUrl(item.imageUrl)}
       alt={item.title}
-      className="h-full w-full object-contain"
+      className="h-full w-full object-cover"
     />
   );
 

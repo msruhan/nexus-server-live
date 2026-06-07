@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { getLicenseEnforcementState } from '@/lib/license-state';
@@ -28,7 +29,11 @@ export default async function LicenseSuspendedPage() {
   ]);
 
   const role = session?.user?.role as string | undefined;
-  const isVendorAdmin = role === 'ADMIN' || role === 'SUB_ADMIN';
+  const isPrimaryAdmin = role === 'ADMIN';
+
+  if (isPrimaryAdmin && state.activated && !state.runtimeAllowed) {
+    redirect('/admin/system');
+  }
 
   if (!state.activated || state.runtimeAllowed) {
     return (
@@ -63,13 +68,13 @@ export default async function LicenseSuspendedPage() {
         message={message}
         endsAt={endsAt}
       />
-      {isVendorAdmin ? (
+      {!session?.user ? (
         <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 pb-6 text-center">
           <Link
-            href="/admin/system"
+            href="/login"
             className="pointer-events-auto inline-flex rounded-full border border-line/80 bg-paper/90 px-4 py-2 text-xs font-medium text-ink-muted shadow-sm backdrop-blur transition-colors hover:border-ink hover:text-ink"
           >
-            Admin · System & license
+            Administrator sign in
           </Link>
         </div>
       ) : null}

@@ -5,12 +5,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { hasPermission } from '@/lib/sub-admin';
 import { activateLicense, validateLicense } from '@/lib/license/client';
+import { canAccessSystemDuringLock } from '@/lib/license-guard';
+import { attachLicenseLockCookie } from '@/lib/license-lock-cookie';
+import { getLicenseEnforcementState, isLicenseRuntimeLocked } from '@/lib/license-state';
 
 async function requireAccess() {
   const session = await auth();
   if (!session?.user?.id) return null;
   const role = (session.user as { role?: string }).role ?? 'USER';
-  if (role !== 'ADMIN' && role !== 'SUB_ADMIN') return null;
+  if (!(await canAccessSystemDuringLock(role))) return null;
   if (role === 'SUB_ADMIN') {
     const allowed = await hasPermission(session.user.id, role, 'manageSystem');
     if (!allowed) return null;
@@ -32,13 +35,20 @@ export async function POST(req: NextRequest) {
     }
     const result = await activateLicense(key.trim());
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
-    return NextResponse.json({ ok: true, info: result.info });
+    return attachLicenseLockCookie(
+      NextResponse.json({ ok: true, info: result.info }),
+      false,
+    );
   }
 
   if (action === 'validate') {
     const result = await validateLicense();
     if (!result.ok) return NextResponse.json({ ok: false, error: result.error });
-    return NextResponse.json({ ok: true, info: result.info });
+    const locked = isLicenseRuntimeLocked(await getLicenseEnforcementState());
+    return attachLicenseLockCookie(
+      NextResponse.json({ ok: true, info: result.info }),
+      locked,
+    );
   }
 
   if (action === 'deactivate' || action === 'remove_local') {

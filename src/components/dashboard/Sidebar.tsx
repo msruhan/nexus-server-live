@@ -44,6 +44,7 @@ import {
   ChartBar,
   Broadcast,
   Archive,
+  Rows,
 } from '@phosphor-icons/react/dist/ssr';
 import { cn } from '@/lib/cn';
 import { formatAppVersion } from '@/lib/app-version';
@@ -148,6 +149,7 @@ const adminSections: Section[] = [
       { href: '/admin/cms/banners', label: 'Banners', icon: ImageIcon, perm: 'editCms' },
       { href: '/admin/cms/running-ads', label: 'Running ads', icon: TextAa, perm: 'editCms' },
       { href: '/admin/cms/menus', label: 'Menus', icon: ListBullets, perm: 'editCms' },
+      { href: '/admin/cms/footer', label: 'Footer', icon: Rows, perm: 'editCms' },
       { href: '/admin/cms/faq', label: 'FAQ', icon: Question, perm: 'editCms' },
       { href: '/admin/cms/testimonials', label: 'Testimonials', icon: ChatTeardrop, perm: 'editCms' },
       { href: '/admin/cms/pages', label: 'Custom pages', icon: FilePlus, perm: 'editCms' },
@@ -175,12 +177,20 @@ function NavBadge({ count, active }: { count: number; active?: boolean }) {
   );
 }
 
+const licenseLockdownSections: Section[] = [
+  {
+    title: 'License',
+    items: [{ href: '/admin/system', label: 'System & update', icon: ArrowsClockwise }],
+  },
+];
+
 export function Sidebar({
   variant,
   user,
   navBadges,
   permissions,
   brand,
+  licenseLockdown,
   children,
 }: {
   variant: 'user' | 'admin';
@@ -191,15 +201,22 @@ export function Sidebar({
   permissions?: Record<string, boolean> | null;
   /** White-label brand identity for the sidebar header. */
   brand?: { siteName: string; logoUrl: string | null };
+  /** When license runtime is locked, only show the system page in admin nav. */
+  licenseLockdown?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const isSubAdmin = user.role === 'SUB_ADMIN';
 
   // Filter admin sections by permission for SUB_ADMIN. ADMIN sees everything.
-  const rawSections = variant === 'admin' ? adminSections : userSections;
+  const rawSections =
+    variant === 'admin' && licenseLockdown
+      ? licenseLockdownSections
+      : variant === 'admin'
+        ? adminSections
+        : userSections;
   const sections = React.useMemo(() => {
-    if (variant !== 'admin' || !isSubAdmin) return rawSections;
+    if (licenseLockdown || variant !== 'admin' || !isSubAdmin) return rawSections;
     const can = (perm?: string) => !perm || permissions?.[perm] === true;
     return rawSections
       .map((sec) => {

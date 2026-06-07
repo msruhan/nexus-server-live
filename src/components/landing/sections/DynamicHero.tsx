@@ -11,6 +11,7 @@ import {
   PhoneUnlock,
 } from '../visuals';
 import { RichText } from '../RichText';
+import { resolveMediaUrl } from '@/lib/media-url';
 
 type Props = {
   content: {
@@ -53,7 +54,7 @@ export function DynamicHero({ content, variant }: Props) {
   const structural =
     variant === 'split-image' || variant === 'minimal-center' ? variant : 'standard';
   const visual = (content.visualVariant as string) ?? 'ticket';
-  const heroImage = (content.bgImageUrl as string) ?? '';
+  const heroImage = resolveMediaUrl((content.bgImageUrl as string) ?? '') ?? '';
 
   // ─── Variant: minimal-center — centered headline, no right column ──
   if (structural === 'minimal-center') {

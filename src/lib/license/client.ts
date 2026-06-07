@@ -25,6 +25,8 @@ const LICENSE_CLEAR_DATA = {
   licenseTier: null,
   licenseRuntimeAllowed: true,
   licenseUpdatesAllowed: true,
+  licenseRenewalCheckoutUrl: null,
+  licenseRenewalDeskUrl: null,
 };
 
 /** Remove license fields from this installation (does not call License Server). */
@@ -86,6 +88,8 @@ export async function activateLicense(rawKey: string): Promise<{ ok: true; info:
         licenseTier: data.tier ?? null,
         licenseRuntimeAllowed: true,
         licenseUpdatesAllowed: true,
+        licenseRenewalCheckoutUrl: null,
+        licenseRenewalDeskUrl: null,
       },
       create: {
         id: 'singleton',
@@ -160,6 +164,8 @@ export async function validateLicense(
           licenseRuntimeAllowed: false,
           licenseUpdatesAllowed: false,
           licensePortalStatus: null,
+          licenseRenewalCheckoutUrl: null,
+          licenseRenewalDeskUrl: null,
         },
       });
       return { ok: false, error: reason };
@@ -168,6 +174,7 @@ export async function validateLicense(
     const runtime = data.entitlements?.runtime ?? true;
     const updates = data.entitlements?.updates ?? true;
     const portalStatus = typeof data.status === 'string' ? data.status : 'active';
+    const renewal = data.renewal as { checkoutUrl?: string; customerDeskUrl?: string } | undefined;
 
     await prisma.siteSettings.update({
       where: { id: 'singleton' },
@@ -181,6 +188,8 @@ export async function validateLicense(
         licenseTier: data.tier ?? undefined,
         licenseRuntimeAllowed: runtime,
         licenseUpdatesAllowed: updates,
+        licenseRenewalCheckoutUrl: runtime ? null : (renewal?.checkoutUrl ?? null),
+        licenseRenewalDeskUrl: runtime ? null : (renewal?.customerDeskUrl ?? null),
       },
     });
 

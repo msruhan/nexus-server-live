@@ -2,12 +2,21 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
-import { X, FloppyDisk, CaretDown } from '@phosphor-icons/react/dist/ssr';
+import { X, FloppyDisk, CaretDown, Upload, Image as ImageIcon } from '@phosphor-icons/react/dist/ssr';
+import { resolveMediaUrl } from '@/lib/media-url';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { SECTION_LABELS, type SectionType } from '@/lib/cms-types';
 import { resolveSettings, hasVariants, defaultVariant, type SectionStyle } from '@/lib/cms-style';
+import { resolveSectionContent } from '@/lib/cms-content';
 import { StylePanel, VariantPicker } from './StylePanel';
+import {
+  BannerSliderFields,
+  CatalogFields,
+  HowToOrderFields,
+  PartnersFields,
+  RunningAdsFields,
+} from './SectionFieldGroups';
 
 type Item = {
   id: string;
@@ -28,8 +37,8 @@ export function SectionEditor({
   onSaved: () => void;
   onClose: () => void;
 }) {
-  const [content, setContent] = React.useState<Record<string, unknown>>(
-    (item.content as Record<string, unknown>) ?? {},
+  const [content, setContent] = React.useState<Record<string, unknown>>(() =>
+    resolveSectionContent(item.sectionType, (item.content as Record<string, unknown>) ?? {}),
   );
   // Resolve stored settings into a fully-populated style + variant.
   const resolved = React.useMemo(
@@ -44,8 +53,9 @@ export function SectionEditor({
   const [showStyle, setShowStyle] = React.useState(false);
 
   React.useEffect(() => {
-    setContent((item.content as Record<string, unknown>) ?? {});
-    setRawJson(JSON.stringify(item.content ?? {}, null, 2));
+    const merged = resolveSectionContent(item.sectionType, (item.content as Record<string, unknown>) ?? {});
+    setContent(merged);
+    setRawJson(JSON.stringify(merged, null, 2));
     const r = resolveSettings(item.settings, item.sectionType);
     setStyle(r.style);
     setVariant(r.variant);
@@ -178,6 +188,92 @@ export function SectionEditor({
   );
 }
 
+function HeroImageField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const [uploading, setUploading] = React.useState(false);
+  const preview = resolveMediaUrl(value || null);
+
+  async function handleUpload(file: File) {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Only image files are supported (PNG, JPG, WebP, GIF).');
+      return;
+    }
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', 'landing');
+    const res = await fetch('/api/admin/cms/media/upload', { method: 'POST', body: fd });
+    setUploading(false);
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error('Upload failed', { description: j.error });
+      return;
+    }
+    onChange(j.url);
+    toast.success('Image uploaded');
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+        Hero image (right column)
+      </label>
+      <p className="font-serif text-xs italic text-ink-muted">
+        Split-image layout only. Paste an https URL or upload PNG, JPG, WebP, or animated GIF (max 8 MB).
+      </p>
+
+      <div className="mt-2 overflow-hidden rounded-xl border border-line bg-paper-100">
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={preview} alt="" className="aspect-[4/3] w-full object-cover" />
+        ) : (
+          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 p-6 text-center">
+            <ImageIcon size={28} weight="duotone" className="text-ink-soft" />
+            <p className="font-serif text-sm italic text-ink-muted">No image yet</p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-bold hover:border-ink">
+          <Upload size={12} weight="bold" />
+          {uploading ? 'Uploading…' : 'Upload image'}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUpload(f);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="rounded-full border border-line px-3 py-1.5 text-xs font-bold text-ink-muted hover:border-ink hover:text-ink"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      <Input
+        placeholder="https://… or /api/uploads/landing/…"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
 // Form-mode fields per section type
 function Fields({
   type,
@@ -238,11 +334,9 @@ function Fields({
             onChange={(e) => setField('secondaryHref', e.target.value)}
           />
           {heroLayout === 'split-image' && (
-            <Input
-              label="Image URL (right column)"
-              hint="Shown in the split-image layout. Use an https or /relative URL."
+            <HeroImageField
               value={(content.bgImageUrl as string) ?? ''}
-              onChange={(e) => setField('bgImageUrl', e.target.value)}
+              onChange={(url) => setField('bgImageUrl', url)}
             />
           )}
           {heroLayout === 'standard' && (
@@ -332,14 +426,46 @@ function Fields({
     case 'faq':
     case 'testimonials':
       return (
-        <Textarea
-          label="Heading"
-          hint="Use {italic:word} for serif emphasis."
-          value={(content.heading as string) ?? ''}
-          onChange={(e) => setField('heading', e.target.value)}
-          rows={2}
-        />
+        <>
+          <Textarea
+            label="Heading"
+            hint="Use {italic:word} for serif emphasis."
+            value={(content.heading as string) ?? ''}
+            onChange={(e) => setField('heading', e.target.value)}
+            rows={2}
+          />
+          <Textarea
+            label="Empty state message"
+            hint="Shown when no items exist in Admin → FAQ or Testimonials."
+            value={(content.emptyMessage as string) ?? ''}
+            onChange={(e) => setField('emptyMessage', e.target.value)}
+            rows={2}
+          />
+          {type === 'faq' && (
+            <Input
+              label="FAQ category filter (optional)"
+              hint="Leave blank to show all visible FAQ items."
+              value={(content.category as string) ?? ''}
+              onChange={(e) => setField('category', e.target.value)}
+            />
+          )}
+        </>
       );
+
+    case 'service_catalog':
+      return <CatalogFields content={content} setContent={setContent} />;
+
+    case 'partners':
+      return <PartnersFields content={content} setContent={setContent} />;
+
+    case 'running_ads':
+      return <RunningAdsFields content={content} setContent={setContent} />;
+
+    case 'how_to_order':
+      return <HowToOrderFields content={content} setContent={setContent} />;
+
+    case 'banner_slider':
+      return <BannerSliderFields content={content} setContent={setContent} />;
 
     default:
       return (
@@ -620,6 +746,20 @@ function StatsFields({ content, setContent }: FieldsProps) {
 
   return (
     <>
+      <Input
+        label="Eyebrow"
+        value={(content.eyebrow as string) ?? ''}
+        onChange={(e) => setContent((prev) => ({ ...prev, eyebrow: e.target.value }))}
+        placeholder="The numbers"
+      />
+      <Textarea
+        label="Heading"
+        hint="Use {italic:word} for serif emphasis. Use {count} for the number of stat items."
+        value={(content.heading as string) ?? ''}
+        onChange={(e) => setContent((prev) => ({ ...prev, heading: e.target.value }))}
+        placeholder="The desk in {count} figures."
+        rows={2}
+      />
       <div>
         <div className="mb-2 flex items-center justify-between">
           <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">

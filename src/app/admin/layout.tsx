@@ -11,8 +11,10 @@ import { getPermissions } from '@/lib/sub-admin';
 import { resolveRoutePermission } from '@/lib/admin-route-permissions';
 import { getBranding } from '@/lib/branding';
 import { revalidateIfStale } from '@/lib/license/client';
-import { getLicenseEnforcementState, shouldRedirectToLicenseSuspended } from '@/lib/license-state';
-
+import {
+  getLicenseEnforcementState,
+  isLicenseRuntimeLocked,
+} from '@/lib/license-state';
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect('/login?next=/admin/dashboard');
@@ -24,7 +26,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // still see the warning + setup link without recursing into a redirect loop.
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
-    select: { enforceAdmin2FA: true, licenseStatus: true, licenseReason: true },
+    select: {
+      enforceAdmin2FA: true,
+      licenseStatus: true,
+      licenseReason: true,
+      licenseRenewalCheckoutUrl: true,
+      licenseRenewalDeskUrl: true,
+    },
   });
 
   // Lazy, non-blocking license freshness check. If the last successful
@@ -34,8 +42,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const pathname = (await headers()).get('x-pathname') ?? '';
   const licenseState = await getLicenseEnforcementState();
-  if (shouldRedirectToLicenseSuspended(licenseState, pathname)) {
-    redirect('/license-suspended');
+  const licenseLockdown = isLicenseRuntimeLocked(licenseState);
+  if (licenseLockdown) {
+    if (role !== 'ADMIN') {
+      redirect('/license-suspended');
+    }
+    // x-pathname is missing on some RSC flight requests; redirecting with an
+    // empty path causes an infinite /admin/system?_rsc=… loop.
+    if (pathname && !pathname.startsWith('/admin/system')) {
+      redirect('/admin/system');
+    }
   }
 
   if (settings?.enforceAdmin2FA) {
@@ -87,11 +103,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         navBadges={navBadges}
         permissions={permissions as Record<string, boolean> | null}
         brand={{ siteName: brand.siteName, logoUrl: brand.logoUrl }}
+        licenseLockdown={licenseLockdown}
       >
         <MobileBar user={userInfo} />
         <LicenseBanner
           status={settings?.licenseStatus ?? 'not_activated'}
           reason={settings?.licenseReason ?? null}
+          renewalCheckoutUrl={settings?.licenseRenewalCheckoutUrl}
+          renewalDeskUrl={settings?.licenseRenewalDeskUrl}
         />
         <main className="flex-1 px-4 py-8 sm:px-8 lg:px-12 lg:py-12">{children}</main>
       </Sidebar>

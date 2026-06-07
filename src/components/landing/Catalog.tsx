@@ -5,130 +5,55 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpRight } from '@phosphor-icons/react/dist/ssr';
 import { Reveal } from '@/components/ui/Reveal';
 import { cn } from '@/lib/cn';
+import { RichText } from './RichText';
+import type { CatalogServiceRow, ServiceCatalogContent } from '@/lib/cms-types';
 
-type ServiceRow = {
-  ref: string;
-  title: string;
-  meta: string; // device + carrier description
-  delivery: string;
-  price: string;
-  popular?: boolean;
-  tag?: string;
+type Props = {
+  content: ServiceCatalogContent;
 };
 
-const imeiServices: ServiceRow[] = [
-  {
-    ref: 'A.205',
-    title: 'iPhone iCloud Clean Removal',
-    meta: 'all models · clean status only',
-    delivery: '3–7 days',
-    price: '$26.99',
-    popular: true,
-    tag: 'Most ordered',
-  },
-  {
-    ref: 'A.101',
-    title: 'Samsung S24 · T-Mobile USA',
-    meta: 'network unlock · all variants',
-    delivery: '1–48 hours',
-    price: '$5.99',
-  },
-  {
-    ref: 'A.118',
-    title: 'iPhone premium check',
-    meta: 'GSX · blacklist · sim-lock · warranty',
-    delivery: 'instant',
-    price: '$0.99',
-  },
-  {
-    ref: 'A.142',
-    title: 'Carrier unlock · universal',
-    meta: 'AT&T · Verizon · EE · Vodafone',
-    delivery: '2–24 hours',
-    price: '$9.99',
-  },
-  {
-    ref: 'A.087',
-    title: 'Sprint USA premium unlock',
-    meta: 'all models · including blacklisted',
-    delivery: '24–72 hours',
-    price: '$14.99',
-  },
-];
-
-const serverServices: ServiceRow[] = [
-  {
-    ref: 'B.301',
-    title: 'Samsung FRP bypass · remote',
-    meta: 'all Galaxy models · session-based',
-    delivery: '10–30 minutes',
-    price: '$4.99',
-    popular: true,
-    tag: 'Fastest',
-  },
-  {
-    ref: 'B.314',
-    title: 'Xiaomi Mi Account removal',
-    meta: 'Mi · Redmi · POCO · permanent',
-    delivery: '15–60 minutes',
-    price: '$7.99',
-  },
-  {
-    ref: 'B.327',
-    title: 'iPhone software repair',
-    meta: 'DFU error · iTunes 9/14/4013 · boot loop',
-    delivery: '20–90 minutes',
-    price: '$6.99',
-  },
-  {
-    ref: 'B.412',
-    title: 'Firmware flash · official',
-    meta: 'Samsung · Xiaomi · Vivo · OPPO · Realme',
-    delivery: '15–45 minutes',
-    price: '$4.49',
-  },
-  {
-    ref: 'B.452',
-    title: 'EFS / baseband repair',
-    meta: 'Qualcomm + MediaTek devices',
-    delivery: '30–60 minutes',
-    price: '$8.99',
-  },
-];
-
-export function Catalog() {
+export function Catalog({ content }: Props) {
   const [tab, setTab] = React.useState<'imei' | 'server'>('imei');
+  const imeiServices = content.imeiServices ?? [];
+  const serverServices = content.serverServices ?? [];
   const data = tab === 'imei' ? imeiServices : serverServices;
+
+  const footerText = (content.footerText ?? '{count} entries shown').replace(
+    '{count}',
+    String(data.length),
+  );
 
   return (
     <section id="catalog" className="relative">
       <div className="mx-auto max-w-[1400px] px-6 py-20 lg:px-10 lg:py-32">
         <Reveal className="mb-12 grid gap-6 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
-            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-muted">
-              § 01 · Catalog
-            </span>
-            <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-ink sm:text-4xl lg:text-[56px] lg:leading-[1.02]">
-              The portal&rsquo;s <span className="font-serif italic font-normal">working</span> menu.
-            </h2>
-            <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-ink/70">
-              Two service tracks. One portal. Everything below is live, priced final, and synced
-              automatically from upstream — when an operator drops support, the line disappears
-              from this page.
-            </p>
+            {content.eyebrow && (
+              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-muted">
+                {content.eyebrow}
+              </span>
+            )}
+            {content.heading && (
+              <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-ink sm:text-4xl lg:text-[56px] lg:leading-[1.02]">
+                <RichText text={content.heading} />
+              </h2>
+            )}
+            {content.subhead && (
+              <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-ink/70">{content.subhead}</p>
+            )}
           </div>
 
-          {/* Tab switcher — minimal, ledger-style */}
           <div className="lg:col-span-5 lg:justify-self-end">
             <div className="inline-flex rounded-full border border-line bg-paper p-1">
               {([
-                { key: 'imei' as const, label: 'Unlock services', count: imeiServices.length },
-                { key: 'server' as const, label: 'Remote services', count: serverServices.length },
+                { key: 'imei' as const, label: content.imeiTabLabel ?? 'Unlock services', count: imeiServices.length },
+                { key: 'server' as const, label: content.serverTabLabel ?? 'Remote services', count: serverServices.length },
               ]).map((t) => {
                 const active = tab === t.key;
                 return (
                   <button
                     key={t.key}
+                    type="button"
                     onClick={() => setTab(t.key)}
                     className={cn(
                       'relative z-10 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors',
@@ -158,7 +83,6 @@ export function Catalog() {
           </div>
         </Reveal>
 
-        {/* Header row of the table */}
         <div className="hidden border-b border-ink/15 px-2 py-3 text-[10px] uppercase tracking-[0.18em] text-ink-muted lg:grid lg:grid-cols-12 lg:gap-4">
           <div className="col-span-1 font-mono">Ref.</div>
           <div className="col-span-6 font-mono">Service</div>
@@ -167,36 +91,42 @@ export function Catalog() {
           <div className="col-span-1" />
         </div>
 
-        {/* Lines */}
         <div className="divide-y divide-line border-b border-line">
-          <AnimatePresence mode="popLayout">
-            {data.map((row, idx) => (
-              <ServiceLine
-                key={`${tab}-${row.ref}`}
-                row={row}
-                idx={idx}
-                accent={tab === 'imei' ? 'ink' : 'blue'}
-              />
-            ))}
-          </AnimatePresence>
+          {data.length === 0 ? (
+            <div className="px-2 py-12 text-center font-serif text-sm italic text-ink-muted">
+              No services in this tab yet. Add rows in Landing builder → Service catalog.
+            </div>
+          ) : (
+            <AnimatePresence mode="popLayout">
+              {data.map((row, idx) => (
+                <ServiceLine
+                  key={`${tab}-${row.ref}-${idx}`}
+                  row={row}
+                  idx={idx}
+                  accent={tab === 'imei' ? 'ink' : 'blue'}
+                />
+              ))}
+            </AnimatePresence>
+          )}
         </div>
 
-        {/* Bottom row */}
         <div className="mt-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-          <p className="font-serif text-[15px] italic text-ink-muted">
-            {data.length} entries shown · roughly 200+ live in the full catalog
-          </p>
-          <a
-            href="#"
-            className="group inline-flex items-center gap-1.5 text-sm font-semibold text-ink"
-          >
-            <span className="border-b border-ink pb-0.5">Open the full catalog</span>
-            <ArrowUpRight
-              weight="bold"
-              size={14}
-              className="transition-transform group-hover:rotate-45"
-            />
-          </a>
+          {footerText && (
+            <p className="font-serif text-[15px] italic text-ink-muted">{footerText}</p>
+          )}
+          {content.catalogLinkText && content.catalogLinkHref && (
+            <a
+              href={content.catalogLinkHref}
+              className="group inline-flex items-center gap-1.5 text-sm font-semibold text-ink"
+            >
+              <span className="border-b border-ink pb-0.5">{content.catalogLinkText}</span>
+              <ArrowUpRight
+                weight="bold"
+                size={14}
+                className="transition-transform group-hover:rotate-45"
+              />
+            </a>
+          )}
         </div>
       </div>
     </section>
@@ -208,10 +138,12 @@ function ServiceLine({
   idx,
   accent,
 }: {
-  row: ServiceRow;
+  row: CatalogServiceRow;
   idx: number;
   accent: 'ink' | 'blue';
 }) {
+  const orderHref = row.orderHref || '#';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -221,12 +153,10 @@ function ServiceLine({
       className="group relative"
     >
       <div className="grid grid-cols-12 gap-4 px-2 py-5 transition-colors duration-300 hover:bg-paper-100 lg:py-6">
-        {/* Ref number */}
         <div className="col-span-12 flex items-baseline justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted lg:col-span-1 lg:block">
           <span>{row.ref}</span>
         </div>
 
-        {/* Title + meta */}
         <div className="col-span-12 lg:col-span-6">
           <div className="flex items-center gap-3">
             <h3 className="font-display text-lg font-extrabold tracking-tight text-ink lg:text-xl">
@@ -238,34 +168,24 @@ function ServiceLine({
               </span>
             )}
           </div>
-          <p className="mt-1 font-serif text-[14px] italic text-ink-muted lg:text-[15px]">
-            {row.meta}
-          </p>
+          <p className="mt-1 font-serif text-[14px] italic text-ink-muted lg:text-[15px]">{row.meta}</p>
         </div>
 
-        {/* Delivery */}
         <div className="col-span-6 lg:col-span-2">
-          <div className="text-[10px] uppercase tracking-wider text-ink-muted lg:hidden">
-            Delivery
-          </div>
-          <div className="mt-0.5 font-mono text-sm font-medium text-ink lg:mt-0">
-            {row.delivery}
-          </div>
+          <div className="text-[10px] uppercase tracking-wider text-ink-muted lg:hidden">Delivery</div>
+          <div className="mt-0.5 font-mono text-sm font-medium text-ink lg:mt-0">{row.delivery}</div>
         </div>
 
-        {/* Price */}
         <div className="col-span-6 text-right lg:col-span-2">
-          <div className="text-[10px] uppercase tracking-wider text-ink-muted lg:hidden">
-            Price
-          </div>
+          <div className="text-[10px] uppercase tracking-wider text-ink-muted lg:hidden">Price</div>
           <div className="mt-0.5 font-display text-base font-extrabold tracking-tight text-ink lg:mt-0 lg:text-lg">
             {row.price}
           </div>
         </div>
 
-        {/* Action */}
         <div className="col-span-12 flex items-center justify-end lg:col-span-1">
-          <button
+          <a
+            href={orderHref}
             className={cn(
               'group/btn inline-flex h-9 items-center justify-center gap-1 rounded-full px-4 font-mono text-[10px] font-bold uppercase tracking-wider transition-all',
               accent === 'ink'
@@ -279,11 +199,10 @@ function ServiceLine({
               size={11}
               className="transition-transform duration-300 group-hover/btn:rotate-45"
             />
-          </button>
+          </a>
         </div>
       </div>
 
-      {/* Underline animation */}
       <span className="absolute bottom-0 left-0 h-px w-0 bg-ink transition-all duration-500 group-hover:w-full" />
     </motion.div>
   );

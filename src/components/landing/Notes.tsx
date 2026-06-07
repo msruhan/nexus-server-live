@@ -9,29 +9,16 @@ import { RichText } from './RichText';
 
 type FaqItem = { id: string; question: string; answer: string };
 
-const FALLBACK: FaqItem[] = [
-  {
-    id: '1',
-    question: 'Do I need my own DhruFusion API key?',
-    answer:
-      'No. The portal handles the upstream connection. You register, fund your wallet, and submit dockets.',
-  },
-  {
-    id: '2',
-    question: 'How long does an order usually take?',
-    answer:
-      'Network unlocks resolve in 2 minutes to 48 hours. iCloud removals take 3–7 days.',
-  },
-  {
-    id: '3',
-    question: 'What happens if my order is rejected?',
-    answer:
-      'The poller picks up the REJECTED status from DhruFusion and the system writes a REFUND ledger entry to your wallet within seconds.',
-  },
-];
-
-export function Notes({ items, heading }: { items?: FaqItem[]; heading?: string }) {
-  const list = items && items.length > 0 ? items : FALLBACK;
+export function Notes({
+  items,
+  heading,
+  emptyMessage,
+}: {
+  items?: FaqItem[];
+  heading?: string;
+  emptyMessage?: string;
+}) {
+  const list = items ?? [];
   const displayHeading = heading ?? 'Things people {italic:always} ask.';
 
   return (
@@ -67,16 +54,24 @@ export function Notes({ items, heading }: { items?: FaqItem[]; heading?: string 
           </Reveal>
 
           <div className="lg:col-span-8">
-            <div className="hidden border-b border-ink/15 pb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted sm:flex sm:justify-between">
-              <span>Q.</span>
-              <span>{list.length} entries</span>
-            </div>
+            {list.length === 0 ? (
+              <p className="font-serif text-sm italic text-ink-muted">
+                {emptyMessage ?? 'No FAQ entries yet. Add items in Admin → FAQ.'}
+              </p>
+            ) : (
+              <>
+                <div className="hidden border-b border-ink/15 pb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted sm:flex sm:justify-between">
+                  <span>Q.</span>
+                  <span>{list.length} entries</span>
+                </div>
 
-            <Accordion.Root type="single" collapsible defaultValue="item-0">
-              {list.map((n, idx) => (
-                <NoteItem key={n.id} value={`item-${idx}`} num={idx + 1} q={n.question} a={n.answer} />
-              ))}
-            </Accordion.Root>
+                <Accordion.Root type="single" collapsible defaultValue="item-0">
+                  {list.map((n, idx) => (
+                    <NoteItem key={n.id} value={`item-${idx}`} num={idx + 1} q={n.question} a={n.answer} />
+                  ))}
+                </Accordion.Root>
+              </>
+            )}
           </div>
         </div>
       </div>

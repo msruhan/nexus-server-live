@@ -17,6 +17,7 @@ import {
   widthClasses,
   alignClasses,
   isDefaultStyle,
+  resolveGradientCss,
   type SectionStyle,
 } from '@/lib/cms-style';
 
@@ -39,36 +40,51 @@ export function SectionFrame({
   const width = widthClasses(style.width);
   const align = alignClasses(style.align);
   const hasImage = style.background === 'image' && !!style.bgImageUrl;
+  const gradientCss = resolveGradientCss(style);
+  const usesCustomBackground = style.background !== 'paper';
 
   const dividerTop = style.dividerTop === 'line' ? 'border-t border-line' : '';
   const dividerBottom = style.dividerBottom === 'line' ? 'border-b border-line' : '';
 
+  const sectionSurfaceStyle: React.CSSProperties = {};
+  if (gradientCss) {
+    sectionSurfaceStyle.backgroundImage = gradientCss;
+  } else if (hasImage) {
+    sectionSurfaceStyle.backgroundImage = `url(${style.bgImageUrl})`;
+    sectionSurfaceStyle.backgroundSize = 'cover';
+    sectionSurfaceStyle.backgroundPosition = 'center';
+    sectionSurfaceStyle.backgroundRepeat = 'no-repeat';
+  }
+
   return (
     <section
       className={`relative overflow-hidden ${bg.wrapper} ${dividerTop} ${dividerBottom}`.trim()}
+      style={Object.keys(sectionSurfaceStyle).length > 0 ? sectionSurfaceStyle : undefined}
       data-cms-styled="true"
       data-cms-dark={bg.isDark ? 'true' : undefined}
     >
-      {/* Background image + overlay layers (below content) */}
-      {hasImage && (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={style.bgImageUrl as string}
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 -z-20 h-full w-full object-cover"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 -z-10 bg-ink"
-            style={{ opacity: style.bgOverlay / 100 }}
-          />
-        </>
+      {hasImage && style.bgOverlay > 0 && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundColor: 'rgb(var(--ink))',
+            opacity: style.bgOverlay / 100,
+          }}
+        />
       )}
 
       <div className={`relative ${padding}`}>
-        <div className={`mx-auto px-6 lg:px-10 ${width} ${align}`.trim()}>{children}</div>
+        <div
+          className={[
+            `mx-auto px-6 lg:px-10 ${width} ${align}`,
+            usesCustomBackground && '[&>section]:!bg-transparent',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {children}
+        </div>
       </div>
     </section>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { motion, animate, useMotionValue } from 'framer-motion';
+import { motion, animate } from 'framer-motion';
 import {
   CheckCircle,
   TrendUp,
@@ -18,92 +18,68 @@ export function StatsDashboard() {
       transition={{ duration: 0.8, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className="relative"
     >
-      <div className="mb-3 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted">
+      <div className="mb-3 flex items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted">
         <span>Fig. 03 — Live performance dashboard</span>
-        <span className="flex items-center gap-1.5">
+        <span className="flex shrink-0 items-center gap-1.5">
           <span className="live-dot" />
           updating
         </span>
       </div>
 
-      {/* Container */}
-      <div className="relative">
-        {/* Grid bg */}
-        <div className="relative aspect-[4/5] overflow-hidden rounded-3xl border border-line bg-paper-50 shadow-card-hover sm:aspect-[5/5]">
-          <div className="absolute inset-0 blueprint opacity-50" />
+      <div className="relative overflow-hidden rounded-3xl border border-line bg-paper-50 shadow-card-hover">
+        <div className="absolute inset-0 blueprint opacity-40" />
 
-          {/* Floating ambient blob */}
-          <motion.div
-            aria-hidden
-            className="absolute -right-20 -top-20 h-64 w-64 rounded-full"
-            style={{ background: 'radial-gradient(closest-side, rgb(var(--primary-500) / 0.18), transparent)' }}
-            animate={{ x: [0, 30, 0], y: [0, 20, 0] }}
-            transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
-            aria-hidden
-            className="absolute -bottom-20 -left-20 h-56 w-56 rounded-full"
-            style={{ background: 'radial-gradient(closest-side, rgb(var(--accent-500) / 0.15), transparent)' }}
-            animate={{ x: [0, -20, 0], y: [0, -30, 0] }}
-            transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
-          />
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute -right-16 -top-16 z-0 h-48 w-48 rounded-full"
+          style={{ background: 'radial-gradient(closest-side, rgb(var(--primary-500) / 0.12), transparent)' }}
+          animate={{ x: [0, 16, 0], y: [0, 12, 0] }}
+          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-16 -left-16 z-0 h-40 w-40 rounded-full"
+          style={{ background: 'radial-gradient(closest-side, rgb(var(--accent-500) / 0.1), transparent)' }}
+          animate={{ x: [0, -12, 0], y: [0, -16, 0] }}
+          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
+        />
 
-          {/* Stat layout */}
-          <div className="relative grid h-full grid-cols-6 grid-rows-6 gap-3 p-5">
-            {/* Big success ring (col-span-3 row-span-3) */}
+        <div className="relative z-10 flex flex-col gap-3 p-4 sm:p-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
             <SuccessRing />
-
-            {/* Revenue tile */}
             <RevenueTile />
+          </div>
 
-            {/* Activity feed */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
             <ActivityFeed />
+            <div className="flex flex-col gap-3 sm:col-span-2">
+              <AverageDeliveryTile />
+              <PendingTile />
+            </div>
+          </div>
 
-            {/* Average delivery */}
-            <AverageDeliveryTile />
-
-            {/* Pending count badge */}
-            <PendingTile />
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line/80 pt-3 font-mono text-[9px] uppercase tracking-[0.16em] text-ink-muted">
+            <span className="flex items-center gap-1.5">
+              <Lightning weight="fill" size={10} />
+              real metrics · last 24h
+            </span>
+            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-amber-900">
+              updates every 60s
+            </span>
           </div>
         </div>
-
-        {/* Annotation */}
-        <motion.div
-          initial={{ opacity: 0, x: 10, rotate: 4 }}
-          animate={{ opacity: 1, x: 0, rotate: 4 }}
-          transition={{ delay: 1.4, duration: 0.6 }}
-          className="absolute -right-2 -top-6 hidden lg:block"
-        >
-          <div className="rounded-md bg-amber-400 px-3 py-1.5 font-serif text-xs italic text-ink shadow-card-hover">
-            ← updates every 60 seconds
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.8 }}
-          className="absolute -bottom-4 left-6 hidden md:block"
-        >
-          <div className="flex items-center gap-2 rounded-full border border-line bg-paper-50 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted shadow-card">
-            <Lightning weight="fill" size={10} />
-            real metrics · last 24h
-          </div>
-        </motion.div>
       </div>
     </motion.div>
   );
 }
 
-// ─── Big success ring ──────────────────────────────────────
 function SuccessRing() {
   const target = 98.7;
-  const mv = useMotionValue(0);
   const [display, setDisplay] = React.useState('0.0');
   const [pct, setPct] = React.useState(0);
 
   React.useEffect(() => {
-    const controls = animate(mv, target, {
+    const controls = animate(0, target, {
       duration: 1.8,
       delay: 0.8,
       ease: [0.16, 1, 0.3, 1],
@@ -113,87 +89,86 @@ function SuccessRing() {
       },
     });
     return controls.stop;
-  }, [mv]);
+  }, []);
 
-  const circumference = 2 * Math.PI * 70;
+  const circumference = 2 * Math.PI * 54;
   const dash = (pct / 100) * circumference;
 
   return (
-    <div className="col-span-4 row-span-3 flex flex-col rounded-2xl border border-line bg-paper p-5 shadow-card">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col rounded-2xl border border-line bg-paper p-4 shadow-card sm:col-span-3">
+      <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
           Success rate · 30d
         </span>
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-inset ring-emerald-200">
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-inset ring-emerald-200">
           <ArrowUp weight="bold" size={9} /> 0.4%
         </span>
       </div>
 
-      <div className="relative mx-auto my-2 flex h-[170px] w-[170px] items-center justify-center">
-        <svg viewBox="0 0 160 160" className="absolute inset-0 -rotate-90">
-          <circle cx="80" cy="80" r="70" stroke="rgb(var(--line))" strokeWidth="10" fill="none" />
-          <motion.circle
-            cx="80"
-            cy="80"
-            r="70"
-            stroke="rgb(var(--primary-500))"
-            strokeWidth="10"
-            strokeLinecap="round"
-            fill="none"
-            strokeDasharray={`${dash} ${circumference}`}
-            style={{ filter: 'drop-shadow(0 4px 12px rgb(var(--primary-500) / 0.4))' }}
-          />
-        </svg>
-        <div className="text-center">
-          <div className="font-display text-[42px] font-black leading-none tracking-tightest tabular-nums text-ink">
-            {display}
-            <span className="text-2xl text-ink-muted">%</span>
-          </div>
-          <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
-            closed successful
+      <div className="mt-2 flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex h-[132px] w-[132px] shrink-0 items-center justify-center">
+          <svg viewBox="0 0 120 120" className="absolute inset-0 -rotate-90">
+            <circle cx="60" cy="60" r="54" stroke="rgb(var(--line))" strokeWidth="8" fill="none" />
+            <motion.circle
+              cx="60"
+              cy="60"
+              r="54"
+              stroke="rgb(var(--primary-500))"
+              strokeWidth="8"
+              strokeLinecap="round"
+              fill="none"
+              strokeDasharray={`${dash} ${circumference}`}
+            />
+          </svg>
+          <div className="text-center">
+            <div className="font-display text-[34px] font-black leading-none tracking-tightest tabular-nums text-ink">
+              {display}
+              <span className="text-lg text-ink-muted">%</span>
+            </div>
+            <div className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-ink-muted">
+              closed successful
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
-        {[
-          { label: 'Total', value: '4,128' },
-          { label: 'Success', value: '4,074' },
-          { label: 'Refund', value: '54' },
-        ].map((s) => (
-          <div key={s.label}>
-            <div className="font-display text-base font-extrabold tabular-nums text-ink">
-              {s.value}
+        <div className="grid w-full grid-cols-3 gap-2 sm:max-w-[200px]">
+          {[
+            { label: 'Total', value: '4,128' },
+            { label: 'Success', value: '4,074' },
+            { label: 'Refund', value: '54' },
+          ].map((s) => (
+            <div key={s.label} className="rounded-lg bg-paper-100 px-2 py-2 text-center">
+              <div className="font-display text-sm font-extrabold tabular-nums text-ink">{s.value}</div>
+              <div className="font-mono text-[8px] uppercase tracking-wider text-ink-muted">{s.label}</div>
             </div>
-            <div className="font-mono text-[9px] uppercase tracking-wider text-ink-muted">
-              {s.label}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Revenue tile ──────────────────────────────────────────
 function RevenueTile() {
   const target = 12_400_000;
   const [display, setDisplay] = React.useState('0');
 
   React.useEffect(() => {
-    const mv = { v: 0 };
     const controls = animate(0, target, {
       duration: 1.8,
       delay: 1.0,
       ease: [0.16, 1, 0.3, 1],
       onUpdate: (v) => {
-        setDisplay(new Intl.NumberFormat('en-US').format(Math.round(v)));
+        setDisplay(
+          new Intl.NumberFormat('id-ID', {
+            notation: 'compact',
+            maximumFractionDigits: 1,
+          }).format(Math.round(v)),
+        );
       },
     });
     return controls.stop;
   }, []);
 
-  // Mini sparkline data
   const points = [10, 14, 12, 18, 16, 22, 19, 24, 28, 26, 32, 34];
   const max = Math.max(...points);
   const min = Math.min(...points);
@@ -206,7 +181,7 @@ function RevenueTile() {
     .join(' ');
 
   return (
-    <div className="col-span-2 row-span-3 flex flex-col rounded-2xl border border-primary-700 bg-primary-500 p-4 text-paper shadow-glow-blue">
+    <div className="flex min-h-[180px] flex-col rounded-2xl border border-primary-700 bg-primary-500 p-4 text-paper shadow-glow-blue sm:col-span-2">
       <div className="flex items-center gap-1.5">
         <Wallet weight="duotone" size={14} />
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper/80">
@@ -214,24 +189,30 @@ function RevenueTile() {
         </span>
       </div>
 
-      <div className="mt-3 font-serif text-sm italic text-paper/70">Rp</div>
-      <div className="mt-1 font-display text-[clamp(1.5rem,3vw,2rem)] font-black leading-none tabular-nums">
-        {display}
+      <div className="mt-3 min-w-0">
+        <div className="font-serif text-xs italic text-paper/70">Rp</div>
+        <div
+          className="font-display text-2xl font-black leading-tight tabular-nums sm:text-3xl"
+          title="Rp 12.400.000"
+        >
+          {display}
+        </div>
+        <div className="mt-0.5 font-mono text-[9px] text-paper/60">12.400.000 full</div>
       </div>
 
-      <div className="mt-auto">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-16 w-full">
+      <div className="mt-auto pt-3">
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-10 w-full">
           <defs>
             <linearGradient id="spark" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgb(var(--paper))" stopOpacity="0.45" />
+              <stop offset="0%" stopColor="rgb(var(--paper))" stopOpacity="0.35" />
               <stop offset="100%" stopColor="rgb(var(--paper))" stopOpacity="0" />
             </linearGradient>
           </defs>
           <motion.path
             d={`${path} L 100 100 L 0 100 Z`}
             fill="url(#spark)"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ delay: 1.2, duration: 1.2 }}
           />
           <motion.path
@@ -246,7 +227,7 @@ function RevenueTile() {
             transition={{ delay: 1.2, duration: 1.4 }}
           />
         </svg>
-        <div className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-paper/80">
+        <div className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-paper/80">
           <ArrowUp weight="bold" size={10} />
           +18.2% vs yesterday
         </div>
@@ -255,7 +236,6 @@ function RevenueTile() {
   );
 }
 
-// ─── Activity feed ─────────────────────────────────────────
 const ACTIVITY = [
   { name: 'Andre', service: 'iCloud removal', delta: 12 },
   { name: 'Sari', service: 'T-Mobile unlock', delta: 38 },
@@ -281,7 +261,7 @@ function ActivityFeed() {
   }, [cursor]);
 
   return (
-    <div className="col-span-4 row-span-3 flex flex-col rounded-2xl border border-line bg-paper p-4 shadow-card">
+    <div className="flex flex-col rounded-2xl border border-line bg-paper p-4 shadow-card sm:col-span-3">
       <div className="mb-3 flex items-center justify-between">
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
           Live activity
@@ -296,17 +276,18 @@ function ActivityFeed() {
         {items.map((item, idx) => (
           <motion.div
             key={`${item.name}-${cursor}-${idx}`}
-            initial={{ opacity: 0, x: -16, height: 0 }}
-            animate={{ opacity: 1, x: 0, height: 'auto' }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            className="flex items-center gap-3 rounded-lg bg-paper-100 px-3 py-2"
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="flex items-center gap-2.5 rounded-lg bg-paper-100 px-3 py-2"
           >
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink font-display text-[11px] font-bold text-paper">
               {item.name[0]}
             </span>
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-xs font-bold text-ink">
-                {item.name} · <span className="font-normal text-ink-muted">{item.service}</span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-bold leading-snug text-ink">
+                <span className="whitespace-nowrap">{item.name}</span>
+                <span className="font-normal text-ink-muted"> · {item.service}</span>
               </div>
               <div className="font-mono text-[9px] text-ink-soft">
                 {idx === 0 ? 'just now' : `${item.delta}s ago`}
@@ -315,7 +296,7 @@ function ActivityFeed() {
             <CheckCircle
               weight="fill"
               size={14}
-              className={idx === 0 ? 'text-amber-500' : 'text-primary-500'}
+              className={`shrink-0 ${idx === 0 ? 'text-amber-500' : 'text-primary-500'}`}
             />
           </motion.div>
         ))}
@@ -324,10 +305,9 @@ function ActivityFeed() {
   );
 }
 
-// ─── Average delivery tile ─────────────────────────────────
 function AverageDeliveryTile() {
   return (
-    <div className="col-span-3 row-span-3 flex flex-col rounded-2xl border border-line bg-paper p-4 shadow-card">
+    <div className="flex flex-1 flex-col rounded-2xl border border-line bg-paper p-4 shadow-card">
       <div className="flex items-center gap-1.5">
         <Lightning weight="duotone" size={14} className="text-primary-700" />
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
@@ -335,23 +315,23 @@ function AverageDeliveryTile() {
         </span>
       </div>
 
-      <div className="mt-3 flex items-baseline gap-2">
-        <CountUpInline target={2} suffix="" duration={1.2} />
-        <span className="font-mono text-sm text-ink-muted">min</span>
-        <CountUpInline target={14} suffix="" duration={1.4} delay={0.3} />
-        <span className="font-mono text-sm text-ink-muted">sec</span>
+      <div className="mt-2 flex items-baseline gap-1.5">
+        <CountUpInline target={2} duration={1.2} />
+        <span className="font-mono text-xs text-ink-muted">min</span>
+        <CountUpInline target={14} duration={1.4} delay={0.3} />
+        <span className="font-mono text-xs text-ink-muted">sec</span>
       </div>
 
-      <div className="mt-auto space-y-1.5">
+      <div className="mt-3 space-y-1.5">
         {[
           { label: 'Network unlock', value: 78 },
           { label: 'FRP bypass', value: 92 },
           { label: 'iCloud removal', value: 18 },
         ].map((row, i) => (
           <div key={row.label}>
-            <div className="mb-0.5 flex items-baseline justify-between font-mono text-[9px] uppercase tracking-wider text-ink-muted">
-              <span>{row.label}</span>
-              <span className="text-ink">{row.value}%</span>
+            <div className="mb-0.5 flex items-baseline justify-between font-mono text-[8px] uppercase tracking-wider text-ink-muted">
+              <span className="truncate pr-2">{row.label}</span>
+              <span className="shrink-0 text-ink">{row.value}%</span>
             </div>
             <div className="h-1 overflow-hidden rounded-full bg-line">
               <motion.div
@@ -390,47 +370,42 @@ function CountUpInline({
     return controls.stop;
   }, [target, duration, delay]);
   return (
-    <span className="font-display text-3xl font-black tabular-nums text-ink">
+    <span className="font-display text-2xl font-black tabular-nums text-ink">
       {display}
       {suffix}
     </span>
   );
 }
 
-// ─── Pending count tile ────────────────────────────────────
 function PendingTile() {
   return (
-    <motion.div
-      animate={{ y: [0, -3, 0] }}
-      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-      className="col-span-3 row-span-3 flex flex-col rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-card"
-    >
+    <div className="flex flex-1 flex-col rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-card">
       <div className="flex items-center gap-1.5">
         <TrendUp weight="duotone" size={14} className="text-amber-700" />
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-800">
           In flight
         </span>
       </div>
-      <div className="mt-3">
+      <div className="mt-2">
         <CountUpInline target={42} duration={1.2} />
       </div>
-      <p className="mt-1 font-serif text-xs italic text-amber-900/70">
-        Polling every 60 seconds. Auto-refund on rejection.
+      <p className="mt-1 text-[11px] leading-snug text-amber-900/75">
+        Polling every 60s. Auto-refund on rejection.
       </p>
-      <div className="mt-auto flex flex-wrap gap-1">
-        {Array.from({ length: 8 }).map((_, i) => (
+      <div className="mt-auto flex flex-wrap items-center gap-1 pt-2">
+        {Array.from({ length: 6 }).map((_, i) => (
           <motion.span
             key={i}
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 1.0 + i * 0.06 }}
-            className="h-1.5 w-6 rounded-full bg-amber-400"
+            className="h-1.5 w-5 rounded-full bg-amber-400"
           />
         ))}
-        <span className="ml-1 self-center font-mono text-[9px] uppercase tracking-wider text-amber-800">
+        <span className="font-mono text-[8px] uppercase tracking-wider text-amber-800">
           + 34 more
         </span>
       </div>
-    </motion.div>
+    </div>
   );
 }
