@@ -1,7 +1,14 @@
 import { prisma } from '@/lib/db'
 import { apiError, apiSuccess, requireApiRole } from '@/lib/api-auth'
 import { decryptImeiApiKey } from '@/lib/crypto/imei-api-secret'
-import { DhruFusionClient, DhruFusionProClient, isImeiProProduct } from '@/lib/dhru-fusion'
+import {
+  DhruFusionClient,
+  DhruFusionProClient,
+  isClassicDhruApiKey,
+  isDhruProSkippedOrUnavailable,
+  isImeiProProduct,
+} from '@/lib/dhru-fusion'
+import { formatDhruSupplierUserMessage } from '@/lib/dhru-supplier-messages'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,14 +30,22 @@ export async function POST(
     if (!api) return apiError('API provider not found', 404)
     if (api.status !== 'ACTIVE') return apiError('API provider is not active', 400)
 
-    // Try Pro API first (REST + Bearer Token)
-    const proClient = new DhruFusionProClient({
-      host: api.host,
-      username: api.username,
-      apiKey: decryptImeiApiKey(api.apiKey),
-    })
+    const apiKey = decryptImeiApiKey(api.apiKey)
 
-    const proResult = await proClient.getProducts()
+    // Pro REST uses Bearer tokens; dashed keys are Classic (legitunlocks, luteam, …).
+    let proResult: Awaited<ReturnType<DhruFusionProClient['getProducts']>> = {
+      success: false,
+      error: 'Skipped — Classic API key format',
+    }
+
+    if (!isClassicDhruApiKey(apiKey)) {
+      const proClient = new DhruFusionProClient({
+        host: api.host,
+        username: api.username,
+        apiKey,
+      })
+      proResult = await proClient.getProducts()
+    }
 
     const imeiProducts =
       proResult.success && proResult.products
@@ -79,21 +94,19 @@ export async function POST(
     const classicClient = new DhruFusionClient({
       host: api.host,
       username: api.username,
-      apiKey: decryptImeiApiKey(api.apiKey),
+      apiKey,
     })
 
     const result = await classicClient.getImeiServiceList()
 
     if (!result.success) {
-      const proUnavailable =
-        !!proResult.error &&
-        proResult.error.includes('REST API Pro is not available')
+      const proUnavailable = isDhruProSkippedOrUnavailable(proResult.error)
       const errorMsg = proUnavailable
         ? result.error || 'Failed to fetch service list from supplier'
         : proResult.error
           ? `Pro API: ${proResult.error}. Classic API: ${result.error}`
           : result.error || 'Failed to fetch service list from supplier'
-      return apiError(errorMsg, 502)
+      return apiError(formatDhruSupplierUserMessage(errorMsg), 502)
     }
 
     // Get existing toolIds for this API to mark which are already imported

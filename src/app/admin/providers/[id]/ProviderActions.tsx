@@ -4,6 +4,10 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Pulse, ArrowsClockwise, Wallet, X } from '@phosphor-icons/react/dist/ssr';
+import {
+  dhruSupplierErrorTitle,
+  formatDhruSupplierUserMessage,
+} from '@/lib/dhru-supplier-messages';
 
 type SyncedBase = {
   toolId: string;
@@ -39,7 +43,10 @@ export function ProviderActions({ providerId }: { providerId: string }) {
     setLoading(null);
     const j = await res.json().catch(() => ({}));
     if (!res.ok || !j.success) {
-      toast.error('Connection failed', { description: j.error ?? 'Unknown error' });
+      const raw = j.error ?? 'Unknown error';
+      toast.error(dhruSupplierErrorTitle(raw), {
+        description: formatDhruSupplierUserMessage(raw),
+      });
       return;
     }
     toast.success('Connection OK', {
@@ -60,7 +67,10 @@ export function ProviderActions({ providerId }: { providerId: string }) {
     setLoading(null);
 
     if (!res.ok || !json.success) {
-      toast.error('Sync failed', { description: json.error ?? 'Unknown error' });
+      const raw = json.error ?? 'Unknown error';
+      toast.error(dhruSupplierErrorTitle(raw), {
+        description: formatDhruSupplierUserMessage(raw),
+      });
       return;
     }
 
@@ -97,7 +107,7 @@ export function ProviderActions({ providerId }: { providerId: string }) {
 
     const services = base.map((s) => ({
       ...s,
-      price: Math.max(1, Math.round(Number(s.price) * 16500)),
+      price: Math.max(0, Math.round(Number(s.price) * 100) / 100),
     }));
 
     const importPath =

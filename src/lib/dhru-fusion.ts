@@ -3,6 +3,7 @@
  * Supports both Classic (form-data + XML) and Pro (REST + Bearer Token) versions.
  */
 
+import { formatDhruSupplierUserMessage } from '@/lib/dhru-supplier-messages'
 import {
   isImeiStressCredit,
   isImeiStressTimeout,
@@ -31,11 +32,146 @@ function buildClassicApiUrls(host: string): string[] {
     const origin = parsed.origin.replace(/\/+$/, '')
     urls.add(`${origin}/api/index.php`)
     urls.add(`${origin}/index.php`)
+    if (!parsed.pathname.toLowerCase().includes('/dhru')) {
+      urls.add(`${origin}/dhru/api/index.php`)
+      urls.add(`${origin}/dhru/index.php`)
+    }
   } catch {
     // Host already validated on create/update; keep conservative fallback.
   }
 
   return [...urls]
+}
+
+/** Dhru Classic keys are dashed segments (e.g. VQL-CBG-UIO-…); Pro uses Bearer tokens. */
+export function isClassicDhruApiKey(apiKey: string): boolean {
+  return /^[A-Z0-9]{3}(-[A-Z0-9]{3}){4,}$/i.test(apiKey.trim())
+}
+
+export function isDhruProSkippedOrUnavailable(error?: string): boolean {
+  if (!error) return true
+  return (
+    error.includes('REST API Pro is not available') ||
+    error.includes('Skipped — Classic API key format')
+  )
+}
+
+const DHRU_CLASSIC_USER_AGENT = 'Recovero-NexusServer/1.0 (DhruFusion Classic API)'
+const DHRU_BROWSER_USER_AGENT =
+  'Mozilla/5.0 (compatible; NexusServer/1.0; DhruFusion Classic API) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+function resolveSiteOrigin(host: string): string {
+  try {
+    const parsed = new URL(host.includes('://') ? host : `https://${host}`)
+    return parsed.origin
+  } catch {
+    return host.replace(/\/+$/, '')
+  }
+}
+
+/** Some panels (e.g. luteam.store) return 409 + JS cookie challenge before API access. */
+function parseBotCookieChallenge(body: string): string | null {
+  const m = body.match(/document\.cookie\s*=\s*["']([^"']+)["']/i)
+  return m?.[1]?.trim() || null
+}
+
+function isBotCookieChallenge(status: number, body: string): boolean {
+  return status === 409 && parseBotCookieChallenge(body) !== null
+}
+
+function isUnsupportedMediaType(status: number, body: string): boolean {
+  return status === 415 || /415 Unsupported Media Type/i.test(body)
+}
+
+/** Imunify360 and similar WAF JSON denials (HTTP 200 with { message: "Access denied…" }). */
+function parseSupplierWafDenial(body: string): string | null {
+  const trimmed = body.trim()
+  if (!trimmed.startsWith('{')) return null
+  try {
+    const json = JSON.parse(trimmed) as { message?: string; SUCCESS?: unknown; ERROR?: unknown }
+    if (json.SUCCESS || json.ERROR) return null
+    const msg = String(json.message ?? '').trim()
+    if (!msg) return null
+    if (/imunify|bot.protection|access denied|whitelist|automation/i.test(msg)) return msg
+    return null
+  } catch {
+    return null
+  }
+}
+
+function formatWafDenialError(_message: string): string {
+  return formatDhruSupplierUserMessage(_message)
+}
+
+type ClassicPostOptions = {
+  cookie?: string
+  siteOrigin?: string
+  browserLike?: boolean
+}
+
+async function postClassicForm(
+  url: string,
+  formData: URLSearchParams,
+  options: ClassicPostOptions = {},
+): Promise<{ response: Response; text: string }> {
+  const { cookie, siteOrigin, browserLike = false } = options
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'User-Agent': browserLike ? DHRU_BROWSER_USER_AGENT : DHRU_CLASSIC_USER_AGENT,
+    Accept: 'application/json, text/plain, */*',
+  }
+  if (browserLike && siteOrigin) {
+    headers.Origin = siteOrigin
+    headers.Referer = `${siteOrigin}/`
+  }
+  if (cookie) headers.Cookie = cookie
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: formData.toString(),
+    signal: AbortSignal.timeout(60000),
+  })
+  const text = await response.text()
+  return { response, text }
+}
+
+async function postClassicWithBypass(
+  url: string,
+  formData: URLSearchParams,
+  siteOrigin: string,
+): Promise<{ response: Response; text: string; lastError?: string }> {
+  let { response, text } = await postClassicForm(url, formData, { siteOrigin })
+
+  if (isUnsupportedMediaType(response.status, text)) {
+    ;({ response, text } = await postClassicForm(url, formData, { siteOrigin, browserLike: true }))
+  }
+
+  if (isBotCookieChallenge(response.status, text)) {
+    const cookie = parseBotCookieChallenge(text)!
+    ;({ response, text } = await postClassicForm(url, formData, {
+      siteOrigin,
+      browserLike: true,
+      cookie,
+    }))
+  }
+
+  const waf = parseSupplierWafDenial(text)
+  if (waf) {
+    return { response, text, lastError: formatWafDenialError(waf) }
+  }
+
+  if (isBotCookieChallenge(response.status, text)) {
+    return {
+      response,
+      text,
+      lastError: formatDhruSupplierUserMessage(
+        'Supplier blocked the API request (bot protection cookie). Whitelist your server IP.',
+      ),
+    }
+  }
+
+  return { response, text }
 }
 
 // ============================================================
@@ -547,13 +683,14 @@ export function formatServerSyncError(classicError: string, proError?: string): 
   const proUnavailable =
     !proError ||
     proError.includes('REST API Pro is not available') ||
-    proError.includes('Invalid JSON')
+    proError.includes('Invalid JSON') ||
+    proError.includes('Skipped — Classic API key format')
 
   if (proUnavailable) {
-    return classicError
+    return formatDhruSupplierUserMessage(classicError)
   }
 
-  return `${classicError} (Pro API: ${proError})`
+  return formatDhruSupplierUserMessage(`${classicError} (Pro API: ${proError})`)
 }
 
 export class DhruFusionClient {
@@ -600,23 +737,27 @@ export class DhruFusionClient {
     formData.set('parameters', xmlParams)
 
     const classicUrls = buildClassicApiUrls(this.host)
+    const siteOrigin = resolveSiteOrigin(this.host)
     let lastError = 'DhruFusion API endpoint not found'
 
     for (const url of classicUrls) {
       try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formData.toString(),
-          signal: AbortSignal.timeout(60000), // 60s timeout
-        })
+        const { response, text, lastError: wafError } = await postClassicWithBypass(
+          url,
+          formData,
+          siteOrigin,
+        )
+
+        if (wafError) {
+          lastError = wafError
+          continue
+        }
 
         if (!response.ok) {
           lastError = `DhruFusion API returned ${response.status}: ${response.statusText}`
           continue
         }
 
-        const text = await response.text()
         try {
           return JSON.parse(text) as DhruResponse
         } catch {
@@ -628,7 +769,7 @@ export class DhruFusionClient {
       }
     }
 
-    throw new Error(lastError)
+    throw new Error(formatDhruSupplierUserMessage(lastError))
   }
 
   /**
@@ -638,12 +779,14 @@ export class DhruFusionClient {
     try {
       const res = await this.request('accountinfo')
       if ('ERROR' in res) {
-        return { success: false, message: res.ERROR[0]?.MESSAGE || 'Unknown error' }
+        const raw = res.ERROR[0]?.MESSAGE || 'Unknown error'
+        return { success: false, message: formatDhruSupplierUserMessage(raw) }
       }
       const info = res.SUCCESS?.[0]?.AccoutInfo
       return { success: true, credit: info?.credit, message: 'Connected' }
     } catch (e) {
-      return { success: false, message: e instanceof Error ? e.message : 'Connection failed' }
+      const raw = e instanceof Error ? e.message : 'Connection failed'
+      return { success: false, message: formatDhruSupplierUserMessage(raw) }
     }
   }
 
@@ -659,7 +802,8 @@ export class DhruFusionClient {
       const res = await this.request('imeiservicelist')
 
       if ('ERROR' in res) {
-        return { success: false, error: res.ERROR[0]?.MESSAGE || 'Unknown error' }
+        const raw = res.ERROR[0]?.MESSAGE || 'Unknown error'
+        return { success: false, error: formatDhruSupplierUserMessage(raw) }
       }
 
       const list = res.SUCCESS?.[0]?.LIST
@@ -669,10 +813,8 @@ export class DhruFusionClient {
 
       return { success: true, list }
     } catch (e) {
-      return {
-        success: false,
-        error: e instanceof Error ? e.message : 'Failed to fetch services',
-      }
+      const raw = e instanceof Error ? e.message : 'Failed to fetch services'
+      return { success: false, error: formatDhruSupplierUserMessage(raw) }
     }
   }
 
