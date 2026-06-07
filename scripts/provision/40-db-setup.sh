@@ -21,20 +21,24 @@ compose_stack_files local_files
 
 wait_for_postgres "${local_files[@]}"
 
-exec_args=(-T)
+# App crash-loops until schema exists — exec fails while container is Restarting.
+log "Stopping app service (if running) before one-off db setup..."
+"${COMPOSE[@]}" "${local_files[@]}" --env-file .env.production stop app 2>/dev/null || true
+
+run_args=(run --rm --no-deps -T)
 if [[ -n "${SEED_ADMIN_EMAIL:-}" ]]; then
-  exec_args+=(-e "SEED_ADMIN_EMAIL=${SEED_ADMIN_EMAIL}")
+  run_args+=(-e "SEED_ADMIN_EMAIL=${SEED_ADMIN_EMAIL}")
 fi
 if [[ -n "${SEED_ADMIN_PASSWORD:-}" ]]; then
-  exec_args+=(-e "SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}")
+  run_args+=(-e "SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}")
 fi
 
-log "Running npm run db:setup:production inside app container..."
+log "Running npm run db:setup:production in one-off app container..."
 "${COMPOSE[@]}" "${local_files[@]}" --env-file .env.production \
-  exec "${exec_args[@]}" app npm run db:setup:production
+  "${run_args[@]}" app npm run db:setup:production
 
-log "Restarting app after schema + seed..."
-"${COMPOSE[@]}" "${local_files[@]}" --env-file .env.production restart app
+log "Starting app after schema + seed..."
+"${COMPOSE[@]}" "${local_files[@]}" --env-file .env.production up -d app
 
 wait_for_app_health "${local_files[@]}"
 

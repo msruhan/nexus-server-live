@@ -41,7 +41,7 @@ Secrets (`AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `CRON_SECRET`, `POSTGRES_PASSWORD
 | 2 | `20-setup-env.sh` — compose templates + `.env.production` (no git) |
 | 3 | `30-deploy-compose.sh` — pull image, postgres + app + Caddy; wait for Postgres only |
 | 3b | `30-deploy-coolify.sh` — when Coolify API UUIDs configured |
-| 4 | `40-db-setup.sh` — `npm run db:setup:production`, restart app, wait for `/api/health` |
+| 4 | `40-db-setup.sh` — one-off `docker compose run` for `db:setup:production`, then start app and wait for `/api/health` |
 | 5 | `50-healthcheck.sh` — `GET https://{domain}/api/health` |
 
 Step 30 does **not** wait for app health — the image runs `check-db` before `next start`, so tables must exist first (step 40). Retries reuse secrets from an existing `.env.production` when present.
