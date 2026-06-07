@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { DownloadSimple } from '@phosphor-icons/react/dist/ssr';
 import type { AnalyticsSummary } from '@/lib/analytics';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 
 const PERIODS: Array<{ value: string; label: string }> = [
   { value: '24h', label: '24h' },
@@ -231,7 +232,10 @@ function Table({
   rows: string[][];
   rightAlignFrom?: number;
 }) {
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(rows, [rows.length]);
+
   return (
+    <div>
     <div className="overflow-hidden rounded-xl border border-line">
       <table className="w-full text-sm">
         <thead>
@@ -247,7 +251,7 @@ function Table({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, ri) => (
+          {pageRows.map((r, ri) => (
             <tr key={ri} className="border-b border-line last:border-0">
               {r.map((cell, ci) => (
                 <td
@@ -267,6 +271,13 @@ function Table({
           ))}
         </tbody>
       </table>
+    </div>
+    <TablePagination
+      currentPage={currentPage}
+      pageCount={pageCount}
+      totalItems={rows.length}
+      onPageChange={setPage}
+    />
     </div>
   );
 }

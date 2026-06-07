@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Plus, Trash } from '@phosphor-icons/react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 import { formatUSD } from '@/lib/format';
 
 type ServiceOption = {
@@ -47,6 +48,7 @@ export function GroupPricingManager({
 
   const catalog = kind === 'imei' ? imeiServices : serverServices;
   const selected = catalog.find((s) => s.id === serviceId);
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(overrides, [overrides.length]);
 
   React.useEffect(() => {
     setServiceId('');
@@ -188,14 +190,14 @@ export function GroupPricingManager({
             </tr>
           </thead>
           <tbody>
-            {overrides.length === 0 ? (
+            {pageRows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-ink-muted">
                   No per-service overrides — the group default applies to all catalog items.
                 </td>
               </tr>
             ) : (
-              overrides.map((o) => (
+              pageRows.map((o) => (
                 <tr key={o.id} className="border-b border-line last:border-0">
                   <td className="px-4 py-3">
                     <div className="font-medium">{o.serviceTitle}</div>
@@ -221,6 +223,13 @@ export function GroupPricingManager({
           </tbody>
         </table>
       </div>
+
+      <TablePagination
+        currentPage={currentPage}
+        pageCount={pageCount}
+        totalItems={overrides.length}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

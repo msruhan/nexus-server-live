@@ -3,13 +3,25 @@ import { ArrowUpRight, Plus } from '@phosphor-icons/react/dist/ssr';
 import { prisma } from '@/lib/db';
 import { formatDate } from '@/lib/format';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { buildTablePageHref, DEFAULT_TABLE_PAGE_SIZE, parseTablePage } from '@/lib/table-pagination';
 import { NewPageButton } from './NewPageButton';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PagesIndex() {
-  const pages = await prisma.customPage.findMany({ orderBy: { updatedAt: 'desc' } });
+export default async function PagesIndex({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const params = await searchParams;
+  const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
+
+  const [pages, total] = await Promise.all([
+    prisma.customPage.findMany({ orderBy: { updatedAt: 'desc' }, skip, take: pageSize }),
+    prisma.customPage.count(),
+  ]);
   return (
     <div>
       <PageHeader
@@ -61,6 +73,15 @@ export default async function PagesIndex() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {total > 0 && (
+        <ServerTablePagination
+          currentPage={page}
+          totalItems={total}
+          pageSize={pageSize}
+          buildHref={(p) => buildTablePageHref('/admin/cms/pages', {}, p)}
+        />
       )}
     </div>
   );

@@ -3,8 +3,9 @@
 import * as React from 'react';
 import { toast } from 'sonner';
 import { Lock, LockOpen, Shield, ArrowClockwise } from '@phosphor-icons/react/dist/ssr';
-import { Input, Textarea } from '@/components/ui/Input';
+import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 
 type IpMode = 'none' | 'allowlist' | 'lock_first';
 
@@ -58,6 +59,7 @@ export function ApiKeySecurityPanel({ keyId, onChanged }: { keyId: string; onCha
   const [saving, setSaving] = React.useState(false);
   const [data, setData] = React.useState<SecurityState | null>(null);
   const [attempts, setAttempts] = React.useState<AttemptRow[]>([]);
+  const attemptsPagination = useTablePagination(attempts, [attempts.length]);
   const [showAttempts, setShowAttempts] = React.useState(false);
 
   // Local form state mirrors server, edited as strings to allow empty = "no limit".
@@ -210,7 +212,7 @@ export function ApiKeySecurityPanel({ keyId, onChanged }: { keyId: string; onCha
               <div className="mt-0.5 text-xs text-ink-muted">
                 {m === 'none' && 'Accept request from any IP.'}
                 {m === 'lock_first' && 'Auto-bind to the first IP that uses the key. Subsequent requests from a different IP are rejected until the lock is released.'}
-                {m === 'allowlist' && 'Accept only IPs / CIDRs you list below.'}
+                {m === 'allowlist' && 'Accept only one IP / CIDR you register below.'}
               </div>
             </button>
           ))}
@@ -251,14 +253,35 @@ export function ApiKeySecurityPanel({ keyId, onChanged }: { keyId: string; onCha
         )}
 
         {ipMode === 'allowlist' && (
-          <Textarea
-            label="Allowed IPs / CIDRs"
-            placeholder="203.0.113.45&#10;198.51.100.0/24&#10;2001:db8::1"
-            value={allowedIps}
-            onChange={(e) => setAllowedIps(e.target.value)}
-            rows={4}
-            hint="One entry per line or comma-separated. IPv4, IPv4 CIDR, or IPv6."
-          />
+          <div className="space-y-3 rounded-xl border border-line bg-paper p-4">
+            {allowedIps.trim() ? (
+              <>
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">Allowed IP</p>
+                  <p className="mt-1 font-mono text-sm font-bold text-ink">{allowedIps.trim()}</p>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    One IP per key. Clear it before registering a different address.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setAllowedIps('')}
+                >
+                  Clear allowlist
+                </Button>
+              </>
+            ) : (
+              <Input
+                label="Allowed IP / CIDR"
+                placeholder="203.0.113.45"
+                value={allowedIps}
+                onChange={(e) => setAllowedIps(e.target.value)}
+                hint="Single IPv4, IPv4 CIDR, or IPv6. Save to apply."
+              />
+            )}
+          </div>
         )}
       </section>
 
@@ -357,6 +380,7 @@ export function ApiKeySecurityPanel({ keyId, onChanged }: { keyId: string; onCha
           {showAttempts ? '▾ Hide attempt log' : '▸ Show recent attempts'}
         </button>
         {showAttempts && (
+          <>
           <div className="mt-3 overflow-hidden rounded-xl border border-line">
             <table className="w-full text-xs">
               <thead>
@@ -369,14 +393,14 @@ export function ApiKeySecurityPanel({ keyId, onChanged }: { keyId: string; onCha
                 </tr>
               </thead>
               <tbody>
-                {attempts.length === 0 ? (
+                {attemptsPagination.pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-3 py-6 text-center text-ink-muted">
                       No attempts yet.
                     </td>
                   </tr>
                 ) : (
-                  attempts.map((a) => (
+                  attemptsPagination.pageRows.map((a) => (
                     <tr key={a.id} className="border-b border-line last:border-0">
                       <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-ink-muted">
                         {fmt(a.createdAt)}
@@ -395,6 +419,13 @@ export function ApiKeySecurityPanel({ keyId, onChanged }: { keyId: string; onCha
               </tbody>
             </table>
           </div>
+          <TablePagination
+            currentPage={attemptsPagination.currentPage}
+            pageCount={attemptsPagination.pageCount}
+            totalItems={attempts.length}
+            onPageChange={attemptsPagination.setPage}
+          />
+          </>
         )}
       </section>
     </div>

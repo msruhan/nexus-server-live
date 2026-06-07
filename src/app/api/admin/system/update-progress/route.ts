@@ -4,7 +4,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { hasPermission } from '@/lib/sub-admin';
-import { getUpdateProgress } from '@/lib/license/updater';
+import { getDockerUpdateProgress, isDockerUpdateInProgress } from '@/lib/license/docker-updater';
+import { getUpdateProgress, isUpdateInProgress } from '@/lib/license/updater';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,10 @@ export async function GET() {
   const session = await requireAccess();
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const progress = getUpdateProgress();
+  const progress = isDockerUpdateInProgress() ? getDockerUpdateProgress() : getUpdateProgress();
+  if (!isDockerUpdateInProgress() && !isUpdateInProgress() && progress.phase === 'idle') {
+    const dockerIdle = getDockerUpdateProgress();
+    if (dockerIdle.phase !== 'idle') return NextResponse.json(dockerIdle);
+  }
   return NextResponse.json(progress);
 }

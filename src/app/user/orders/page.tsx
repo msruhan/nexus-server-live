@@ -6,8 +6,15 @@ import { OrderStatus } from '@/lib/constants';
 import type { ImeiOrderStatus, ServerOrderStatus } from '@prisma/client';
 import { formatUSD, relativeTime } from '@/lib/format';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { EmptyState } from '@/components/ui/EmptyState';
+import {
+  buildTablePageHref,
+  parseTablePage,
+  tablePageCount,
+  USER_ORDERS_PAGE_SIZE,
+} from '@/lib/table-pagination';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,38 +28,41 @@ const STATUS_TABS: Array<{ key: string; label: string; statuses?: string[] }> = 
 export default async function UserOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; page?: string }>;
 }) {
   const session = await auth();
   const userId = session!.user.id;
-  const { status } = await searchParams;
-  const tab = STATUS_TABS.find((t) => t.key === status) ?? STATUS_TABS[0];
+  const params = await searchParams;
+  const tab = STATUS_TABS.find((t) => t.key === params.status) ?? STATUS_TABS[0];
+  const { page, pageSize, skip } = parseTablePage(params.page, USER_ORDERS_PAGE_SIZE);
+  const fetchLimit = skip + pageSize;
 
   const statusFilter = tab.statuses
     ? { status: { in: tab.statuses as ImeiOrderStatus[] } }
     : {};
+  const serverStatusFilter = tab.statuses
+    ? { status: { in: tab.statuses as ServerOrderStatus[] } }
+    : {};
 
-  const [imei, server] = await Promise.all([
+  const [imei, server, imeiCount, serverCount] = await Promise.all([
     prisma.imeiOrder.findMany({
       where: { userId, ...statusFilter },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: fetchLimit,
       include: { service: { select: { title: true } } },
     }),
     prisma.serverOrder.findMany({
-      where: {
-        userId,
-        ...(tab.statuses
-          ? { status: { in: tab.statuses as ServerOrderStatus[] } }
-          : {}),
-      },
+      where: { userId, ...serverStatusFilter },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: fetchLimit,
       include: { service: { select: { title: true } } },
     }),
+    prisma.imeiOrder.count({ where: { userId, ...statusFilter } }),
+    prisma.serverOrder.count({ where: { userId, ...serverStatusFilter } }),
   ]);
 
-  const all = [
+  const total = imeiCount + serverCount;
+  const merged = [
     ...imei.map((o) => ({
       id: o.id,
       type: 'imei' as const,
@@ -74,6 +84,9 @@ export default async function UserOrdersPage({
       when: o.createdAt,
     })),
   ].sort((a, b) => b.when.getTime() - a.when.getTime());
+
+  const all = merged.slice(skip, skip + pageSize);
+  const currentPage = Math.min(page, tablePageCount(total, pageSize));
 
   return (
     <div>
@@ -155,6 +168,19 @@ export default async function UserOrdersPage({
               ))}
             </tbody>
           </table>
+          <div className="border-t border-line bg-paper-50 px-4 py-3">
+            <ServerTablePagination
+              currentPage={currentPage}
+              totalItems={total}
+              pageSize={pageSize}
+              className="mt-0"
+              buildHref={(p) =>
+                buildTablePageHref('/user/orders', {
+                  status: tab.key !== 'all' ? tab.key : undefined,
+                }, p)
+              }
+            />
+          </div>
         </div>
       )}
     </div>

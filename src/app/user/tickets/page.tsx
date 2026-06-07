@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
+import { buildTablePageHref, DEFAULT_TABLE_PAGE_SIZE, parseTablePage } from '@/lib/table-pagination';
 import { Plus } from '@phosphor-icons/react/dist/ssr';
 
 export const dynamic = 'force-dynamic';
@@ -22,15 +24,24 @@ const PRIORITY_TONE: Record<string, string> = {
   urgent: 'text-red-700',
 };
 
-export default async function UserTicketsPage() {
+export default async function UserTicketsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect('/login?next=/user/tickets');
 
-  const tickets = await prisma.supportTicket.findMany({
-    where: { userId: session.user.id },
-    orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-    take: 100,
-    select: {
+  const params = await searchParams;
+  const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
+
+  const [tickets, total] = await Promise.all([
+    prisma.supportTicket.findMany({
+      where: { userId: session.user.id },
+      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+      skip,
+      take: pageSize,
+      select: {
       id: true,
       ticketCode: true,
       subject: true,
@@ -42,7 +53,9 @@ export default async function UserTicketsPage() {
       updatedAt: true,
       _count: { select: { replies: true } },
     },
-  });
+    }),
+    prisma.supportTicket.count({ where: { userId: session.user.id } }),
+  ]);
 
   return (
     <div className="max-w-5xl">
@@ -124,6 +137,13 @@ export default async function UserTicketsPage() {
           </tbody>
         </table>
       </div>
+
+      <ServerTablePagination
+        currentPage={page}
+        totalItems={total}
+        pageSize={pageSize}
+        buildHref={(p) => buildTablePageHref('/user/tickets', {}, p)}
+      />
     </div>
   );
 }

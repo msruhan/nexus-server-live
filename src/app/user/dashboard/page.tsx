@@ -57,7 +57,7 @@ export default async function UserDashboardPage() {
 
       {/* KPI cards */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <KpiCard label="Wallet balance" value={formatUSD(wallet?.balance ?? 0)} accent="primary" link="/user/wallet" />
+        <KpiCard label="Wallet balance" value={formatUSD(wallet?.balance ?? 0)} accent="primary" link="/user/wallet#topup" />
         <KpiCard label="Total orders" value={String(totalImei)} link="/user/orders" />
         <KpiCard label="In-flight" value={String(activeImei)} link="/user/orders?status=active" />
       </div>

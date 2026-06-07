@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Plus, Trash, ShieldCheck } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/Button';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 import type { PermissionKey } from '@/lib/sub-admin';
 
 type PermissionRecord = Record<string, unknown>;
@@ -36,6 +37,7 @@ export function SubAdminManager({
   const router = useRouter();
   const [subAdmins, setSubAdmins] = React.useState(initial);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(subAdmins, [subAdmins.length]);
   const [promoteUserId, setPromoteUserId] = React.useState('');
   const [promoting, setPromoting] = React.useState(false);
 
@@ -116,14 +118,14 @@ export function SubAdminManager({
             </tr>
           </thead>
           <tbody>
-            {subAdmins.length === 0 ? (
+            {pageRows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-12 text-center text-ink-muted">
                   No sub-admins yet. Promote a user above.
                 </td>
               </tr>
             ) : (
-              subAdmins.flatMap((u) => {
+              pageRows.flatMap((u) => {
                 const expanded = expandedId === u.id;
                 return [
                   <tr key={u.id} className="border-b border-line last:border-0">
@@ -169,6 +171,13 @@ export function SubAdminManager({
           </tbody>
         </table>
       </div>
+
+      <TablePagination
+        currentPage={currentPage}
+        pageCount={pageCount}
+        totalItems={subAdmins.length}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

@@ -19,18 +19,31 @@ export type DeactivateLicenseResult =
   | { ok: true; remote: false; warning: string }
   | { ok: false; error: string };
 
+export type UpdateDeployMode = 'docker' | 'zip';
+
 export type UpdateInfo = {
   available: boolean;
   currentVersion: string;
   latestVersion: string | null;
   changelog: string | null;
+  deployMode: UpdateDeployMode;
+  dockerImage: string | null;
   downloadSize: number | null; // bytes
   checksum: string | null;
   downloadUrl: string | null;
 };
 
 export type UpdateProgress = {
-  phase: 'idle' | 'downloading' | 'extracting' | 'installing' | 'migrating' | 'building' | 'restarting' | 'done' | 'failed';
+  phase:
+    | 'idle'
+    | 'downloading'
+    | 'extracting'
+    | 'installing'
+    | 'migrating'
+    | 'building'
+    | 'restarting'
+    | 'done'
+    | 'failed';
   percent: number; // 0-100
   message: string;
   error?: string;

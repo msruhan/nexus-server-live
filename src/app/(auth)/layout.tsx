@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { guardAgainstBlockedIp } from '@/lib/ip-block-guard';
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
+  await guardAgainstBlockedIp();
   return (
     <main className="relative grid min-h-screen grid-cols-1 lg:grid-cols-2">
       {/* Left side — form */}

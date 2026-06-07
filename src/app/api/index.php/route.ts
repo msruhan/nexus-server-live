@@ -18,6 +18,7 @@ import {
   recordFailure,
 } from '@/lib/api-key-security';
 import { requireRuntimeLicense } from '@/lib/license-guard';
+import { enforceGlobalApiWhitelist, isIpBlocked } from '@/lib/global-ip-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -500,6 +501,10 @@ export async function POST(req: Request) {
   const clientIp = getClientIp(req);
   const userAgent = req.headers.get('user-agent');
 
+  if (clientIp && (await isIpBlocked(clientIp))) {
+    return err('Your IP address is blocked from accessing this service.');
+  }
+
   const auth = await authClassic(username, apiaccesskey);
   if (!auth.ok) {
     return auth.response;
@@ -518,6 +523,19 @@ export async function POST(req: Request) {
   // skip every check below — preserving existing reseller behavior.
   const apiKey = auth.key!;
   if (apiKey) {
+    const globalWhitelist = await enforceGlobalApiWhitelist(clientIp);
+    if (!globalWhitelist.ok) {
+      void recordAttempt({
+        apiKeyId: auth.apiKeyId,
+        outcome: 'REJECTED_IP',
+        reason: globalWhitelist.reason,
+        ip: clientIp,
+        userAgent,
+        action,
+      });
+      return err(globalWhitelist.reason);
+    }
+
     const throttle = enforceThrottle(apiKey);
     if (!throttle.ok) {
       void recordAttempt({

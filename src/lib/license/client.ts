@@ -334,6 +334,8 @@ export async function checkForUpdate(): Promise<{ ok: true; info: UpdateInfo } |
     const latestVersion = data.latestVersion ?? data.version ?? null;
     const available = latestVersion ? latestVersion !== currentVersion : false;
 
+    const deployMode = data.deployMode === 'zip' ? 'zip' : 'docker';
+
     return {
       ok: true,
       info: {
@@ -341,6 +343,8 @@ export async function checkForUpdate(): Promise<{ ok: true; info: UpdateInfo } |
         currentVersion,
         latestVersion,
         changelog: data.changelog ?? null,
+        deployMode,
+        dockerImage: data.dockerImage ?? null,
         downloadSize: data.downloadSize ?? null,
         checksum: data.checksum ?? null,
         downloadUrl: data.downloadUrl ?? null,

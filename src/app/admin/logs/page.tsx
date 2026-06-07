@@ -1,15 +1,28 @@
 import { prisma } from '@/lib/db';
 import { formatDate } from '@/lib/format';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
+import { buildTablePageHref, DEFAULT_TABLE_PAGE_SIZE, parseTablePage } from '@/lib/table-pagination';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminLogsPage() {
-  const logs = await prisma.activityLog.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-    include: { user: { select: { name: true, email: true } } },
-  });
+export default async function AdminLogsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const params = await searchParams;
+  const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
+
+  const [logs, total] = await Promise.all([
+    prisma.activityLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: pageSize,
+      include: { user: { select: { name: true, email: true } } },
+    }),
+    prisma.activityLog.count(),
+  ]);
 
   return (
     <div>
@@ -20,7 +33,7 @@ export default async function AdminLogsPage() {
             Activity <span className="font-serif italic font-normal">log</span>.
           </>
         }
-        subtitle="Last 100 sensitive actions · who, when, what, against which entity."
+        subtitle="Sensitive actions · who, when, what, against which entity."
       />
 
       <div className="overflow-hidden rounded-xl border border-line bg-ink text-paper">
@@ -51,6 +64,13 @@ export default async function AdminLogsPage() {
           </tbody>
         </table>
       </div>
+
+      <ServerTablePagination
+        currentPage={page}
+        totalItems={total}
+        pageSize={pageSize}
+        buildHref={(p) => buildTablePageHref('/admin/logs', {}, p)}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ApiKeysManager } from '@/components/account/ApiKeysManager';
+import { UserApiIpWhitelistPanel } from '@/components/account/UserApiIpWhitelistPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,7 @@ export default function UserApiKeysPage() {
         }
         subtitle="Generate and manage API keys for external website integrations."
       />
+      <UserApiIpWhitelistPanel />
       <ApiKeysManager />
     </div>
   );

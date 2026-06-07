@@ -17,6 +17,7 @@ import {
   filterCatalogRows,
   type CatalogGroupOption,
 } from '@/components/admin/CatalogTableToolbar';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 
 type Row = {
   id: string;
@@ -48,6 +49,11 @@ export function ServerServicesTable({
     () => filterCatalogRows(rows, search, groupFilter, 'B'),
     [rows, search, groupFilter],
   );
+
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(filtered, [
+    search,
+    groupFilter,
+  ]);
 
   async function update(id: string, patch: Record<string, unknown>) {
     setBusy(id);
@@ -110,7 +116,7 @@ export function ServerServicesTable({
                 </td>
               </tr>
             )}
-            {filtered.map((r) => (
+            {pageRows.map((r) => (
               <tr key={r.id} className="border-b border-line last:border-0 hover:bg-paper-100">
                 <td className="px-4 py-3 font-mono text-xs">B.{r.ref}</td>
                 <td className="px-4 py-3">
@@ -160,6 +166,13 @@ export function ServerServicesTable({
           </tbody>
         </table>
       </div>
+
+      <TablePagination
+        currentPage={currentPage}
+        pageCount={pageCount}
+        totalItems={filtered.length}
+        onPageChange={setPage}
+      />
 
       {editing && (
         <EditServerServiceDialog

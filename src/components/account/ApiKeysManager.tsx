@@ -10,6 +10,7 @@ import {
   API_KEY_DISPLAY_MASK_LENGTH,
   ApiKeySecretDisplay,
 } from '@/components/account/ApiKeySecretDisplay';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 
 type ApiKeyRow = {
   id: string;
@@ -46,6 +47,7 @@ export function ApiKeysManager() {
   const [rows, setRows] = React.useState<ApiKeyRow[]>([]);
   const [newPlain, setNewPlain] = React.useState<string | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(rows, [rows.length]);
   const [downloadingDoc, setDownloadingDoc] = React.useState(false);
 
   async function load() {
@@ -250,14 +252,14 @@ export function ApiKeysManager() {
                   Loading API keys...
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : pageRows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-ink-muted">
                   No API keys yet.
                 </td>
               </tr>
             ) : (
-              rows.flatMap((r) => {
+              pageRows.flatMap((r) => {
                 const ipBadge = (() => {
                   if (!r.ipMode || r.ipMode === 'none') {
                     return (
@@ -372,6 +374,15 @@ export function ApiKeysManager() {
           </tbody>
         </table>
       </div>
+
+      {!loading && rows.length > 0 && (
+        <TablePagination
+          currentPage={currentPage}
+          pageCount={pageCount}
+          totalItems={rows.length}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   );
 }

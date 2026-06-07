@@ -8,6 +8,7 @@ import {
   dhruSupplierErrorTitle,
   formatDhruSupplierUserMessage,
 } from '@/lib/dhru-supplier-messages';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 
 type SyncedBase = {
   toolId: string;
@@ -232,7 +233,6 @@ function SyncServicesDialog({
   onConfirm: (ids: string[]) => void;
 }) {
   const [search, setSearch] = React.useState('');
-  const [page, setPage] = React.useState(1);
   const [selected, setSelected] = React.useState<Set<string>>(
     () => new Set(services.map((s) => s.toolId)),
   );
@@ -250,10 +250,11 @@ function SyncServicesDialog({
     });
   }, [services, search]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const start = (currentPage - 1) * pageSize;
-  const pageRows = filtered.slice(start, start + pageSize);
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(
+    filtered,
+    [search],
+    pageSize,
+  );
 
   const allIds = filtered.map((s) => s.toolId);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
@@ -393,27 +394,13 @@ function SyncServicesDialog({
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-mono text-ink-muted">
-            <button
-              type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-full border border-line px-2 py-1 disabled:opacity-50"
-            >
-              Prev
-            </button>
-            <span>
-              Page {currentPage} / {pageCount}
-            </span>
-            <button
-              type="button"
-              disabled={currentPage >= pageCount}
-              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-              className="rounded-full border border-line px-2 py-1 disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
+          <TablePagination
+            currentPage={currentPage}
+            pageCount={pageCount}
+            totalItems={filtered.length}
+            onPageChange={setPage}
+            className="mt-0"
+          />
           <div className="flex items-center gap-2">
             <button
               type="button"

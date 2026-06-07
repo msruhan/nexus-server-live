@@ -6,6 +6,7 @@ import { StatusPill } from '@/components/ui/StatusPill';
 import { UserToggle } from './UserToggle';
 import { UserGroupSelect, type UserGroupOption } from './UserGroupSelect';
 import { CatalogTableToolbar } from '@/components/admin/CatalogTableToolbar';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 
 type Row = {
   id: string;
@@ -50,6 +51,11 @@ export function UsersTable({
     ...groups.map((g) => ({ id: g.id, title: g.name })),
   ];
 
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(filtered, [
+    search,
+    groupFilter,
+  ]);
+
   return (
     <>
       <CatalogTableToolbar
@@ -84,7 +90,7 @@ export function UsersTable({
                 </td>
               </tr>
             )}
-            {filtered.map((u) => (
+            {pageRows.map((u) => (
               <tr key={u.id} className="border-b border-line last:border-0 hover:bg-paper-100">
                 <td className="px-4 py-3 font-medium">{u.name}</td>
                 <td className="px-4 py-3 font-mono text-xs text-ink-muted">{u.email}</td>
@@ -105,6 +111,13 @@ export function UsersTable({
           </tbody>
         </table>
       </div>
+
+      <TablePagination
+        currentPage={currentPage}
+        pageCount={pageCount}
+        totalItems={filtered.length}
+        onPageChange={setPage}
+      />
     </>
   );
 }

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RenewalCtas, showRenewalCtas } from '@/components/dashboard/RenewalCtas';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 
 type LicenseData = {
   status: 'active' | 'inactive' | 'not_activated';
@@ -36,6 +37,7 @@ type Props = {
 };
 
 export function SystemPanel({ initial }: Props) {
+  const historyPagination = useTablePagination(initial.updateHistory, [initial.updateHistory.length]);
   const [license, setLicense] = React.useState(initial.license);
   const [licenseKey, setLicenseKey] = React.useState('');
   const [activating, setActivating] = React.useState(false);
@@ -48,6 +50,8 @@ export function SystemPanel({ initial }: Props) {
     available: boolean;
     latestVersion: string | null;
     changelog: string | null;
+    deployMode: 'docker' | 'zip';
+    dockerImage: string | null;
     downloadUrl: string | null;
     checksum: string | null;
   } | null>(null);
@@ -145,6 +149,8 @@ export function SystemPanel({ initial }: Props) {
           available: data.available,
           latestVersion: data.latestVersion,
           changelog: data.changelog,
+          deployMode: data.deployMode === 'zip' ? 'zip' : 'docker',
+          dockerImage: data.dockerImage ?? null,
           downloadUrl: data.downloadUrl,
           checksum: data.checksum,
         });
@@ -158,15 +164,24 @@ export function SystemPanel({ initial }: Props) {
   };
 
   const handleApplyUpdate = async () => {
-    if (!updateInfo?.downloadUrl || !updateInfo.latestVersion) return;
+    if (!updateInfo?.latestVersion) return;
+    if (updateInfo.deployMode === 'zip' && !updateInfo.downloadUrl) return;
     setUpdating(true);
-    setProgress({ phase: 'downloading', percent: 5, message: 'Starting update...' });
+    setProgress({
+      phase: 'downloading',
+      percent: 5,
+      message:
+        updateInfo.deployMode === 'docker'
+          ? 'Starting remote Docker update…'
+          : 'Starting update...',
+    });
     try {
       const res = await fetch('/api/admin/system/update-apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           targetVersion: updateInfo.latestVersion,
+          deployMode: updateInfo.deployMode,
           downloadUrl: updateInfo.downloadUrl,
           checksum: updateInfo.checksum,
         }),
@@ -344,6 +359,9 @@ export function SystemPanel({ initial }: Props) {
                     {updateInfo.changelog && (
                       <p className="mt-1 text-xs text-ink-muted line-clamp-3">{updateInfo.changelog}</p>
                     )}
+                    {updateInfo.deployMode === 'docker' && updateInfo.dockerImage ? (
+                      <p className="mt-1 font-mono text-[10px] text-ink-muted">{updateInfo.dockerImage}</p>
+                    ) : null}
                   </div>
                   <button
                     onClick={handleApplyUpdate}
@@ -399,14 +417,14 @@ export function SystemPanel({ initial }: Props) {
               </tr>
             </thead>
             <tbody>
-              {initial.updateHistory.length === 0 ? (
+              {historyPagination.pageRows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-8 text-center text-ink-muted">
                     No update history yet.
                   </td>
                 </tr>
               ) : (
-                initial.updateHistory.map((entry) => (
+                historyPagination.pageRows.map((entry) => (
                   <tr key={entry.id} className="border-b border-line last:border-0">
                     <td className="px-3 py-2 font-mono text-[11px] text-ink-muted">
                       {new Date(entry.appliedAt).toLocaleString()}
@@ -434,6 +452,12 @@ export function SystemPanel({ initial }: Props) {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          currentPage={historyPagination.currentPage}
+          pageCount={historyPagination.pageCount}
+          totalItems={initial.updateHistory.length}
+          onPageChange={historyPagination.setPage}
+        />
       </section>
     </div>
   );

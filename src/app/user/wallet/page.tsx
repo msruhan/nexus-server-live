@@ -1,28 +1,36 @@
+import Link from 'next/link';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { formatUSD, formatDate, relativeTime } from '@/lib/format';
+import { listEnabledGateways } from '@/lib/payment/registry';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
 import { StatusPill } from '@/components/ui/StatusPill';
-import { TopupForm } from './TopupForm';
+import { buildTablePageHref, DEFAULT_TABLE_PAGE_SIZE, parseTablePage } from '@/lib/table-pagination';
+import { OnlineTopupForm } from './topup-online/OnlineTopupForm';
 
 export const dynamic = 'force-dynamic';
 
-export default async function WalletPage() {
+export default async function WalletPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const session = await auth();
   const userId = session!.user.id;
+  const params = await searchParams;
+  const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
 
-  const [wallet, ledger, topups] = await Promise.all([
+  const [wallet, ledger, ledgerTotal, gateways] = await Promise.all([
     prisma.wallet.findUnique({ where: { userId } }),
     prisma.walletLedger.findMany({
       where: { wallet: { userId } },
       orderBy: { createdAt: 'desc' },
-      take: 30,
+      skip,
+      take: pageSize,
     }),
-    prisma.topupRequest.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    }),
+    prisma.walletLedger.count({ where: { wallet: { userId } } }),
+    listEnabledGateways(),
   ]);
 
   return (
@@ -34,7 +42,7 @@ export default async function WalletPage() {
             Your <span className="font-serif italic font-normal">ledger</span>.
           </>
         }
-        subtitle="Every TOPUP, PAYMENT, REFUND — recorded immutably with timestamps."
+        subtitle="Top up via payment gateway · every TOPUP, PAYMENT, and REFUND is recorded in your ledger."
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -48,6 +56,14 @@ export default async function WalletPage() {
           <p className="mt-2 text-xs font-serif italic text-paper/80 sm:text-sm">
             Updated {wallet ? relativeTime(wallet.updatedAt) : 'never'}
           </p>
+          {gateways.length > 0 && (
+            <Link
+              href="#topup"
+              className="mt-4 inline-flex rounded-full bg-paper px-4 py-2 text-xs font-bold text-primary-700 hover:bg-paper/90"
+            >
+              Top up online →
+            </Link>
+          )}
         </div>
         <div className="rounded-2xl border border-line bg-paper-50 p-5 sm:col-span-1">
           <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
@@ -67,54 +83,22 @@ export default async function WalletPage() {
         </div>
       </div>
 
-      {/* Top-up form */}
-      <section className="mt-12 grid gap-8 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <h2 className="border-b border-ink/15 pb-3 font-display text-xl font-extrabold tracking-tight text-ink">
-            Request top-up
-          </h2>
-          <p className="mt-3 max-w-sm font-serif italic text-ink-muted">
-            Submit a top-up request. An admin will approve it and the balance will be credited to your wallet as a
-            TOPUP ledger entry.
+      <section id="topup" className="mt-12 scroll-mt-8">
+        <h2 className="border-b border-ink/15 pb-3 font-display text-xl font-extrabold tracking-tight text-ink">
+          Top up online
+        </h2>
+        <p className="mt-3 max-w-xl font-serif italic text-ink-muted">
+          Pay with USDT, PayPal, or card. Balance is credited automatically after payment is confirmed.
+        </p>
+        {gateways.length === 0 ? (
+          <p className="mt-6 rounded-2xl border border-dashed border-line bg-paper-50 px-6 py-10 font-serif italic text-ink-muted">
+            Online top-up is not available yet. Please contact support or check back later.
           </p>
-          <div className="mt-3">
-            <a
-              href="/user/wallet/topup-online"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-primary-700 underline-offset-4 hover:underline"
-            >
-              Or top up online (USDT / Card) →
-            </a>
+        ) : (
+          <div className="mt-6 max-w-3xl">
+            <OnlineTopupForm gateways={gateways} />
           </div>
-          <div className="mt-6">
-            <TopupForm />
-          </div>
-        </div>
-
-        {/* Pending top-ups */}
-        <div className="lg:col-span-7">
-          <h2 className="border-b border-ink/15 pb-3 font-display text-xl font-extrabold tracking-tight text-ink">
-            Top-up requests
-          </h2>
-          {topups.length === 0 ? (
-            <p className="mt-4 font-serif italic text-ink-muted">No top-up requests yet.</p>
-          ) : (
-            <div className="mt-4 divide-y divide-line">
-              {topups.map((t) => (
-                <div key={t.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <div className="font-display text-base font-bold tracking-tight text-ink">
-                      {formatUSD(t.amount)}
-                    </div>
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-ink-muted">
-                      {formatDate(t.createdAt)}
-                    </div>
-                  </div>
-                  <StatusPill status={t.status} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </section>
 
       {/* Ledger */}
@@ -154,6 +138,12 @@ export default async function WalletPage() {
             </table>
           </div>
         )}
+        <ServerTablePagination
+          currentPage={page}
+          totalItems={ledgerTotal}
+          pageSize={pageSize}
+          buildHref={(p) => buildTablePageHref('/user/wallet', {}, p)}
+        />
       </section>
     </div>
   );

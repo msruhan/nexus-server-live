@@ -3,9 +3,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { prisma } from '@/lib/db';
 import { hasPermission } from '@/lib/sub-admin';
 import { applyUpdate, isUpdateInProgress } from '@/lib/license/updater';
+import { applyDockerUpdate, getDeployMode, isDockerUpdateInProgress } from '@/lib/license/docker-updater';
 import { requireUpdatesLicense } from '@/lib/license-guard';
 
 async function requireAccess() {
@@ -24,29 +24,47 @@ export async function POST(req: NextRequest) {
   const session = await requireAccess();
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  if (isUpdateInProgress()) {
-    return NextResponse.json({ error: 'An update is already in progress' }, { status: 409 });
-  }
-
   const body = await req.json();
-  const { targetVersion, downloadUrl, checksum } = body;
+  const { targetVersion, downloadUrl, checksum, deployMode } = body;
 
-  if (!targetVersion || !downloadUrl) {
-    return NextResponse.json({ error: 'targetVersion and downloadUrl required' }, { status: 400 });
+  if (!targetVersion) {
+    return NextResponse.json({ error: 'targetVersion required' }, { status: 400 });
   }
 
   const updatesDenied = await requireUpdatesLicense();
   if (updatesDenied) return updatesDenied;
 
-  const settings = await prisma.siteSettings.findUnique({
-    where: { id: 'singleton' },
-    select: { licenseKey: true, licenseStatus: true, licenseDomain: true },
-  });
+  const mode = deployMode === 'zip' ? 'zip' : getDeployMode();
+
+  if (mode === 'docker') {
+    if (isDockerUpdateInProgress()) {
+      return NextResponse.json({ error: 'An update is already in progress' }, { status: 409 });
+    }
+    const result = await applyDockerUpdate(targetVersion);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, message: 'Docker update started', deployMode: 'docker' });
+  }
+
+  if (isUpdateInProgress()) {
+    return NextResponse.json({ error: 'An update is already in progress' }, { status: 409 });
+  }
+
+  if (!downloadUrl) {
+    return NextResponse.json({ error: 'downloadUrl required for ZIP updates' }, { status: 400 });
+  }
+
+  const settings = await import('@/lib/db').then((m) =>
+    m.prisma.siteSettings.findUnique({
+      where: { id: 'singleton' },
+      select: { licenseKey: true, licenseDomain: true },
+    }),
+  );
   if (!settings?.licenseKey) {
     return NextResponse.json({ error: 'License required to apply updates' }, { status: 403 });
   }
 
-  // Fire-and-forget — the update runs in background
   void applyUpdate({
     downloadUrl,
     targetVersion,
@@ -55,5 +73,5 @@ export async function POST(req: NextRequest) {
     licenseDomain: settings.licenseDomain,
   });
 
-  return NextResponse.json({ ok: true, message: 'Update started' });
+  return NextResponse.json({ ok: true, message: 'Update started', deployMode: 'zip' });
 }

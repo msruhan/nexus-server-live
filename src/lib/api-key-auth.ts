@@ -11,6 +11,7 @@ import {
   recordAttempt,
   recordFailure,
 } from '@/lib/api-key-security';
+import { enforceGlobalApiWhitelist, isIpBlocked } from '@/lib/global-ip-policy';
 
 const API_KEY_PREFIX = 'nx_live_';
 const API_KEY_BYTES = 24;
@@ -67,6 +68,14 @@ export async function requireApiKeyAuth(
       error: Response;
     }
 > {
+  const clientIp = getClientIp(req);
+  if (await isIpBlocked(clientIp)) {
+    return {
+      ok: false,
+      error: apiError('Your IP address is blocked from accessing this service.', 403),
+    };
+  }
+
   const incoming = getIncomingApiKey(req);
   if (!incoming) {
     return { ok: false, error: apiError('Missing API key', 401) };
@@ -123,8 +132,19 @@ export async function requireApiKeyAuth(
   // ─── Security policy (opt-in) ──────────────────────────────
   // All checks degrade gracefully: keys with default/null settings
   // skip these checks entirely, so legacy behavior is preserved.
-  const clientIp = getClientIp(req);
   const userAgent = req.headers.get('user-agent');
+
+  const globalWhitelist = await enforceGlobalApiWhitelist(clientIp);
+  if (!globalWhitelist.ok) {
+    void recordAttempt({
+      apiKeyId: key.id,
+      outcome: 'REJECTED_IP',
+      reason: globalWhitelist.reason,
+      ip: clientIp,
+      userAgent,
+    });
+    return { ok: false, error: apiError(globalWhitelist.reason, 403) };
+  }
 
   const throttle = enforceThrottle(key);
   if (!throttle.ok) {

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Plus, Trash, PencilSimple, ArrowRight } from '@phosphor-icons/react';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 import { formatPriceGroupRule, type PriceGroupAdjustmentType } from '@/lib/price-group';
 
 type Group = {
@@ -30,6 +31,7 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
   const [adjustmentType, setAdjustmentType] = React.useState<PriceGroupAdjustmentType>('PERCENT');
   const [discountPercent, setDiscountPercent] = React.useState('10');
   const [fixedAdjustment, setFixedAdjustment] = React.useState('-5');
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(groups, [groups.length]);
 
   React.useEffect(() => setGroups(initial), [initial]);
 
@@ -184,14 +186,14 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
             </tr>
           </thead>
           <tbody>
-            {groups.length === 0 ? (
+            {pageRows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-ink-muted">
                   No user groups yet.
                 </td>
               </tr>
             ) : (
-              groups.map((g) => (
+              pageRows.map((g) => (
                 <tr key={g.id} className="border-b border-line last:border-0">
                   <td className="px-4 py-3">
                     <div className="font-semibold">{g.name}</div>
@@ -245,6 +247,13 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
           </tbody>
         </table>
       </div>
+
+      <TablePagination
+        currentPage={currentPage}
+        pageCount={pageCount}
+        totalItems={groups.length}
+        onPageChange={setPage}
+      />
 
       {editing && (
         <EditGroupDialog

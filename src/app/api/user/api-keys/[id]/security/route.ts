@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { apiError, apiSuccess, requireApiAuth } from '@/lib/api-auth';
 import { logActivity } from '@/lib/activity';
 import { normalizeIp } from '@/lib/ip-utils';
+import { USER_API_IP_WHITELIST_LIMIT } from '@/lib/global-ip-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,15 @@ const ipListSchema = z
       .map((s) => s.trim())
       .filter(Boolean);
     if (list.length === 0) return null;
+    if (list.length > USER_API_IP_WHITELIST_LIMIT) {
+      throw new z.ZodError([
+        {
+          code: z.ZodIssueCode.custom,
+          path: ['allowedIps'],
+          message: `Per-key allowlist supports at most ${USER_API_IP_WHITELIST_LIMIT} IP. Clear the current entry before changing it.`,
+        },
+      ]);
+    }
     // Light validation: each entry must be IP, IP/CIDR, or plain IPv6.
     for (const entry of list) {
       const [base, bits] = entry.includes('/') ? entry.split('/') : [entry, undefined];

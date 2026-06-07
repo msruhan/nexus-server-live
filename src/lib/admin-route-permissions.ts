@@ -28,6 +28,7 @@ const ROUTE_PERMISSIONS: Array<{ prefix: string; perm: PermissionKey }> = [
   { prefix: '/admin/tickets', perm: 'viewTickets' },
   { prefix: '/admin/logs', perm: 'viewActivityLog' },
   { prefix: '/admin/api-keys', perm: 'manageApiKeys' },
+  { prefix: '/admin/ip-management', perm: 'manageApiKeys' },
   { prefix: '/admin/email', perm: 'manageEmailSettings' },
   { prefix: '/admin/telegram', perm: 'manageTelegram' },
   { prefix: '/admin/system', perm: 'manageSystem' },

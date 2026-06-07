@@ -54,6 +54,7 @@ model User {
   subAdminPermissions SubAdminPermission?
   invoices       Invoice[]
   webhookEndpoints WebhookEndpoint[]
+  apiIpWhitelist   IpWhitelistEntry?
 
   @@index([priceGroupId])
 }
@@ -564,6 +565,9 @@ model SiteSettings {
   paymentStripePublishableKey String?
   paymentStripeWebhookSecret String? @db.Text
 
+  /// When true, API key requests must come from an IP in IpWhitelistEntry.
+  apiIpWhitelistEnforced   Boolean @default(false)
+
   // USD per 1 USDT — used by USDT Portal to convert the user's USD
   // wallet amount to USDT for the hosted checkout.
   // Example: 1.00 means 1 USD = 1 USDT (1:1 peg).
@@ -1010,6 +1014,35 @@ model UpdateLog {
   durationSeconds Int?
 
   @@index([appliedAt])
+}
+
+// ─── Global IP policy (admin-managed) ───────────────────────────
+// Block: site-wide deny (web + API). Whitelist: required for external API sync.
+model IpBlockEntry {
+  id        String   @id @default(cuid())
+  ip        String   @unique // IPv4, IPv6, or CIDR e.g. 203.0.113.0/24
+  label     String?
+  note      String?  @db.Text
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+model IpWhitelistEntry {
+  id        String   @id @default(cuid())
+  ip        String   @unique
+  label     String?
+  note      String?  @db.Text
+  createdBy String?
+  // Set when a reseller registers their server IP (max one per user).
+  userId    String?  @unique
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
 }
 
 // ─── Invoices / Receipts ────────────────────────────────────────

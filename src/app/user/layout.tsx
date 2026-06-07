@@ -7,8 +7,11 @@ import { MobileBar } from '@/components/dashboard/MobileBar';
 import { AccountThemeShell } from '@/components/appearance/AccountThemeShell';
 import { getBranding } from '@/lib/branding';
 import { getLicenseEnforcementState, shouldRedirectToLicenseSuspended } from '@/lib/license-state';
+import { guardAgainstBlockedIp } from '@/lib/ip-block-guard';
 
 export default async function UserLayout({ children }: { children: React.ReactNode }) {
+  await guardAgainstBlockedIp();
+
   const session = await auth();
   if (!session?.user) redirect('/login?next=/user/dashboard');
   // ADMIN and SUB_ADMIN belong in the admin panel, not the member desk.

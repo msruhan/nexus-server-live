@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowUpRight } from '@phosphor-icons/react/dist/ssr'
 import { formatUSD } from '@/lib/format'
 import { CatalogTableToolbar } from '@/components/admin/CatalogTableToolbar'
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination'
 
 export type PublicServiceRow = {
   id: string
@@ -27,7 +28,6 @@ export function PublicServicesTable({
 }) {
   const [q, setQ] = React.useState('')
   const [groupFilter, setGroupFilter] = React.useState('')
-  const [page, setPage] = React.useState(1)
 
   const groups = React.useMemo(() => {
     const map = new Map<string, string>()
@@ -50,14 +50,7 @@ export function PublicServicesTable({
     })
   }, [rows, q, groupFilter])
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const currentPage = Math.min(page, pageCount)
-  const start = (currentPage - 1) * pageSize
-  const pageRows = filtered.slice(start, start + pageSize)
-
-  React.useEffect(() => {
-    setPage(1)
-  }, [q, groupFilter])
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(filtered, [q, groupFilter], pageSize)
 
   return (
     <div className="mt-10">
@@ -117,29 +110,12 @@ export function PublicServicesTable({
         </table>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
-          Page {currentPage} / {pageCount}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={currentPage <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="rounded-full border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-ink hover:border-ink disabled:opacity-50"
-          >
-            Prev
-          </button>
-          <button
-            type="button"
-            disabled={currentPage >= pageCount}
-            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-            className="rounded-full border border-line bg-paper px-3 py-1.5 text-[11px] font-bold text-ink hover:border-ink disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      <TablePagination
+        currentPage={currentPage}
+        pageCount={pageCount}
+        totalItems={filtered.length}
+        onPageChange={setPage}
+      />
     </div>
   )
 }

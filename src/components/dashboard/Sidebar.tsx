@@ -45,6 +45,7 @@ import {
   Broadcast,
   Archive,
   Rows,
+  Shield,
 } from '@phosphor-icons/react/dist/ssr';
 import { cn } from '@/lib/cn';
 import { formatAppVersion } from '@/lib/app-version';
@@ -131,9 +132,10 @@ const adminSections: Section[] = [
       { href: '/admin/tickets', label: 'Support tickets', icon: ChatCircleDots, perm: 'viewTickets' },
       { href: '/admin/logs', label: 'Activity log', icon: Scroll, perm: 'viewActivityLog' },
       { href: '/admin/api-keys', label: 'API keys', icon: Key, perm: 'manageApiKeys' },
+      { href: '/admin/ip-management', label: 'IP management', icon: Shield, perm: 'manageApiKeys' },
       { href: '/admin/email', label: 'Email / SMTP', icon: Envelope, perm: 'manageEmailSettings' },
       { href: '/admin/telegram', label: 'Telegram bot', icon: TelegramLogo, perm: 'manageTelegram' },
-      { href: '/admin/system', label: 'System & update', icon: ArrowsClockwise, perm: 'manageSystem' },
+      { href: '/admin/system', label: 'License & Update', icon: ArrowsClockwise, perm: 'manageSystem' },
       { href: '/admin/backup', label: 'Database backup', icon: Archive, perm: 'manageBackups' },
       { href: '/admin/download-tools', label: 'Download tools', icon: DownloadSimple, perm: 'editCms' },
       { href: '/admin/appearance', label: 'Palette & theme', icon: Palette },
@@ -180,7 +182,7 @@ function NavBadge({ count, active }: { count: number; active?: boolean }) {
 const licenseLockdownSections: Section[] = [
   {
     title: 'License',
-    items: [{ href: '/admin/system', label: 'System & update', icon: ArrowsClockwise }],
+    items: [{ href: '/admin/system', label: 'License & Update', icon: ArrowsClockwise }],
   },
 ];
 

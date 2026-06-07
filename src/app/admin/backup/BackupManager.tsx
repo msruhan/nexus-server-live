@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 import {
   Database,
   DownloadSimple,
@@ -74,6 +75,7 @@ export function BackupManager({ initial }: { initial: Initial }) {
   const router = useRouter();
   const [schedule, setSchedule] = React.useState<Schedule>(initial.schedule);
   const [backups, setBackups] = React.useState<Backup[]>(initial.backups);
+  const { pageRows, currentPage, pageCount, setPage } = useTablePagination(backups, [backups.length]);
   const [running, setRunning] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [emailingId, setEmailingId] = React.useState<string | null>(null);
@@ -542,14 +544,14 @@ export function BackupManager({ initial }: { initial: Initial }) {
               </tr>
             </thead>
             <tbody>
-              {backups.length === 0 ? (
+              {pageRows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-10 text-center text-ink-muted">
                     No backups yet. Create your first backup above.
                   </td>
                 </tr>
               ) : (
-                backups.map((b) => (
+                pageRows.map((b) => (
                   <tr key={b.id} className="border-b border-line last:border-0">
                     <td className="px-3 py-2.5 font-mono text-[11px] text-ink-muted">
                       {formatDateTime(b.startedAt)}
@@ -625,6 +627,12 @@ export function BackupManager({ initial }: { initial: Initial }) {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          currentPage={currentPage}
+          pageCount={pageCount}
+          totalItems={backups.length}
+          onPageChange={setPage}
+        />
         <p className="mt-3 font-serif text-xs italic text-ink-muted">
           Backups are stored on the server under the configured backup directory. Download important
           snapshots to off-site storage for disaster recovery.

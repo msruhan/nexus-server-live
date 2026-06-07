@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { PencilSimple, Plus, Trash, Star, Upload, Image as ImageIcon } from '@phosphor-icons/react';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 
 type ImeiGroup = {
   id: string;
@@ -170,6 +171,8 @@ export function GroupServicesManager({
   const router = useRouter();
   const [imeiGroups, setImeiGroups] = React.useState(initialImei);
   const [serverBoxes, setServerBoxes] = React.useState(initialServer);
+  const imeiPagination = useTablePagination(imeiGroups, [imeiGroups.length]);
+  const serverPagination = useTablePagination(serverBoxes, [serverBoxes.length]);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [editingImei, setEditingImei] = React.useState<ImeiGroup | null>(null);
   const [editingServer, setEditingServer] = React.useState<ServerBox | null>(null);
@@ -459,7 +462,7 @@ export function GroupServicesManager({
                 </tr>
               </thead>
               <tbody>
-                {imeiGroups.map((g) => (
+                {imeiPagination.pageRows.map((g) => (
                   <tr key={g.id} className="border-b border-line last:border-0 hover:bg-paper-100">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -514,6 +517,12 @@ export function GroupServicesManager({
               </tbody>
             </table>
           </div>
+          <TablePagination
+            currentPage={imeiPagination.currentPage}
+            pageCount={imeiPagination.pageCount}
+            totalItems={imeiGroups.length}
+            onPageChange={imeiPagination.setPage}
+          />
         </>
       ) : (
         <>
@@ -582,7 +591,7 @@ export function GroupServicesManager({
                 </tr>
               </thead>
               <tbody>
-                {serverBoxes.map((b) => (
+                {serverPagination.pageRows.map((b) => (
                   <tr key={b.id} className="border-b border-line last:border-0 hover:bg-paper-100">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -637,6 +646,12 @@ export function GroupServicesManager({
               </tbody>
             </table>
           </div>
+          <TablePagination
+            currentPage={serverPagination.currentPage}
+            pageCount={serverPagination.pageCount}
+            totalItems={serverBoxes.length}
+            onPageChange={serverPagination.setPage}
+          />
         </>
       )}
 

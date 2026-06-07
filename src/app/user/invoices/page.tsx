@@ -2,19 +2,31 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { formatUSD, formatDate } from '@/lib/format';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
+import { buildTablePageHref, DEFAULT_TABLE_PAGE_SIZE, parseTablePage } from '@/lib/table-pagination';
 import { DownloadSimple, Receipt } from '@phosphor-icons/react/dist/ssr';
 
 export const dynamic = 'force-dynamic';
 
-export default async function UserInvoicesPage() {
+export default async function UserInvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const session = await auth();
   const userId = session!.user.id;
+  const params = await searchParams;
+  const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
 
-  const invoices = await prisma.invoice.findMany({
-    where: { userId },
-    orderBy: { issuedAt: 'desc' },
-    take: 100,
-  });
+  const [invoices, total] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { userId },
+      orderBy: { issuedAt: 'desc' },
+      skip,
+      take: pageSize,
+    }),
+    prisma.invoice.count({ where: { userId } }),
+  ]);
 
   return (
     <div>
@@ -90,6 +102,15 @@ export default async function UserInvoicesPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {total > 0 && (
+        <ServerTablePagination
+          currentPage={page}
+          totalItems={total}
+          pageSize={pageSize}
+          buildHref={(p) => buildTablePageHref('/user/invoices', {}, p)}
+        />
       )}
     </div>
   );

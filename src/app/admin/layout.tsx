@@ -15,7 +15,11 @@ import {
   getLicenseEnforcementState,
   isLicenseRuntimeLocked,
 } from '@/lib/license-state';
+import { guardAgainstBlockedIp } from '@/lib/ip-block-guard';
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  await guardAgainstBlockedIp();
+
   const session = await auth();
   if (!session?.user) redirect('/login?next=/admin/dashboard');
   const role = session.user.role as string;

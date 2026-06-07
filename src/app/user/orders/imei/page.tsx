@@ -6,8 +6,10 @@ import { OrderStatus } from '@/lib/constants';
 import type { ImeiOrderStatus } from '@prisma/client';
 import { formatUSD, relativeTime } from '@/lib/format';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { buildTablePageHref, parseTablePage, USER_ORDERS_PAGE_SIZE } from '@/lib/table-pagination';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,22 +23,28 @@ const STATUS_TABS: Array<{ key: string; label: string; statuses?: ImeiOrderStatu
 export default async function UserImeiOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; page?: string }>;
 }) {
   const session = await auth();
   const userId = session!.user.id;
-  const { status } = await searchParams;
-  const tab = STATUS_TABS.find((t) => t.key === status) ?? STATUS_TABS[0];
+  const params = await searchParams;
+  const tab = STATUS_TABS.find((t) => t.key === params.status) ?? STATUS_TABS[0];
+  const { page, pageSize, skip } = parseTablePage(params.page, USER_ORDERS_PAGE_SIZE);
+  const where = {
+    userId,
+    ...(tab.statuses ? { status: { in: tab.statuses } } : {}),
+  };
 
-  const rows = await prisma.imeiOrder.findMany({
-    where: {
-      userId,
-      ...(tab.statuses ? { status: { in: tab.statuses } } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-    include: { service: { select: { title: true } } },
-  });
+  const [rows, total] = await Promise.all([
+    prisma.imeiOrder.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: pageSize,
+      include: { service: { select: { title: true } } },
+    }),
+    prisma.imeiOrder.count({ where }),
+  ]);
 
   return (
     <div>
@@ -112,6 +120,19 @@ export default async function UserImeiOrdersPage({
               ))}
             </tbody>
           </table>
+          <div className="border-t border-line bg-paper-50 px-4 py-3">
+            <ServerTablePagination
+              currentPage={page}
+              totalItems={total}
+              pageSize={pageSize}
+              className="mt-0"
+              buildHref={(p) =>
+                buildTablePageHref('/user/orders/imei', {
+                  status: tab.key !== 'all' ? tab.key : undefined,
+                }, p)
+              }
+            />
+          </div>
         </div>
       )}
     </div>

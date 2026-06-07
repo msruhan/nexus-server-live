@@ -1,12 +1,21 @@
 import { prisma } from '@/lib/db';
 import { ALL_EMAIL_EVENTS } from '@/lib/email/types';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
+import { buildTablePageHref, DEFAULT_TABLE_PAGE_SIZE, parseTablePage } from '@/lib/table-pagination';
 import { EmailSettingsForm } from './EmailSettingsForm';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminEmailPage() {
-  const [settings, recentLogs] = await Promise.all([
+export default async function AdminEmailPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const params = await searchParams;
+  const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
+
+  const [settings, recentLogs, totalLogs] = await Promise.all([
     prisma.siteSettings.findUnique({
       where: { id: 'singleton' },
       select: {
@@ -22,7 +31,8 @@ export default async function AdminEmailPage() {
     }),
     prisma.emailLog.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 25,
+      skip,
+      take: pageSize,
       select: {
         id: true,
         toAddress: true,
@@ -35,6 +45,7 @@ export default async function AdminEmailPage() {
         createdAt: true,
       },
     }),
+    prisma.emailLog.count(),
   ]);
 
   return (
@@ -113,6 +124,13 @@ export default async function AdminEmailPage() {
           </tbody>
         </table>
       </div>
+
+      <ServerTablePagination
+        currentPage={page}
+        totalItems={totalLogs}
+        pageSize={pageSize}
+        buildHref={(p) => buildTablePageHref('/admin/email', {}, p)}
+      />
     </div>
   );
 }

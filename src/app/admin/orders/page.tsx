@@ -4,7 +4,14 @@ import { prisma } from '@/lib/db';
 import { OrderStatus } from '@/lib/constants';
 import { formatUSD, relativeTime } from '@/lib/format';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
 import { StatusPill } from '@/components/ui/StatusPill';
+import {
+  buildTablePageHref,
+  DEFAULT_TABLE_PAGE_SIZE,
+  parseTablePage,
+  tablePageCount,
+} from '@/lib/table-pagination';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,12 +28,11 @@ const SOURCE_TABS = [
   { key: 'server', label: 'Order Server' },
 ] as const;
 
-function buildOrdersHref(source: string, status: string) {
-  const params = new URLSearchParams();
-  if (source !== 'all') params.set('kind', source);
-  if (status !== 'all') params.set('status', status);
-  const query = params.toString();
-  return query ? `/admin/orders?${query}` : '/admin/orders';
+function buildOrdersHref(source: string, status: string, page?: number) {
+  return buildTablePageHref('/admin/orders', {
+    kind: source !== 'all' ? source : undefined,
+    status: status !== 'all' ? status : undefined,
+  }, page ?? 1);
 }
 
 function extractServerDeviceValue(requiredFieldsJson: string | null): { serialNumber: string | null; imei: string | null } {
@@ -55,20 +61,24 @@ function extractServerDeviceValue(requiredFieldsJson: string | null): { serialNu
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; kind?: string }>;
+  searchParams: Promise<{ status?: string; kind?: string; page?: string }>;
 }) {
-  const { status, kind } = await searchParams;
+  const params = await searchParams;
+  const { status, kind } = params;
   const tab = TABS.find((t) => t.key === status) ?? TABS[0];
   const sourceTab = SOURCE_TABS.find((t) => t.key === kind) ?? SOURCE_TABS[0];
   const where = tab.filter ? { status: tab.filter } : {};
+  const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
+  const fetchLimit = skip + pageSize;
 
-  const [imei, server] = await Promise.all([
+  const [imei, server, imeiCount, serverCount] = await Promise.all([
     sourceTab.key === 'server'
       ? Promise.resolve([])
       : prisma.imeiOrder.findMany({
           where,
           orderBy: { createdAt: 'desc' },
-          take: 50,
+          take: sourceTab.key === 'all' ? fetchLimit : pageSize,
+          skip: sourceTab.key === 'all' ? 0 : skip,
           include: { service: true, user: true },
         }),
     sourceTab.key === 'imei'
@@ -76,12 +86,22 @@ export default async function AdminOrdersPage({
       : prisma.serverOrder.findMany({
           where,
           orderBy: { createdAt: 'desc' },
-          take: 50,
+          take: sourceTab.key === 'all' ? fetchLimit : pageSize,
+          skip: sourceTab.key === 'all' ? 0 : skip,
           include: { service: true, user: true },
         }),
+    sourceTab.key === 'server' ? Promise.resolve(0) : prisma.imeiOrder.count({ where }),
+    sourceTab.key === 'imei' ? Promise.resolve(0) : prisma.serverOrder.count({ where }),
   ]);
 
-  const all = [
+  const total =
+    sourceTab.key === 'imei'
+      ? imeiCount
+      : sourceTab.key === 'server'
+        ? serverCount
+        : imeiCount + serverCount;
+
+  const merged = [
     ...imei.map((o) => ({
       id: o.id,
       type: 'imei' as const,
@@ -109,6 +129,10 @@ export default async function AdminOrdersPage({
     })),
   ].sort((a, b) => b.when.getTime() - a.when.getTime());
 
+  const all =
+    sourceTab.key === 'all' ? merged.slice(skip, skip + pageSize) : merged;
+  const currentPage = Math.min(page, tablePageCount(total, pageSize));
+
   return (
     <div>
       <PageHeader
@@ -118,7 +142,7 @@ export default async function AdminOrdersPage({
             All <span className="font-serif italic font-normal">dockets</span>.
           </>
         }
-        subtitle="Live view across both registers · {all.length} entries shown."
+        subtitle={`Live view across both registers · ${total} total entries.`}
       />
 
       <div className="mb-3 flex flex-wrap gap-1 rounded-full border border-line bg-paper-50 p-1 text-sm">
@@ -204,6 +228,13 @@ export default async function AdminOrdersPage({
           </tbody>
         </table>
       </div>
+
+      <ServerTablePagination
+        currentPage={currentPage}
+        totalItems={total}
+        pageSize={pageSize}
+        buildHref={(p) => buildOrdersHref(sourceTab.key, tab.key, p)}
+      />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
+import { buildTablePageHref, DEFAULT_TABLE_PAGE_SIZE, parseTablePage } from '@/lib/table-pagination';
 import { TicketRowActions } from './TicketRowActions';
 
 export const dynamic = 'force-dynamic';
@@ -16,9 +18,10 @@ const STATUS_TONE: Record<string, string> = {
 export default async function AdminTicketsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
   const params = await searchParams;
+  const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
   const where: Record<string, unknown> = {};
   if (params.status) where.status = params.status;
   if (params.q) {
@@ -29,16 +32,18 @@ export default async function AdminTicketsPage({
     ];
   }
 
-  const [tickets, counts] = await Promise.all([
+  const [tickets, total, counts] = await Promise.all([
     prisma.supportTicket.findMany({
       where,
       orderBy: [{ status: 'asc' }, { lastReplyAt: 'desc' }, { updatedAt: 'desc' }],
-      take: 200,
+      skip,
+      take: pageSize,
       include: {
         user: { select: { name: true, email: true } },
         _count: { select: { replies: true } },
       },
     }),
+    prisma.supportTicket.count({ where }),
     prisma.supportTicket.groupBy({
       by: ['status'],
       _count: { _all: true },
@@ -146,6 +151,18 @@ export default async function AdminTicketsPage({
           </tbody>
         </table>
       </div>
+
+      <ServerTablePagination
+        currentPage={page}
+        totalItems={total}
+        pageSize={pageSize}
+        buildHref={(p) =>
+          buildTablePageHref('/admin/tickets', {
+            status: params.status,
+            q: params.q,
+          }, p)
+        }
+      />
     </div>
   );
 }

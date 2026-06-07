@@ -1,10 +1,19 @@
 import { prisma } from '@/lib/db';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
+import { buildTablePageHref, DEFAULT_TABLE_PAGE_SIZE, parseTablePage } from '@/lib/table-pagination';
 import { PaymentSettingsForm } from './PaymentSettingsForm';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminPaymentsPage() {
+export default async function AdminPaymentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const params = await searchParams;
+  const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
+
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
     select: {
@@ -20,11 +29,15 @@ export default async function AdminPaymentsPage() {
     },
   });
 
-  const recentIntents = await prisma.paymentIntent.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 25,
-    include: { user: { select: { email: true, name: true } } },
-  });
+  const [recentIntents, totalIntents] = await Promise.all([
+    prisma.paymentIntent.findMany({
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: pageSize,
+      include: { user: { select: { email: true, name: true } } },
+    }),
+    prisma.paymentIntent.count(),
+  ]);
 
   return (
     <div className="max-w-5xl">
@@ -107,6 +120,13 @@ export default async function AdminPaymentsPage() {
           </tbody>
         </table>
       </div>
+
+      <ServerTablePagination
+        currentPage={page}
+        totalItems={totalIntents}
+        pageSize={pageSize}
+        buildHref={(p) => buildTablePageHref('/admin/payments', {}, p)}
+      />
     </div>
   );
 }

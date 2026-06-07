@@ -14,6 +14,7 @@ import {
   ListBullets,
   X,
 } from '@phosphor-icons/react/dist/ssr';
+import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 
 type EventDef = { key: string; label: string; description: string };
 
@@ -196,6 +197,7 @@ function EndpointCard({
   const [busy, setBusy] = React.useState(false);
   const [showLog, setShowLog] = React.useState(false);
   const [deliveries, setDeliveries] = React.useState<Delivery[] | null>(null);
+  const deliveriesPagination = useTablePagination(deliveries ?? [], [deliveries?.length ?? 0]);
 
   const act = async (body: Record<string, unknown>) => {
     setBusy(true);
@@ -368,12 +370,12 @@ function EndpointCard({
                     <tr>
                       <td colSpan={6} className="px-3 py-6 text-center text-ink-muted">Loading…</td>
                     </tr>
-                  ) : deliveries.length === 0 ? (
+                  ) : deliveriesPagination.pageRows.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-3 py-6 text-center text-ink-muted">No deliveries yet.</td>
                     </tr>
                   ) : (
-                    deliveries.map((d) => (
+                    deliveriesPagination.pageRows.map((d) => (
                       <tr key={d.id} className="border-b border-line last:border-0">
                         <td className="px-3 py-2 font-mono text-[10px] text-ink-muted">
                           {new Date(d.createdAt).toLocaleString()}
@@ -408,6 +410,14 @@ function EndpointCard({
                 </tbody>
               </table>
             </div>
+            {deliveries && deliveries.length > 0 && (
+              <TablePagination
+                currentPage={deliveriesPagination.currentPage}
+                pageCount={deliveriesPagination.pageCount}
+                totalItems={deliveries.length}
+                onPageChange={deliveriesPagination.setPage}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
