@@ -153,18 +153,19 @@ function findLocalPgBinary(name: string, explicitEnv?: string): string | null {
   return null;
 }
 
+/** Hostnames typical for Docker Compose DB services (not reachable as TCP from the host). */
+const COMPOSE_DB_HOSTS = new Set(['postgres', 'db', 'database']);
+
 /**
- * If the DB host is local and Postgres is running in Docker, find the
- * container so we can exec pg_dump inside it (no host install needed).
+ * If Postgres runs in Docker, find the container so we can exec pg_dump/psql
+ * inside it (client version always matches the server image).
  * Honors BACKUP_DOCKER_CONTAINER when set.
  */
 function findDockerPostgres(conn: ParsedDbUrl): string | null {
-  // Only meaningful for a local DB.
   const localHosts = ['localhost', '127.0.0.1', '::1', 'host.docker.internal'];
-  if (!localHosts.includes(conn.host)) return null;
-
-  // Explicit container name wins.
-  const explicit = process.env.BACKUP_DOCKER_CONTAINER?.trim();
+  const explicitContainer = process.env.BACKUP_DOCKER_CONTAINER?.trim();
+  const composeServiceHost = COMPOSE_DB_HOSTS.has(conn.host);
+  if (!localHosts.includes(conn.host) && !composeServiceHost && !explicitContainer) return null;
 
   let dockerAvailable = false;
   try {
@@ -175,10 +176,10 @@ function findDockerPostgres(conn: ParsedDbUrl): string | null {
   }
   if (!dockerAvailable) return null;
 
-  if (explicit) {
+  if (explicitContainer) {
     // Validate container name: only alphanumeric, dash, underscore, dot.
     // Rejects any shell metacharacters that could enable command injection.
-    if (!/^[a-zA-Z0-9_.-]+$/.test(explicit)) {
+    if (!/^[a-zA-Z0-9_.-]+$/.test(explicitContainer)) {
       console.warn(
         '[backup] BACKUP_DOCKER_CONTAINER contains invalid characters — ignoring. ' +
           'Only letters, digits, hyphens, underscores, and dots are allowed.',
@@ -186,8 +187,8 @@ function findDockerPostgres(conn: ParsedDbUrl): string | null {
       return null;
     }
     try {
-      execSync(`docker inspect ${explicit}`, { stdio: 'ignore' });
-      return explicit;
+      execSync(`docker inspect ${explicitContainer}`, { stdio: 'ignore' });
+      return explicitContainer;
     } catch {
       return null;
     }
@@ -226,10 +227,11 @@ function findDockerPostgres(conn: ParsedDbUrl): string | null {
  * local binary nor a Docker postgres container is available.
  */
 function resolvePgDumpRunner(conn: ParsedDbUrl): PgRunner | null {
-  const bin = findLocalPgDump();
-  if (bin) return { mode: 'binary', bin };
+  // Prefer postgres container (matching pg_dump major) when docker CLI is available.
   const container = findDockerPostgres(conn);
   if (container) return { mode: 'docker', container, tool: 'pg_dump' };
+  const bin = findLocalPgDump();
+  if (bin) return { mode: 'binary', bin };
   return null;
 }
 
@@ -238,10 +240,10 @@ function resolvePgDumpRunner(conn: ParsedDbUrl): PgRunner | null {
  * binary nor a Docker postgres container is available.
  */
 function resolvePsqlRunner(conn: ParsedDbUrl): PgRunner | null {
-  const bin = findLocalPsql();
-  if (bin) return { mode: 'binary', bin };
   const container = findDockerPostgres(conn);
   if (container) return { mode: 'docker', container, tool: 'psql' };
+  const bin = findLocalPsql();
+  if (bin) return { mode: 'binary', bin };
   return null;
 }
 

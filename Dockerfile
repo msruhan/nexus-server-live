@@ -3,8 +3,16 @@
 # Run:   docker run -p 3000:3000 --env-file .env.production nexus-server
 
 FROM node:20-bookworm-slim AS base
+# Postgres 16 server in compose — client must be >= server major (Debian bookworm default is 15).
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates postgresql-client \
+  && apt-get install -y --no-install-recommends curl ca-certificates gnupg openssl \
+  && install -d /usr/share/postgresql-common/pgdg \
+  && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    | gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg \
+  && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+    > /etc/apt/sources.list.d/pgdg.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends postgresql-client-16 \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
