@@ -17,8 +17,24 @@ function writeProgress(progress: UpdateProgress) {
   }
 }
 
+function clearDockerUpdateState() {
+  dockerUpdateInProgress = false;
+  activeJobId = null;
+}
+
+/** Drop stale in-memory lock when progress file shows a terminal state. */
+function syncDockerUpdateInProgress(): boolean {
+  if (!dockerUpdateInProgress) return false;
+  const { phase } = getDockerUpdateProgress();
+  if (phase === 'failed' || phase === 'done' || phase === 'idle') {
+    clearDockerUpdateState();
+    return false;
+  }
+  return true;
+}
+
 export function isDockerUpdateInProgress(): boolean {
-  return dockerUpdateInProgress;
+  return syncDockerUpdateInProgress();
 }
 
 export function getDockerUpdateProgress(): UpdateProgress {
@@ -102,6 +118,7 @@ export async function applyDockerUpdate(targetVersion: string): Promise<{ ok: tr
     if (!res.ok || !data.ok) {
       const err = data.error ?? `Request failed (${res.status})`;
       writeProgress({ phase: 'failed', percent: 0, message: 'Update failed', error: err });
+      clearDockerUpdateState();
       return { ok: false, error: err };
     }
 
