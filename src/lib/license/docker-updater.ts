@@ -32,9 +32,35 @@ export function getDockerUpdateProgress(): UpdateProgress {
   }
 }
 
+function databaseHostFromEnv(): string | null {
+  const raw = process.env.DATABASE_URL?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw.replace(/^postgresql:/, 'http:')).hostname || null;
+  } catch {
+    return null;
+  }
+}
+
+/** True for Hermes / docker-compose stacks (DB service hostname `postgres`). */
+export function isComposeDockerDatabase(): boolean {
+  return databaseHostFromEnv() === 'postgres';
+}
+
 export function getDeployMode(): 'docker' | 'zip' {
   const mode = (process.env.NEXUS_DEPLOY_MODE ?? '').trim().toLowerCase();
-  return mode === 'docker' ? 'docker' : 'zip';
+  if (mode === 'docker') return 'docker';
+  if (mode === 'zip') return 'zip';
+  if (isComposeDockerDatabase()) return 'docker';
+  return 'zip';
+}
+
+/** Portal check hint wins when explicit; otherwise infer from env / DATABASE_URL. */
+export function resolveDeployMode(portalMode?: string | null): 'docker' | 'zip' {
+  const hint = (portalMode ?? '').trim().toLowerCase();
+  if (hint === 'docker') return 'docker';
+  if (hint === 'zip') return 'zip';
+  return getDeployMode();
 }
 
 function mapPortalPhase(phase: string): UpdateProgress['phase'] {

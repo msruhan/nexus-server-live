@@ -5,7 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { hasPermission } from '@/lib/sub-admin';
 import { applyUpdate, isUpdateInProgress } from '@/lib/license/updater';
-import { applyDockerUpdate, getDeployMode, isDockerUpdateInProgress } from '@/lib/license/docker-updater';
+import {
+  applyDockerUpdate,
+  isDockerUpdateInProgress,
+  resolveDeployMode,
+} from '@/lib/license/docker-updater';
 import { requireUpdatesLicense } from '@/lib/license-guard';
 
 async function requireAccess() {
@@ -34,7 +38,7 @@ export async function POST(req: NextRequest) {
   const updatesDenied = await requireUpdatesLicense();
   if (updatesDenied) return updatesDenied;
 
-  const mode = deployMode === 'zip' ? 'zip' : getDeployMode();
+  const mode = resolveDeployMode(deployMode);
 
   if (mode === 'docker') {
     if (isDockerUpdateInProgress()) {
