@@ -27,6 +27,10 @@ type UpdateHistoryEntry = {
   durationSeconds: number | null;
 };
 
+const UPDATE_WAIT_MESSAGE = 'Update in progress, please wait…';
+const UPDATE_SUCCESS_MESSAGE = 'Update completed successfully.';
+const UPDATE_FAILED_MESSAGE = 'Update failed. Please try again later.';
+
 type Props = {
   initial: {
     currentVersion: string;
@@ -49,9 +53,7 @@ export function SystemPanel({ initial }: Props) {
   const [updateInfo, setUpdateInfo] = React.useState<{
     available: boolean;
     latestVersion: string | null;
-    changelog: string | null;
     deployMode: 'docker' | 'zip';
-    dockerImage: string | null;
     downloadUrl: string | null;
     checksum: string | null;
   } | null>(null);
@@ -78,8 +80,8 @@ export function SystemPanel({ initial }: Props) {
         setProgress(data);
         if (data.phase === 'done' || data.phase === 'failed') {
           setUpdating(false);
-          if (data.phase === 'done') showMessage('success', data.message);
-          if (data.phase === 'failed') showMessage('error', data.error ?? 'Update failed');
+          if (data.phase === 'done') showMessage('success', UPDATE_SUCCESS_MESSAGE);
+          if (data.phase === 'failed') showMessage('error', UPDATE_FAILED_MESSAGE);
         }
       } catch { /* silent */ }
     }, 2000);
@@ -148,9 +150,7 @@ export function SystemPanel({ initial }: Props) {
         setUpdateInfo({
           available: data.available,
           latestVersion: data.latestVersion,
-          changelog: data.changelog,
           deployMode: data.deployMode === 'zip' ? 'zip' : 'docker',
-          dockerImage: data.dockerImage ?? null,
           downloadUrl: data.downloadUrl,
           checksum: data.checksum,
         });
@@ -167,14 +167,7 @@ export function SystemPanel({ initial }: Props) {
     if (!updateInfo?.latestVersion) return;
     if (updateInfo.deployMode === 'zip' && !updateInfo.downloadUrl) return;
     setUpdating(true);
-    setProgress({
-      phase: 'downloading',
-      percent: 5,
-      message:
-        updateInfo.deployMode === 'docker'
-          ? 'Starting remote Docker update…'
-          : 'Starting update...',
-    });
+    setProgress({ phase: 'downloading', percent: 0, message: UPDATE_WAIT_MESSAGE });
     try {
       const res = await fetch('/api/admin/system/update-apply', {
         method: 'POST',
@@ -189,7 +182,7 @@ export function SystemPanel({ initial }: Props) {
       const data = await res.json();
       if (!data.ok) {
         setUpdating(false);
-        showMessage('error', data.error ?? 'Failed to start update');
+        showMessage('error', UPDATE_FAILED_MESSAGE);
       }
     } catch {
       setUpdating(false);
@@ -356,12 +349,6 @@ export function SystemPanel({ initial }: Props) {
                     <div className="text-sm font-bold text-ink">
                       Update available: v{updateInfo.latestVersion}
                     </div>
-                    {updateInfo.changelog && (
-                      <p className="mt-1 text-xs text-ink-muted line-clamp-3">{updateInfo.changelog}</p>
-                    )}
-                    {updateInfo.deployMode === 'docker' && updateInfo.dockerImage ? (
-                      <p className="mt-1 font-mono text-[10px] text-ink-muted">{updateInfo.dockerImage}</p>
-                    ) : null}
                   </div>
                   <button
                     onClick={handleApplyUpdate}
@@ -374,28 +361,17 @@ export function SystemPanel({ initial }: Props) {
               </motion.div>
             )}
 
-            {/* Progress bar */}
-            {updating && progress && (
+            {/* Progress — generic message only (no vendor/registry details) */}
+            {updating && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="rounded-xl border border-line bg-paper p-5"
               >
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-ink">{progress.message}</span>
-                  <span className="font-mono text-ink-muted">{progress.percent}%</span>
+                <p className="text-xs font-medium text-ink">{UPDATE_WAIT_MESSAGE}</p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-paper-200">
+                  <div className="h-full w-2/5 animate-pulse rounded-full bg-primary-500" />
                 </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-paper-200">
-                  <motion.div
-                    className="h-full rounded-full bg-primary-500"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress.percent}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
-                {progress.error && (
-                  <p className="mt-2 text-xs text-red-600">{progress.error}</p>
-                )}
               </motion.div>
             )}
           </div>

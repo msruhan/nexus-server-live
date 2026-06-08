@@ -42,11 +42,17 @@ export async function POST(req: NextRequest) {
 
   if (mode === 'docker') {
     if (isDockerUpdateInProgress()) {
-      return NextResponse.json({ error: 'An update is already in progress' }, { status: 409 });
+      return NextResponse.json(
+        { error: 'An update is already in progress. Please wait.' },
+        { status: 409 },
+      );
     }
     const result = await applyDockerUpdate(targetVersion);
     if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Update failed. Please try again later.' },
+        { status: 400 },
+      );
     }
     return NextResponse.json({ ok: true, message: 'Docker update started', deployMode: 'docker' });
   }

@@ -24,5 +24,6 @@ export async function POST() {
 
   const result = await checkForUpdate();
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
-  return NextResponse.json({ ok: true, ...result.info });
+  const { changelog: _changelog, dockerImage: _dockerImage, ...publicInfo } = result.info;
+  return NextResponse.json({ ok: true, ...publicInfo });
 }
