@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { ArrowUpRight } from '@phosphor-icons/react/dist/ssr';
 import { prisma } from '@/lib/db';
-import { OrderStatus } from '@/lib/constants';
 import { formatUSD, relativeTime } from '@/lib/format';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
@@ -12,21 +11,18 @@ import {
   parseTablePage,
   tablePageCount,
 } from '@/lib/table-pagination';
+import {
+  extractServerDeviceValue,
+  ORDER_SOURCE_TABS,
+  ORDER_STATUS_TABS,
+  imeiOrderStatusWhere,
+  serverOrderStatusWhere,
+  resolveOrderSourceTab,
+  resolveOrderStatusTab,
+} from '@/lib/admin-orders-query';
+import { OrdersExportButton } from './OrdersExportButton';
 
 export const dynamic = 'force-dynamic';
-
-const TABS = [
-  { key: 'all', label: 'All', filter: undefined },
-  { key: 'active', label: 'In flight', filter: { in: [OrderStatus.PENDING, OrderStatus.IN_PROCESS] } },
-  { key: 'success', label: 'Success', filter: { equals: OrderStatus.SUCCESS } },
-  { key: 'refunded', label: 'Refunded', filter: { in: [OrderStatus.REJECTED, OrderStatus.CANCELLED] } },
-];
-
-const SOURCE_TABS = [
-  { key: 'all', label: 'All orders' },
-  { key: 'imei', label: 'Order IMEI' },
-  { key: 'server', label: 'Order Server' },
-] as const;
 
 function buildOrdersHref(source: string, status: string, page?: number) {
   return buildTablePageHref('/admin/orders', {
@@ -35,39 +31,17 @@ function buildOrdersHref(source: string, status: string, page?: number) {
   }, page ?? 1);
 }
 
-function extractServerDeviceValue(requiredFieldsJson: string | null): { serialNumber: string | null; imei: string | null } {
-  if (!requiredFieldsJson) return { serialNumber: null, imei: null };
-  try {
-    const parsed = JSON.parse(requiredFieldsJson) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { serialNumber: null, imei: null };
-    }
-    const values = parsed as Record<string, unknown>;
-    const getText = (key: string) => {
-      const value = values[key];
-      if (typeof value !== 'string') return null;
-      const trimmed = value.trim();
-      return trimmed || null;
-    };
-    return {
-      serialNumber: getText('sn') ?? getText('serial') ?? getText('serialnumber'),
-      imei: getText('imei'),
-    };
-  } catch {
-    return { serialNumber: null, imei: null };
-  }
-}
-
 export default async function AdminOrdersPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string; kind?: string; page?: string }>;
 }) {
   const params = await searchParams;
-  const { status, kind } = params;
-  const tab = TABS.find((t) => t.key === status) ?? TABS[0];
-  const sourceTab = SOURCE_TABS.find((t) => t.key === kind) ?? SOURCE_TABS[0];
-  const where = tab.filter ? { status: tab.filter } : {};
+  const tab = resolveOrderStatusTab(params.status);
+  const sourceTab = resolveOrderSourceTab(params.kind);
+  const imeiWhere = imeiOrderStatusWhere(tab.key);
+  const serverWhere = serverOrderStatusWhere(tab.key);
+  const include = { service: true, user: true } as const;
   const { page, pageSize, skip } = parseTablePage(params.page, DEFAULT_TABLE_PAGE_SIZE);
   const fetchLimit = skip + pageSize;
 
@@ -75,23 +49,23 @@ export default async function AdminOrdersPage({
     sourceTab.key === 'server'
       ? Promise.resolve([])
       : prisma.imeiOrder.findMany({
-          where,
+          where: imeiWhere,
           orderBy: { createdAt: 'desc' },
           take: sourceTab.key === 'all' ? fetchLimit : pageSize,
           skip: sourceTab.key === 'all' ? 0 : skip,
-          include: { service: true, user: true },
+          include,
         }),
     sourceTab.key === 'imei'
       ? Promise.resolve([])
       : prisma.serverOrder.findMany({
-          where,
+          where: serverWhere,
           orderBy: { createdAt: 'desc' },
           take: sourceTab.key === 'all' ? fetchLimit : pageSize,
           skip: sourceTab.key === 'all' ? 0 : skip,
-          include: { service: true, user: true },
+          include,
         }),
-    sourceTab.key === 'server' ? Promise.resolve(0) : prisma.imeiOrder.count({ where }),
-    sourceTab.key === 'imei' ? Promise.resolve(0) : prisma.serverOrder.count({ where }),
+    sourceTab.key === 'server' ? Promise.resolve(0) : prisma.imeiOrder.count({ where: imeiWhere }),
+    sourceTab.key === 'imei' ? Promise.resolve(0) : prisma.serverOrder.count({ where: serverWhere }),
   ]);
 
   const total =
@@ -143,10 +117,11 @@ export default async function AdminOrdersPage({
           </>
         }
         subtitle={`Live view across both registers · ${total} total entries.`}
+        actions={<OrdersExportButton kind={sourceTab.key} status={tab.key} />}
       />
 
       <div className="mb-3 flex flex-wrap gap-1 rounded-full border border-line bg-paper-50 p-1 text-sm">
-        {SOURCE_TABS.map((t) => {
+        {ORDER_SOURCE_TABS.map((t) => {
           const active = sourceTab.key === t.key;
           return (
             <Link
@@ -163,7 +138,7 @@ export default async function AdminOrdersPage({
       </div>
 
       <div className="mb-6 flex flex-wrap gap-1 rounded-full border border-line bg-paper-50 p-1 text-sm">
-        {TABS.map((t) => {
+        {ORDER_STATUS_TABS.map((t) => {
           const active = tab.key === t.key;
           return (
             <Link
