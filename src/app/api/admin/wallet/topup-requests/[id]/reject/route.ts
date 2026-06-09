@@ -11,6 +11,15 @@ export async function POST(
   if (error) return error;
   const { id } = await params;
 
+  const existing = await prisma.topupRequest.findUnique({
+    where: { id },
+    select: { id: true, status: true },
+  });
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (existing.status !== 'PENDING') {
+    return NextResponse.json({ error: 'Request already reviewed' }, { status: 400 });
+  }
+
   await prisma.topupRequest.update({
     where: { id },
     data: {
@@ -26,6 +35,10 @@ export async function POST(
     entity: 'TopupRequest',
     entityId: id,
   });
+
+  void import('@/lib/email/notify').then(({ notifyTopupRejected }) =>
+    notifyTopupRejected({ topupRequestId: id }),
+  );
 
   return NextResponse.json({ ok: true });
 }

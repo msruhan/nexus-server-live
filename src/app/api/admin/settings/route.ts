@@ -12,6 +12,7 @@ const schema = z.object({
   logoUrl: z.string().optional().nullable(),
   faviconUrl: z.string().optional().nullable(),
   supportEmail: z.string().optional().nullable(),
+  adminNotificationEmail: z.string().max(200).optional().nullable(),
   brandShowPoweredBy: z.boolean().optional(),
   brandInvoicePrefix: z.string().optional().nullable(),
   copyrightText: z.string().optional().nullable(),
@@ -34,10 +35,19 @@ export async function PUT(req: Request) {
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid' }, { status: 400 });
 
+  const data = { ...parsed.data };
+  if (typeof data.adminNotificationEmail === 'string') {
+    const trimmed = data.adminNotificationEmail.trim();
+    data.adminNotificationEmail = trimmed === '' ? null : trimmed;
+    if (data.adminNotificationEmail && !z.string().email().safeParse(data.adminNotificationEmail).success) {
+      return NextResponse.json({ error: 'Invalid admin notification email' }, { status: 400 });
+    }
+  }
+
   await prisma.siteSettings.upsert({
     where: { id: 'singleton' },
-    update: parsed.data,
-    create: { id: 'singleton', ...parsed.data },
+    update: data,
+    create: { id: 'singleton', ...data },
   });
 
   resetBrandingCache();

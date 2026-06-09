@@ -41,6 +41,12 @@ export async function POST(req: Request) {
     userName: session.user.name ?? session.user.email ?? 'Unknown',
     amount: parsed.data.amount,
   });
+  void import('@/lib/email/notify').then(({ notifyAdminNewTopup }) =>
+    notifyAdminNewTopup({
+      userName: session.user.name ?? session.user.email ?? 'Unknown',
+      amount: parsed.data.amount,
+    }),
+  );
 
   return NextResponse.json({ ok: true, id: tr.id });
 }

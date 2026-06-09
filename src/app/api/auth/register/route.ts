@@ -47,5 +47,9 @@ export async function POST(req: Request) {
 
   await logActivity({ userId: user.id, action: 'user.registered', entity: 'User', entityId: user.id });
 
+  void import('@/lib/email/notify').then(({ notifyRegistered }) =>
+    notifyRegistered({ userId: user.id, email: user.email, name: user.name ?? '' }),
+  );
+
   return NextResponse.json({ ok: true, id: user.id });
 }

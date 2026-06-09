@@ -525,6 +525,8 @@ model SiteSettings {
   // line is shown in the footer; a licensed reseller can turn it off.
   brandShowPoweredBy  Boolean  @default(true)
   supportEmail        String?
+  /// Inbox for admin alert emails (new orders, top-ups, tickets). Falls back to supportEmail.
+  adminNotificationEmail String?
   brandInvoicePrefix  String?  // e.g. "INV" → INV-2026-0001 on invoices
 
   enableDarkMode      Boolean  @default(true)

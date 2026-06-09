@@ -225,6 +225,16 @@ export async function POST(req: Request) {
       serviceName: service.title,
       price: order.price.toString(),
     })
+    void import('@/lib/email/notify').then(({ notifyOrderCreated, notifyAdminNewOrder }) => {
+      notifyOrderCreated({ kind: 'server', orderId: order.id })
+      notifyAdminNewOrder({
+        orderCode: order.orderCode,
+        userName: session.user.name ?? session.user.email ?? 'Unknown',
+        serviceName: service.title,
+        price: order.price.toString(),
+        kind: 'server',
+      })
+    })
 
     const refreshed = await prisma.serverOrder.findUnique({
       where: { id: order.id },

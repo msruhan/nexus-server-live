@@ -14,6 +14,13 @@ import {
   topupApprovedTemplate,
   paymentCreditedTemplate,
   passwordChangedTemplate,
+  welcomeTemplate,
+  orderCreatedTemplate,
+  ticketStatusTemplate,
+  topupRejectedTemplate,
+  adminNewOrderTemplate,
+  adminNewTopupTemplate,
+  adminNewTicketTemplate,
 } from './templates';
 import {
   notifyTelegramOrderStatus,
@@ -47,6 +54,24 @@ function fmtUsd(n: bigint | number | string): string {
     maximumFractionDigits: 2,
   }).format(v);
 }
+
+async function resolveAdminEmail(): Promise<string | null> {
+  const row = await prisma.siteSettings.findUnique({
+    where: { id: 'singleton' },
+    select: {
+      adminNotificationEmail: true,
+      supportEmail: true,
+      smtpFromAddress: true,
+    },
+  });
+  const admin = row?.adminNotificationEmail?.trim();
+  if (admin) return admin;
+  const support = row?.supportEmail?.trim();
+  if (support) return support;
+  const from = row?.smtpFromAddress?.trim();
+  return from || null;
+}
+
 
 export async function notifyTicketReply(input: {
   ticketId: string;
@@ -288,5 +313,264 @@ export async function notifyPasswordChanged(userId: string) {
     });
   } catch (e) {
     console.error('[notify] password.changed', e);
+  }
+}
+
+export async function notifyRegistered(input: { userId: string; email: string; name: string }) {
+  try {
+    const siteName = await loadSiteName();
+    const loginUrl = `${resolveBaseUrl()}/login`;
+    const { text, html } = welcomeTemplate({
+      siteName,
+      recipientName: input.name || 'there',
+      loginUrl,
+    });
+    await sendEmail({
+      to: input.email,
+      subject: `Welcome to ${siteName}`,
+      text,
+      html,
+      event: 'auth.registered',
+      refType: 'User',
+      refId: input.userId,
+    });
+  } catch (e) {
+    console.error('[notify] auth.registered', e);
+  }
+}
+
+export async function notifyOrderCreated(input: {
+  kind: 'imei' | 'server';
+  orderId: string;
+}) {
+  try {
+    if (input.kind === 'imei') {
+      const order = await prisma.imeiOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderCode: true,
+          price: true,
+          user: { select: { email: true, name: true } },
+          service: { select: { title: true } },
+        },
+      });
+      if (!order?.user?.email) return;
+      const siteName = await loadSiteName();
+      const url = `${resolveBaseUrl()}/user/orders`;
+      const { text, html } = orderCreatedTemplate({
+        siteName,
+        recipientName: order.user.name ?? 'there',
+        orderCode: order.orderCode,
+        serviceName: order.service?.title ?? '—',
+        amount: fmtUsd(order.price.toString()),
+        url,
+      });
+      await sendEmail({
+        to: order.user.email,
+        subject: `Order received — ${order.orderCode}`,
+        text,
+        html,
+        event: 'order.imei.created',
+        refType: 'ImeiOrder',
+        refId: order.id,
+      });
+    } else {
+      const order = await prisma.serverOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderCode: true,
+          price: true,
+          user: { select: { email: true, name: true } },
+          service: { select: { title: true } },
+        },
+      });
+      if (!order?.user?.email) return;
+      const siteName = await loadSiteName();
+      const url = `${resolveBaseUrl()}/user/orders`;
+      const { text, html } = orderCreatedTemplate({
+        siteName,
+        recipientName: order.user.name ?? 'there',
+        orderCode: order.orderCode,
+        serviceName: order.service?.title ?? '—',
+        amount: fmtUsd(order.price.toString()),
+        url,
+      });
+      await sendEmail({
+        to: order.user.email,
+        subject: `Order received — ${order.orderCode}`,
+        text,
+        html,
+        event: 'order.server.created',
+        refType: 'ServerOrder',
+        refId: order.id,
+      });
+    }
+  } catch (e) {
+    console.error('[notify] order.created', e);
+  }
+}
+
+export async function notifyTicketStatusChanged(input: {
+  ticketId: string;
+  previousStatus: string;
+  newStatus: string;
+}) {
+  try {
+    const ticket = await prisma.supportTicket.findUnique({
+      where: { id: input.ticketId },
+      select: {
+        id: true,
+        ticketCode: true,
+        subject: true,
+        user: { select: { email: true, name: true } },
+      },
+    });
+    if (!ticket?.user?.email) return;
+    const siteName = await loadSiteName();
+    const url = `${resolveBaseUrl()}/user/tickets/${ticket.id}`;
+    const { text, html } = ticketStatusTemplate({
+      siteName,
+      recipientName: ticket.user.name ?? 'there',
+      ticketCode: ticket.ticketCode,
+      subject: ticket.subject,
+      previousStatus: input.previousStatus,
+      newStatus: input.newStatus,
+      url,
+    });
+    await sendEmail({
+      to: ticket.user.email,
+      subject: `Ticket ${ticket.ticketCode} — status updated`,
+      text,
+      html,
+      event: 'ticket.status_changed',
+      refType: 'SupportTicket',
+      refId: ticket.id,
+    });
+  } catch (e) {
+    console.error('[notify] ticket.status_changed', e);
+  }
+}
+
+export async function notifyTopupRejected(input: { topupRequestId: string }) {
+  try {
+    const row = await prisma.topupRequest.findUnique({
+      where: { id: input.topupRequestId },
+      select: {
+        id: true,
+        amount: true,
+        user: { select: { email: true, name: true } },
+      },
+    });
+    if (!row?.user?.email) return;
+    const siteName = await loadSiteName();
+    const url = `${resolveBaseUrl()}/user/wallet`;
+    const { text, html } = topupRejectedTemplate({
+      siteName,
+      recipientName: row.user.name ?? 'there',
+      amount: fmtUsd(row.amount.toString()),
+      url,
+    });
+    await sendEmail({
+      to: row.user.email,
+      subject: `Top-up request not approved`,
+      text,
+      html,
+      event: 'wallet.topup_rejected',
+      refType: 'TopupRequest',
+      refId: row.id,
+    });
+  } catch (e) {
+    console.error('[notify] wallet.topup_rejected', e);
+  }
+}
+
+export async function notifyAdminNewOrder(input: {
+  orderCode: string;
+  userName: string;
+  serviceName: string;
+  price: string | number | bigint;
+  kind: 'imei' | 'server';
+}) {
+  try {
+    const to = await resolveAdminEmail();
+    if (!to) return;
+    const siteName = await loadSiteName();
+    const url = `${resolveBaseUrl()}/admin/orders`;
+    const { text, html } = adminNewOrderTemplate({
+      siteName,
+      orderCode: input.orderCode,
+      userName: input.userName,
+      serviceName: input.serviceName,
+      amount: fmtUsd(input.price),
+      url,
+    });
+    await sendEmail({
+      to,
+      subject: `New order — ${input.orderCode}`,
+      text,
+      html,
+      event: 'admin.order.new',
+    });
+  } catch (e) {
+    console.error('[notify] admin.order.new', e);
+  }
+}
+
+export async function notifyAdminNewTopup(input: {
+  userName: string;
+  amount: string | number | bigint;
+}) {
+  try {
+    const to = await resolveAdminEmail();
+    if (!to) return;
+    const siteName = await loadSiteName();
+    const url = `${resolveBaseUrl()}/admin/wallet`;
+    const { text, html } = adminNewTopupTemplate({
+      siteName,
+      userName: input.userName,
+      amount: fmtUsd(input.amount),
+      url,
+    });
+    await sendEmail({
+      to,
+      subject: 'New top-up request',
+      text,
+      html,
+      event: 'admin.topup.new',
+    });
+  } catch (e) {
+    console.error('[notify] admin.topup.new', e);
+  }
+}
+
+export async function notifyAdminNewTicket(input: {
+  ticketCode: string;
+  userName: string;
+  subject: string;
+  ticketId: string;
+}) {
+  try {
+    const to = await resolveAdminEmail();
+    if (!to) return;
+    const siteName = await loadSiteName();
+    const url = `${resolveBaseUrl()}/admin/tickets/${input.ticketId}`;
+    const { text, html } = adminNewTicketTemplate({
+      siteName,
+      ticketCode: input.ticketCode,
+      userName: input.userName,
+      subject: input.subject,
+      url,
+    });
+    await sendEmail({
+      to,
+      subject: `New ticket — ${input.ticketCode}`,
+      text,
+      html,
+      event: 'admin.ticket.new',
+    });
+  } catch (e) {
+    console.error('[notify] admin.ticket.new', e);
   }
 }

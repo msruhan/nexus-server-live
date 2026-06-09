@@ -111,6 +111,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       body: `Status changed to ${nextStatus} by admin.`,
       isSystem: true,
     });
+    void import('@/lib/email/notify').then(({ notifyTicketStatusChanged }) =>
+      notifyTicketStatusChanged({
+        ticketId: id,
+        previousStatus: ticket.status,
+        newStatus: nextStatus,
+      }),
+    );
   }
 
   await logActivity({

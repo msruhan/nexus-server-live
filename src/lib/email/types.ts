@@ -4,6 +4,8 @@
  * picker.
  */
 export type EmailEvent =
+  | 'auth.registered'
+  | 'auth.password_changed'
   | 'ticket.reply'
   | 'ticket.status_changed'
   | 'order.imei.created'
@@ -15,10 +17,14 @@ export type EmailEvent =
   | 'wallet.topup_approved'
   | 'wallet.topup_rejected'
   | 'payment.credited'
-  | 'auth.password_changed'
-  | 'backup.created';
+  | 'backup.created'
+  | 'admin.order.new'
+  | 'admin.topup.new'
+  | 'admin.ticket.new';
 
 export const ALL_EMAIL_EVENTS: EmailEvent[] = [
+  'auth.registered',
+  'auth.password_changed',
   'ticket.reply',
   'ticket.status_changed',
   'order.imei.created',
@@ -30,8 +36,61 @@ export const ALL_EMAIL_EVENTS: EmailEvent[] = [
   'wallet.topup_approved',
   'wallet.topup_rejected',
   'payment.credited',
-  'auth.password_changed',
   'backup.created',
+  'admin.order.new',
+  'admin.topup.new',
+  'admin.ticket.new',
+];
+
+export const EMAIL_EVENT_GROUPS: Array<{
+  title: string;
+  events: Array<{ key: EmailEvent; label: string }>;
+}> = [
+  {
+    title: 'Account',
+    events: [
+      { key: 'auth.registered', label: 'Welcome — new registration' },
+      { key: 'auth.password_changed', label: 'Password changed' },
+    ],
+  },
+  {
+    title: 'Support',
+    events: [
+      { key: 'ticket.reply', label: 'Ticket reply from staff' },
+      { key: 'ticket.status_changed', label: 'Ticket status updated' },
+    ],
+  },
+  {
+    title: 'Orders',
+    events: [
+      { key: 'order.imei.created', label: 'IMEI order placed' },
+      { key: 'order.imei.success', label: 'IMEI order completed' },
+      { key: 'order.imei.rejected', label: 'IMEI order rejected' },
+      { key: 'order.server.created', label: 'Server order placed' },
+      { key: 'order.server.success', label: 'Server order completed' },
+      { key: 'order.server.rejected', label: 'Server order rejected' },
+    ],
+  },
+  {
+    title: 'Wallet & payments',
+    events: [
+      { key: 'wallet.topup_approved', label: 'Top-up approved' },
+      { key: 'wallet.topup_rejected', label: 'Top-up rejected' },
+      { key: 'payment.credited', label: 'Payment credited' },
+    ],
+  },
+  {
+    title: 'System',
+    events: [{ key: 'backup.created', label: 'Database backup ready' }],
+  },
+  {
+    title: 'Admin alerts',
+    events: [
+      { key: 'admin.order.new', label: 'New order placed' },
+      { key: 'admin.topup.new', label: 'New top-up request' },
+      { key: 'admin.ticket.new', label: 'New support ticket' },
+    ],
+  },
 ];
 
 /** Mail attachment. Provide `path` (file on disk) or `content` (buffer/string). */

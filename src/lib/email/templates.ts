@@ -145,3 +145,169 @@ ${block(text)}`,
   );
   return { text, html };
 }
+
+export function welcomeTemplate(input: {
+  siteName: string;
+  recipientName: string;
+  loginUrl: string;
+}) {
+  const text = `Hi ${input.recipientName},
+
+Welcome to ${input.siteName}! Your account is ready.
+
+Sign in: ${input.loginUrl}`;
+  const html = shell(
+    input.siteName,
+    `<h2 style="margin:0 0 12px;font-size:18px">Welcome aboard</h2>
+<p style="margin:0 0 12px">Hi ${input.recipientName}, your account at <strong>${input.siteName}</strong> is ready.</p>
+<p><a href="${input.loginUrl}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">Sign in</a></p>`,
+    'You received this because you registered an account.',
+  );
+  return { text, html };
+}
+
+export function orderCreatedTemplate(input: {
+  siteName: string;
+  recipientName: string;
+  orderCode: string;
+  serviceName: string;
+  amount: string;
+  url: string;
+}) {
+  const text = `Hi ${input.recipientName},
+
+We received your order ${input.orderCode} for ${input.serviceName} (${input.amount}).
+
+Track your order: ${input.url}`;
+  const html = shell(
+    input.siteName,
+    `<h2 style="margin:0 0 12px;font-size:18px">Order received — ${input.orderCode}</h2>
+<p style="margin:0 0 12px">${input.serviceName}</p>
+<p style="margin:0 0 12px"><strong>${input.amount}</strong></p>
+<p><a href="${input.url}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">View order</a></p>`,
+  );
+  return { text, html };
+}
+
+export function ticketStatusTemplate(input: {
+  siteName: string;
+  recipientName: string;
+  ticketCode: string;
+  subject: string;
+  previousStatus: string;
+  newStatus: string;
+  url: string;
+}) {
+  const text = `Hi ${input.recipientName},
+
+Your ticket ${input.ticketCode} — ${input.subject} — was updated.
+
+Status: ${input.previousStatus} → ${input.newStatus}
+
+View ticket: ${input.url}`;
+  const html = shell(
+    input.siteName,
+    `<h2 style="margin:0 0 12px;font-size:18px">Ticket ${input.ticketCode} updated</h2>
+<p style="margin:0 0 12px">${input.subject}</p>
+<p style="margin:0 0 12px">Status: <strong>${input.previousStatus}</strong> → <strong>${input.newStatus}</strong></p>
+<p><a href="${input.url}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">View ticket</a></p>`,
+  );
+  return { text, html };
+}
+
+export function topupRejectedTemplate(input: {
+  siteName: string;
+  recipientName: string;
+  amount: string;
+  url: string;
+}) {
+  const text = `Hi ${input.recipientName},
+
+Your top-up request for ${input.amount} was not approved.
+
+If you have questions, please open a support ticket.
+
+Wallet: ${input.url}`;
+  const html = shell(
+    input.siteName,
+    `<h2 style="margin:0 0 12px;font-size:18px">Top-up not approved</h2>
+<p style="margin:0 0 12px">Your request for <strong>${input.amount}</strong> was not approved.</p>
+<p style="margin:0 0 12px">Contact support if you need help.</p>
+<p><a href="${input.url}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">View wallet</a></p>`,
+  );
+  return { text, html };
+}
+
+export function adminNewOrderTemplate(input: {
+  siteName: string;
+  orderCode: string;
+  userName: string;
+  serviceName: string;
+  amount: string;
+  url: string;
+}) {
+  const text = `New order ${input.orderCode}
+
+Customer: ${input.userName}
+Service: ${input.serviceName}
+Amount: ${input.amount}
+
+Open: ${input.url}`;
+  const html = shell(
+    input.siteName,
+    `<h2 style="margin:0 0 12px;font-size:18px">New order — ${input.orderCode}</h2>
+<p style="margin:0 0 8px"><strong>Customer:</strong> ${input.userName}</p>
+<p style="margin:0 0 8px"><strong>Service:</strong> ${input.serviceName}</p>
+<p style="margin:0 0 12px"><strong>Amount:</strong> ${input.amount}</p>
+<p><a href="${input.url}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">View in admin</a></p>`,
+    'Admin notification — new customer order.',
+  );
+  return { text, html };
+}
+
+export function adminNewTopupTemplate(input: {
+  siteName: string;
+  userName: string;
+  amount: string;
+  url: string;
+}) {
+  const text = `New top-up request
+
+Customer: ${input.userName}
+Amount: ${input.amount}
+
+Review: ${input.url}`;
+  const html = shell(
+    input.siteName,
+    `<h2 style="margin:0 0 12px;font-size:18px">New top-up request</h2>
+<p style="margin:0 0 8px"><strong>Customer:</strong> ${input.userName}</p>
+<p style="margin:0 0 12px"><strong>Amount:</strong> ${input.amount}</p>
+<p><a href="${input.url}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">Review request</a></p>`,
+    'Admin notification — wallet top-up pending approval.',
+  );
+  return { text, html };
+}
+
+export function adminNewTicketTemplate(input: {
+  siteName: string;
+  ticketCode: string;
+  userName: string;
+  subject: string;
+  url: string;
+}) {
+  const text = `New support ticket ${input.ticketCode}
+
+From: ${input.userName}
+Subject: ${input.subject}
+
+Open: ${input.url}`;
+  const html = shell(
+    input.siteName,
+    `<h2 style="margin:0 0 12px;font-size:18px">New ticket — ${input.ticketCode}</h2>
+<p style="margin:0 0 8px"><strong>From:</strong> ${input.userName}</p>
+<p style="margin:0 0 12px"><strong>Subject:</strong> ${input.subject}</p>
+<p><a href="${input.url}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">Open ticket</a></p>`,
+    'Admin notification — new support ticket.',
+  );
+  return { text, html };
+}

@@ -128,6 +128,14 @@ export async function POST(req: Request) {
     userName: session.user.name ?? session.user.email ?? 'Unknown',
     subject: parsed.data.subject,
   });
+  void import('@/lib/email/notify').then(({ notifyAdminNewTicket }) =>
+    notifyAdminNewTicket({
+      ticketCode: ticket.ticketCode,
+      userName: session.user.name ?? session.user.email ?? 'Unknown',
+      subject: parsed.data.subject,
+      ticketId: ticket.id,
+    }),
+  );
 
   return apiSuccess(
     {

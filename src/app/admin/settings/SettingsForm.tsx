@@ -13,6 +13,7 @@ type Initial = {
   logoUrl: string;
   faviconUrl: string;
   supportEmail: string;
+  adminNotificationEmail: string;
   brandShowPoweredBy: boolean;
   brandInvoicePrefix: string;
   copyrightText: string;
@@ -110,6 +111,17 @@ export function SettingsForm({ initial }: { initial: Initial }) {
             onChange={(e) => patch('supportEmail', e.target.value)}
             placeholder="support@yourbrand.com"
           />
+          <div className="sm:col-span-2">
+            <Input
+              label="Admin notification email"
+              value={state.adminNotificationEmail}
+              onChange={(e) => patch('adminNotificationEmail', e.target.value)}
+              placeholder="alerts@yourbrand.com"
+            />
+            <p className="mt-1 font-serif text-xs italic text-ink-muted">
+              Receives alerts for new orders, top-ups, and tickets. Leave empty to use Support email.
+            </p>
+          </div>
         </div>
       </Card>
 

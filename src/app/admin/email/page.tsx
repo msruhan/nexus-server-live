@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { ALL_EMAIL_EVENTS } from '@/lib/email/types';
+import { EMAIL_EVENT_GROUPS } from '@/lib/email/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ServerTablePagination } from '@/components/ui/ServerTablePagination';
 import { buildTablePageHref, DEFAULT_TABLE_PAGE_SIZE, parseTablePage } from '@/lib/table-pagination';
@@ -73,7 +73,7 @@ export default async function AdminEmailPage({
             .map((s) => s.trim())
             .filter(Boolean),
         }}
-        availableEvents={ALL_EMAIL_EVENTS}
+        eventGroups={EMAIL_EVENT_GROUPS}
       />
 
       <h2 className="mt-12 font-display text-xl font-extrabold tracking-tight">Recent emails</h2>

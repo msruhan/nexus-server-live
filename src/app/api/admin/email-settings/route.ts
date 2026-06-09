@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { apiError, apiSuccess, requireApiRole } from '@/lib/api-auth';
 import { resetTransporter, verifySmtp, sendEmail } from '@/lib/email/mailer';
-import { ALL_EMAIL_EVENTS } from '@/lib/email/types';
+import { ALL_EMAIL_EVENTS, EMAIL_EVENT_GROUPS } from '@/lib/email/types';
 import { logActivity } from '@/lib/activity';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +40,7 @@ export async function GET() {
   return apiSuccess({
     settings: row,
     availableEvents: ALL_EMAIL_EVENTS,
+    eventGroups: EMAIL_EVENT_GROUPS,
   });
 }
 

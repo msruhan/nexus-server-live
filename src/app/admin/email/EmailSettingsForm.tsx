@@ -17,12 +17,17 @@ type Initial = {
   smtpEvents: string[];
 };
 
+type EventGroup = {
+  title: string;
+  events: Array<{ key: string; label: string }>;
+};
+
 export function EmailSettingsForm({
   initial,
-  availableEvents,
+  eventGroups,
 }: {
   initial: Initial;
-  availableEvents: string[];
+  eventGroups: EventGroup[];
 }) {
   const router = useRouter();
   const [state, setState] = React.useState(initial);
@@ -187,20 +192,29 @@ export function EmailSettingsForm({
         title="Events"
         description="Select which events should trigger an email. If you select none, ALL events are enabled."
       >
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {availableEvents.map((e) => (
-            <label
-              key={e}
-              className="flex items-center gap-2 rounded-lg border border-line bg-paper-50 px-3 py-2 text-sm"
-            >
-              <input
-                type="checkbox"
-                checked={state.smtpEvents.includes(e)}
-                onChange={() => toggleEvent(e)}
-                className="h-4 w-4"
-              />
-              <code className="font-mono text-[11px]">{e}</code>
-            </label>
+        <div className="space-y-5">
+          {eventGroups.map((group) => (
+            <div key={group.title}>
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                {group.title}
+              </h3>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {group.events.map((e) => (
+                  <label
+                    key={e.key}
+                    className="flex items-start gap-2 rounded-lg border border-line bg-paper-50 px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={state.smtpEvents.includes(e.key)}
+                      onChange={() => toggleEvent(e.key)}
+                      className="mt-0.5 h-4 w-4 shrink-0"
+                    />
+                    <span>{e.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
         <div className="mt-3 text-xs text-ink-muted">

@@ -27,6 +27,7 @@ export default async function AdminSettingsPage() {
           logoUrl: settings?.logoUrl ?? '',
           faviconUrl: settings?.faviconUrl ?? '',
           supportEmail: settings?.supportEmail ?? '',
+          adminNotificationEmail: settings?.adminNotificationEmail ?? '',
           brandShowPoweredBy: settings?.brandShowPoweredBy ?? true,
           brandInvoicePrefix: settings?.brandInvoicePrefix ?? 'INV',
           copyrightText: settings?.copyrightText ?? '',
