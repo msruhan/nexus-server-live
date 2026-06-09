@@ -34,4 +34,5 @@ if [[ "${mem_mb:-0}" -lt 3500 ]]; then
   log "WARN: RAM ${mem_mb}MB — 4GB+ recommended"
 fi
 
-log "Preflight OK — domain=$CUSTOMER_DOMAIN image=$NEXUS_IMAGE mode=$PROVISION_MODE"
+log "Preflight OK — domain=$CUSTOMER_DOMAIN mode=$PROVISION_MODE"
+log_image_tag "$NEXUS_IMAGE"

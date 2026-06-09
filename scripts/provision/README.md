@@ -24,6 +24,8 @@ Deterministic bash pipeline for customer VPS installs. Hermes job runner SCPs th
 | `INSTALL_DIR` | `/opt/nexus-server` |
 | `REGISTRY_USERNAME` / `REGISTRY_TOKEN` | For private GHCR pulls on customer VPS |
 | `REGISTRY_HOST` | `ghcr.io` |
+| `NEXUS_MASK_REGISTRY` | `true` — pull vendor image, retag to `nexus-server:tag` on VPS (hides `ghcr.io` in `docker ps` / `.env`) |
+| `NEXUS_LOCAL_IMAGE_NAME` | `nexus-server` — local tag name when masking is enabled |
 | `COOLIFY_API_TOKEN` | Coolify UI → Keys & Tokens |
 | `COOLIFY_PROJECT_UUID` / `COOLIFY_SERVER_UUID` | Required for Coolify API deploy |
 | `COOLIFY_ENVIRONMENT_NAME` | `production` |

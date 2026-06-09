@@ -75,4 +75,5 @@ if [[ -n "${LICENSE_KEY:-}" ]]; then
 fi
 
 chmod 600 "$ENV_FILE"
-log "Environment + compose templates ready (NEXUS_IMAGE=$NEXUS_IMAGE)"
+log "Environment + compose templates ready"
+log_image_tag "$NEXUS_IMAGE"

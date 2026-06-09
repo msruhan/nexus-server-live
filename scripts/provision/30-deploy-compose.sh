@@ -34,9 +34,9 @@ fi
 
 load_postgres_password
 
-registry_login
-log "Pulling $NEXUS_IMAGE ..."
-docker pull "$NEXUS_IMAGE"
+SOURCE_IMAGE="$NEXUS_IMAGE"
+pull_and_localize_image "$SOURCE_IMAGE" >/dev/null
+persist_nexus_image_env "$INSTALL_DIR/.env.production" "$NEXUS_IMAGE"
 
 log "Starting stack (postgres + app + caddy) from pre-built image..."
 "${COMPOSE[@]}" -f docker-compose.stack.yml -f docker-compose.caddy.yml --env-file .env.production up -d

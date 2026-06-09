@@ -37,8 +37,88 @@ registry_login() {
   fi
   local host="${REGISTRY_HOST:-ghcr.io}"
   need_cmd docker
-  log "Logging in to container registry ($host)..."
+  if is_registry_mask_enabled; then
+    log "Logging in to container registry..."
+  else
+    log "Logging in to container registry ($host)..."
+  fi
   echo "$REGISTRY_TOKEN" | docker login "$host" -u "$REGISTRY_USERNAME" --password-stdin
+}
+
+# When true (default), pull from vendor registry then retag locally (nexus-server:tag)
+# so docker ps and .env.production do not expose ghcr.io on customer VPS.
+is_registry_mask_enabled() {
+  [[ "${NEXUS_MASK_REGISTRY:-true}" != "false" ]]
+}
+
+local_image_name() {
+  printf '%s' "${NEXUS_LOCAL_IMAGE_NAME:-nexus-server}"
+}
+
+image_tag_from_ref() {
+  local ref="$1"
+  if [[ "$ref" == *@* ]]; then
+    ref="${ref%%@*}"
+  fi
+  if [[ "$ref" == *:* ]]; then
+    printf '%s' "${ref##*:}"
+  else
+    printf '%s' "latest"
+  fi
+}
+
+local_image_ref() {
+  local source_ref="$1"
+  printf '%s:%s' "$(local_image_name)" "$(image_tag_from_ref "$source_ref")"
+}
+
+is_vendor_registry_ref() {
+  local ref="$1"
+  [[ "$ref" == */* ]]
+}
+
+# Pull vendor image, optionally retag to local name, export NEXUS_IMAGE. Prints final ref.
+pull_and_localize_image() {
+  local source_ref="$1"
+  [[ -n "$source_ref" ]] || die "pull_and_localize_image: empty source ref"
+
+  if ! is_registry_mask_enabled || ! is_vendor_registry_ref "$source_ref"; then
+    registry_login
+    log "Pulling application image..."
+    docker pull "$source_ref"
+    export NEXUS_IMAGE="$source_ref"
+    printf '%s' "$source_ref"
+    return 0
+  fi
+
+  local local_ref tag
+  local_ref="$(local_image_ref "$source_ref")"
+  tag="$(image_tag_from_ref "$source_ref")"
+
+  registry_login
+  log "Pulling application image (v${tag})..."
+  docker pull "$source_ref"
+  docker tag "$source_ref" "$local_ref"
+  docker rmi "$source_ref" 2>/dev/null || true
+  export NEXUS_IMAGE="$local_ref"
+  log "Application image ready (v${tag})"
+  printf '%s' "$local_ref"
+}
+
+persist_nexus_image_env() {
+  local env_file="${1:-$INSTALL_DIR/.env.production}"
+  local image_ref="$2"
+  [[ -f "$env_file" ]] || die "Missing $env_file"
+  if grep -q '^NEXUS_IMAGE=' "$env_file"; then
+    sed -i "s|^NEXUS_IMAGE=.*|NEXUS_IMAGE=${image_ref}|" "$env_file"
+  else
+    printf '\nNEXUS_IMAGE=%s\n' "$image_ref" >>"$env_file"
+  fi
+}
+
+log_image_tag() {
+  local ref="$1"
+  log "Image tag: v$(image_tag_from_ref "$ref")"
 }
 
 env_value_from_file() {
