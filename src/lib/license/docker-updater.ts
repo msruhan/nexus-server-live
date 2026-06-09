@@ -26,7 +26,7 @@ function clearDockerUpdateState() {
 function syncDockerUpdateInProgress(): boolean {
   if (!dockerUpdateInProgress) return false;
   const { phase } = getDockerUpdateProgress();
-  if (phase === 'failed' || phase === 'done' || phase === 'idle') {
+  if (phase === 'failed' || phase === 'done') {
     clearDockerUpdateState();
     return false;
   }
@@ -152,8 +152,21 @@ async function recordDockerUpdateSuccess(
     where: { toVersion: normalizedTarget, status: 'success' },
   });
 
-  if (existing && getDockerUpdateProgress().phase === 'done') {
-    await clearDockerUpdatePending();
+  if (existing) {
+    await prisma.siteSettings.update({
+      where: { id: 'singleton' },
+      data: {
+        lastUpdateVersion: normalizedTarget,
+        lastUpdateAt: new Date(),
+        pendingUpdateFromVersion: null,
+        pendingUpdateTargetVersion: null,
+      },
+    });
+    writeProgress({
+      phase: 'done',
+      percent: 100,
+      message: `Updated to v${normalizedTarget} successfully.`,
+    });
     clearDockerUpdateState();
     return;
   }
@@ -214,6 +227,51 @@ export async function reconcileDockerUpdateHistory(): Promise<void> {
     settings.pendingUpdateTargetVersion,
     settings.pendingUpdateFromVersion ?? undefined,
   );
+}
+
+/** Poll endpoint: reconcile DB pending state + progress file (survives container recreate). */
+export async function resolveUpdateProgressForPoll(): Promise<UpdateProgress> {
+  await reconcileDockerUpdateHistory();
+
+  const settings = await prisma.siteSettings.findUnique({
+    where: { id: 'singleton' },
+    select: {
+      pendingUpdateTargetVersion: true,
+      pendingUpdateFromVersion: true,
+    },
+  });
+
+  const target = settings?.pendingUpdateTargetVersion?.trim();
+  if (target && versionsMatch(getAppVersion(), target)) {
+    const existing = await prisma.updateLog.findFirst({
+      where: { toVersion: target, status: 'success' },
+    });
+    if (!existing) {
+      await recordDockerUpdateSuccess(target, settings?.pendingUpdateFromVersion ?? undefined);
+    } else {
+      await clearDockerUpdatePending();
+      writeProgress({
+        phase: 'done',
+        percent: 100,
+        message: `Updated to v${target} successfully.`,
+      });
+    }
+    return { phase: 'done', percent: 100, message: `Updated to v${target} successfully.` };
+  }
+
+  const fileProgress = getDockerUpdateProgress();
+  if (fileProgress.phase === 'done' || fileProgress.phase === 'failed') {
+    return fileProgress;
+  }
+  if (fileProgress.phase !== 'idle') {
+    return fileProgress;
+  }
+
+  if (target) {
+    return { phase: 'restarting', percent: 55, message: 'Applying update…' };
+  }
+
+  return fileProgress;
 }
 
 export async function acknowledgeDockerUpdateRecord(input: {

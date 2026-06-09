@@ -4,7 +4,11 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { hasPermission } from '@/lib/sub-admin';
-import { getDockerUpdateProgress, isDockerUpdateInProgress } from '@/lib/license/docker-updater';
+import {
+  getDockerUpdateProgress,
+  isDockerUpdateInProgress,
+  resolveUpdateProgressForPoll,
+} from '@/lib/license/docker-updater';
 import { getUpdateProgress, isUpdateInProgress } from '@/lib/license/updater';
 import type { UpdateProgress } from '@/lib/license/types';
 
@@ -41,10 +45,17 @@ export async function GET() {
   const session = await requireAccess();
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const progress = isDockerUpdateInProgress() ? getDockerUpdateProgress() : getUpdateProgress();
-  if (!isDockerUpdateInProgress() && !isUpdateInProgress() && progress.phase === 'idle') {
-    const dockerIdle = getDockerUpdateProgress();
-    if (dockerIdle.phase !== 'idle') return NextResponse.json(publicUpdateProgress(dockerIdle));
+  if (isDockerUpdateInProgress() || getDockerUpdateProgress().phase !== 'idle') {
+    const dockerProgress = isDockerUpdateInProgress()
+      ? getDockerUpdateProgress()
+      : await resolveUpdateProgressForPoll();
+    return NextResponse.json(publicUpdateProgress(dockerProgress));
   }
-  return NextResponse.json(publicUpdateProgress(progress));
+
+  if (isUpdateInProgress()) {
+    return NextResponse.json(publicUpdateProgress(getUpdateProgress()));
+  }
+
+  const resolved = await resolveUpdateProgressForPoll();
+  return NextResponse.json(publicUpdateProgress(resolved));
 }

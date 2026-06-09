@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RenewalCtas, showRenewalCtas } from '@/components/dashboard/RenewalCtas';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
@@ -41,6 +42,7 @@ type Props = {
 };
 
 export function SystemPanel({ initial }: Props) {
+  const router = useRouter();
   const historyPagination = useTablePagination(initial.updateHistory, [initial.updateHistory.length]);
   const [license, setLicense] = React.useState(initial.license);
   const [licenseKey, setLicenseKey] = React.useState('');
@@ -75,12 +77,17 @@ export function SystemPanel({ initial }: Props) {
     : 0;
 
   const updateFromVersionRef = React.useRef<string | null>(null);
+  const updateTargetVersionRef = React.useRef<string | null>(null);
 
   const finishUpdate = React.useCallback((phase: 'done' | 'failed') => {
     setUpdating(false);
-    if (phase === 'done') showMessage('success', UPDATE_SUCCESS_MESSAGE);
+    updateTargetVersionRef.current = null;
+    if (phase === 'done') {
+      showMessage('success', UPDATE_SUCCESS_MESSAGE);
+      router.refresh();
+    }
     if (phase === 'failed') showMessage('error', UPDATE_FAILED_MESSAGE);
-  }, []);
+  }, [router]);
 
   const acknowledgeUpdateRecord = React.useCallback(async (targetVersion: string) => {
     try {
@@ -99,40 +106,51 @@ export function SystemPanel({ initial }: Props) {
   React.useEffect(() => {
     if (!updating) return;
 
-    const checkInstalledVersion = async (targetVersion: string) => {
+    const targetVersion =
+      updateTargetVersionRef.current ?? updateInfo?.latestVersion ?? null;
+
+    const checkInstalledVersion = async (version: string) => {
       try {
         const res = await fetch('/api/admin/system');
         if (!res.ok) return false;
         const sys = await res.json();
         const current = String(sys.currentVersion ?? '').replace(/^v/i, '');
-        const target = targetVersion.replace(/^v/i, '');
+        const target = version.replace(/^v/i, '');
         return current.length > 0 && current === target;
       } catch {
         return false;
       }
     };
 
-    const interval = setInterval(async () => {
+    const pollOnce = async () => {
       try {
         const res = await fetch('/api/admin/system/update-progress');
         const data = await res.json();
+        if (data.error) return;
         setProgress(data);
-        if (data.phase === 'done' || data.phase === 'failed') {
-          if (data.phase === 'done' && updateInfo?.latestVersion) {
-            await acknowledgeUpdateRecord(updateInfo.latestVersion);
-          }
-          finishUpdate(data.phase);
+
+        const activeTarget = updateTargetVersionRef.current ?? updateInfo?.latestVersion ?? null;
+
+        if (data.phase === 'done') {
+          if (activeTarget) await acknowledgeUpdateRecord(activeTarget);
+          finishUpdate('done');
           return;
         }
-        // Container recreate clears /tmp progress — recover when the new image is already live.
-        if (data.phase === 'idle' && updateInfo?.latestVersion) {
-          if (await checkInstalledVersion(updateInfo.latestVersion)) {
-            await acknowledgeUpdateRecord(updateInfo.latestVersion);
-            finishUpdate('done');
-          }
+        if (data.phase === 'failed') {
+          finishUpdate('failed');
+          return;
         }
-      } catch { /* silent */ }
-    }, 2000);
+
+        // Container recreate / 502 during restart — recover when target is already installed.
+        if (activeTarget && (await checkInstalledVersion(activeTarget))) {
+          await acknowledgeUpdateRecord(activeTarget);
+          finishUpdate('done');
+        }
+      } catch { /* silent — retry on next tick */ }
+    };
+
+    void pollOnce();
+    const interval = setInterval(pollOnce, 2000);
     return () => clearInterval(interval);
   }, [updating, updateInfo?.latestVersion, finishUpdate, acknowledgeUpdateRecord]);
 
@@ -221,8 +239,9 @@ export function SystemPanel({ initial }: Props) {
         updateFromVersionRef.current = String(sys.currentVersion ?? '');
       }
     } catch { /* silent */ }
+    updateTargetVersionRef.current = updateInfo.latestVersion;
     setUpdating(true);
-    setProgress({ phase: 'downloading', percent: 0, message: UPDATE_WAIT_MESSAGE });
+    setProgress({ phase: 'downloading', percent: 5, message: UPDATE_WAIT_MESSAGE });
     try {
       const res = await fetch('/api/admin/system/update-apply', {
         method: 'POST',
@@ -237,6 +256,7 @@ export function SystemPanel({ initial }: Props) {
       const data = await res.json();
       if (!data.ok) {
         setUpdating(false);
+        updateTargetVersionRef.current = null;
         showMessage('error', UPDATE_FAILED_MESSAGE);
       }
     } catch {
