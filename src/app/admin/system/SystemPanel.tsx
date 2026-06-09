@@ -74,23 +74,48 @@ export function SystemPanel({ initial }: Props) {
     ? Math.min(100, Math.max(0, progress?.percent ?? 0))
     : 0;
 
+  const finishUpdate = React.useCallback((phase: 'done' | 'failed') => {
+    setUpdating(false);
+    if (phase === 'done') showMessage('success', UPDATE_SUCCESS_MESSAGE);
+    if (phase === 'failed') showMessage('error', UPDATE_FAILED_MESSAGE);
+  }, []);
+
   // Poll progress while updating
   React.useEffect(() => {
     if (!updating) return;
+
+    const checkInstalledVersion = async (targetVersion: string) => {
+      try {
+        const res = await fetch('/api/admin/system');
+        if (!res.ok) return false;
+        const sys = await res.json();
+        const current = String(sys.currentVersion ?? '').replace(/^v/i, '');
+        const target = targetVersion.replace(/^v/i, '');
+        return current.length > 0 && current === target;
+      } catch {
+        return false;
+      }
+    };
+
     const interval = setInterval(async () => {
       try {
         const res = await fetch('/api/admin/system/update-progress');
         const data = await res.json();
         setProgress(data);
         if (data.phase === 'done' || data.phase === 'failed') {
-          setUpdating(false);
-          if (data.phase === 'done') showMessage('success', UPDATE_SUCCESS_MESSAGE);
-          if (data.phase === 'failed') showMessage('error', UPDATE_FAILED_MESSAGE);
+          finishUpdate(data.phase);
+          return;
+        }
+        // Container recreate clears /tmp progress — recover when the new image is already live.
+        if (data.phase === 'idle' && updateInfo?.latestVersion) {
+          if (await checkInstalledVersion(updateInfo.latestVersion)) {
+            finishUpdate('done');
+          }
         }
       } catch { /* silent */ }
     }, 2000);
     return () => clearInterval(interval);
-  }, [updating]);
+  }, [updating, updateInfo?.latestVersion, finishUpdate]);
 
   const handleActivate = async () => {
     if (!licenseKey.trim()) return;

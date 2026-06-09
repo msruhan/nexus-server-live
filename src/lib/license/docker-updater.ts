@@ -87,6 +87,39 @@ function mapPortalPhase(phase: string): UpdateProgress['phase'] {
   return 'downloading';
 }
 
+function normalizeVersion(version: string): string {
+  return version.trim().replace(/^v/i, '');
+}
+
+function versionsMatch(a: string, b: string): boolean {
+  return normalizeVersion(a) === normalizeVersion(b);
+}
+
+async function recordDockerUpdateSuccess(targetVersion: string): Promise<void> {
+  if (getDockerUpdateProgress().phase === 'done') {
+    clearDockerUpdateState();
+    return;
+  }
+  await prisma.updateLog.create({
+    data: {
+      fromVersion: getAppVersion(),
+      toVersion: targetVersion,
+      status: 'success',
+      durationSeconds: null,
+    },
+  });
+  await prisma.siteSettings.update({
+    where: { id: 'singleton' },
+    data: { lastUpdateVersion: targetVersion, lastUpdateAt: new Date() },
+  });
+  writeProgress({
+    phase: 'done',
+    percent: 100,
+    message: `Updated to v${targetVersion} successfully.`,
+  });
+  clearDockerUpdateState();
+}
+
 export async function applyDockerUpdate(targetVersion: string): Promise<{ ok: true } | { ok: false; error: string }> {
   if (dockerUpdateInProgress) {
     return { ok: false, error: 'An update is already in progress' };
@@ -171,35 +204,30 @@ async function pollDockerUpdateJob(
         error: data.error ?? undefined,
       });
 
-      if (data.status === 'success') {
-        await prisma.updateLog.create({
-          data: {
-            fromVersion: getAppVersion(),
-            toVersion: targetVersion,
-            status: 'success',
-            durationSeconds: null,
-          },
-        });
-        await prisma.siteSettings.update({
-          where: { id: 'singleton' },
-          data: { lastUpdateVersion: targetVersion, lastUpdateAt: new Date() },
-        });
-        dockerUpdateInProgress = false;
-        activeJobId = null;
+      // Portal job may lag or callback may fail while Hermes already recreated the container.
+      const installed = versionsMatch(getAppVersion(), targetVersion);
+      if (data.status === 'success' || (installed && data.status === 'running')) {
+        await recordDockerUpdateSuccess(targetVersion);
         return;
       }
 
       if (data.status === 'failed') {
+        const error = String(data.error ?? 'update_failed').slice(0, 2000);
         await prisma.updateLog.create({
           data: {
             fromVersion: getAppVersion(),
             toVersion: targetVersion,
             status: 'failed',
-            error: String(data.error ?? 'update_failed').slice(0, 2000),
+            error,
           },
         });
-        dockerUpdateInProgress = false;
-        activeJobId = null;
+        writeProgress({
+          phase: 'failed',
+          percent: 0,
+          message: 'Update failed',
+          error,
+        });
+        clearDockerUpdateState();
         return;
       }
     } catch {
