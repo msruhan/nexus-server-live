@@ -70,6 +70,10 @@ export function SystemPanel({ initial }: Props) {
     setTimeout(() => setMessage(null), 6000);
   };
 
+  const updatePercent = updating
+    ? Math.min(100, Math.max(0, progress?.percent ?? 0))
+    : 0;
+
   // Poll progress while updating
   React.useEffect(() => {
     if (!updating) return;
@@ -361,16 +365,30 @@ export function SystemPanel({ initial }: Props) {
               </motion.div>
             )}
 
-            {/* Progress — generic message only (no vendor/registry details) */}
+            {/* Progress — percent only (no vendor/registry/changelog details) */}
             {updating && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="rounded-xl border border-line bg-paper p-5"
               >
-                <p className="text-xs font-medium text-ink">{UPDATE_WAIT_MESSAGE}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-medium text-ink">{UPDATE_WAIT_MESSAGE}</p>
+                  <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-ink">
+                    {updatePercent}%
+                  </span>
+                </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-paper-200">
-                  <div className="h-full w-2/5 animate-pulse rounded-full bg-primary-500" />
+                  {updatePercent > 0 ? (
+                    <motion.div
+                      className="h-full rounded-full bg-primary-500"
+                      initial={false}
+                      animate={{ width: `${updatePercent}%` }}
+                      transition={{ duration: 0.4, ease: 'easeOut' }}
+                    />
+                  ) : (
+                    <div className="h-full w-2/5 animate-pulse rounded-full bg-primary-500" />
+                  )}
                 </div>
               </motion.div>
             )}
