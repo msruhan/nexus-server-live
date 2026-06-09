@@ -125,22 +125,37 @@ const adminSections: Section[] = [
     ],
   },
   {
-    title: 'People & logs',
+    title: 'People & support',
     items: [
       { href: '/admin/users', label: 'Users', icon: Users, perm: 'viewUsers' },
       { href: '/admin/sub-admins', label: 'Sub admins', icon: UsersThree, perm: 'manageSubAdmins' },
       { href: '/admin/tickets', label: 'Support tickets', icon: ChatCircleDots, perm: 'viewTickets' },
+    ],
+  },
+  {
+    title: 'Security & logs',
+    items: [
       { href: '/admin/logs', label: 'Activity log', icon: Scroll, perm: 'viewActivityLog' },
       { href: '/admin/api-keys', label: 'API keys', icon: Key, perm: 'manageApiKeys' },
       { href: '/admin/ip-management', label: 'IP management', icon: Shield, perm: 'manageApiKeys' },
+    ],
+  },
+  {
+    title: 'Notifications',
+    items: [
       { href: '/admin/email', label: 'Email / SMTP', icon: Envelope, perm: 'manageEmailSettings' },
       { href: '/admin/telegram', label: 'Telegram bot', icon: TelegramLogo, perm: 'manageTelegram' },
+    ],
+  },
+  {
+    title: 'Platform',
+    items: [
       { href: '/admin/system', label: 'License & Update', icon: ArrowsClockwise, perm: 'manageSystem' },
       { href: '/admin/backup', label: 'Database backup', icon: Archive, perm: 'manageBackups' },
-      { href: '/admin/download-tools', label: 'Download tools', icon: DownloadSimple, perm: 'editCms' },
-      { href: '/admin/appearance', label: 'Palette & theme', icon: Palette },
       { href: '/admin/maintenance', label: 'Maintenance mode', icon: Warning, perm: 'editSettings' },
       { href: '/admin/settings', label: 'Settings', icon: GearSix, perm: 'viewSettings' },
+      { href: '/admin/appearance', label: 'Palette & theme', icon: Palette },
+      { href: '/admin/download-tools', label: 'Download tools', icon: DownloadSimple, perm: 'editCms' },
     ],
   },
   {
