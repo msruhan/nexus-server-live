@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { getCurrentVersion, revalidateIfStale } from '@/lib/license/client';
+import { reconcileDockerUpdateHistory } from '@/lib/license/docker-updater';
 import { SystemPanel } from './SystemPanel';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,7 @@ export default async function AdminSystemPage() {
   // Always re-check with the License Server when opening this page so a
   // vendor-side revoke/expiry is reflected immediately (maxAge 0 = force).
   await revalidateIfStale(0);
+  await reconcileDockerUpdateHistory();
 
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },

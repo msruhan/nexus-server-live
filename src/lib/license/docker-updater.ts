@@ -95,29 +95,142 @@ function versionsMatch(a: string, b: string): boolean {
   return normalizeVersion(a) === normalizeVersion(b);
 }
 
-async function recordDockerUpdateSuccess(targetVersion: string): Promise<void> {
-  if (getDockerUpdateProgress().phase === 'done') {
+async function markDockerUpdatePending(fromVersion: string, targetVersion: string): Promise<void> {
+  await prisma.siteSettings.update({
+    where: { id: 'singleton' },
+    data: {
+      pendingUpdateFromVersion: normalizeVersion(fromVersion),
+      pendingUpdateTargetVersion: normalizeVersion(targetVersion),
+    },
+  });
+}
+
+async function clearDockerUpdatePending(): Promise<void> {
+  await prisma.siteSettings.update({
+    where: { id: 'singleton' },
+    data: {
+      pendingUpdateFromVersion: null,
+      pendingUpdateTargetVersion: null,
+    },
+  });
+}
+
+async function resolveFromVersionForUpdate(targetVersion: string): Promise<string> {
+  const settings = await prisma.siteSettings.findUnique({
+    where: { id: 'singleton' },
+    select: { pendingUpdateFromVersion: true, lastUpdateVersion: true },
+  });
+
+  for (const candidate of [
+    settings?.pendingUpdateFromVersion,
+    settings?.lastUpdateVersion,
+    getAppVersion(),
+  ]) {
+    if (candidate?.trim() && !versionsMatch(candidate, targetVersion)) {
+      return normalizeVersion(candidate);
+    }
+  }
+
+  const lastLog = await prisma.updateLog.findFirst({
+    where: { status: 'success' },
+    orderBy: { appliedAt: 'desc' },
+    select: { toVersion: true },
+  });
+  if (lastLog?.toVersion && !versionsMatch(lastLog.toVersion, targetVersion)) {
+    return normalizeVersion(lastLog.toVersion);
+  }
+
+  return 'initial';
+}
+
+async function recordDockerUpdateSuccess(
+  targetVersion: string,
+  fromVersionOverride?: string,
+): Promise<void> {
+  const normalizedTarget = normalizeVersion(targetVersion);
+  const existing = await prisma.updateLog.findFirst({
+    where: { toVersion: normalizedTarget, status: 'success' },
+  });
+
+  if (existing && getDockerUpdateProgress().phase === 'done') {
+    await clearDockerUpdatePending();
     clearDockerUpdateState();
     return;
   }
-  await prisma.updateLog.create({
-    data: {
-      fromVersion: getAppVersion(),
-      toVersion: targetVersion,
-      status: 'success',
-      durationSeconds: null,
-    },
-  });
+
+  if (!existing) {
+    const fromVersion = fromVersionOverride
+      ? normalizeVersion(fromVersionOverride)
+      : await resolveFromVersionForUpdate(normalizedTarget);
+    await prisma.updateLog.create({
+      data: {
+        fromVersion,
+        toVersion: normalizedTarget,
+        status: 'success',
+        durationSeconds: null,
+      },
+    });
+  }
+
   await prisma.siteSettings.update({
     where: { id: 'singleton' },
-    data: { lastUpdateVersion: targetVersion, lastUpdateAt: new Date() },
+    data: {
+      lastUpdateVersion: normalizedTarget,
+      lastUpdateAt: new Date(),
+      pendingUpdateFromVersion: null,
+      pendingUpdateTargetVersion: null,
+    },
   });
   writeProgress({
     phase: 'done',
     percent: 100,
-    message: `Updated to v${targetVersion} successfully.`,
+    message: `Updated to v${normalizedTarget} successfully.`,
   });
   clearDockerUpdateState();
+}
+
+/** Complete history when a Docker update survived container recreate (pending row in DB). */
+export async function reconcileDockerUpdateHistory(): Promise<void> {
+  const settings = await prisma.siteSettings.findUnique({
+    where: { id: 'singleton' },
+    select: {
+      lastUpdateVersion: true,
+      pendingUpdateFromVersion: true,
+      pendingUpdateTargetVersion: true,
+    },
+  });
+  if (!settings?.pendingUpdateTargetVersion) return;
+  if (!versionsMatch(getAppVersion(), settings.pendingUpdateTargetVersion)) return;
+
+  const logged = await prisma.updateLog.findFirst({
+    where: { toVersion: settings.pendingUpdateTargetVersion, status: 'success' },
+  });
+  if (logged && versionsMatch(settings.lastUpdateVersion ?? '', settings.pendingUpdateTargetVersion)) {
+    await clearDockerUpdatePending();
+    return;
+  }
+
+  await recordDockerUpdateSuccess(
+    settings.pendingUpdateTargetVersion,
+    settings.pendingUpdateFromVersion ?? undefined,
+  );
+}
+
+export async function acknowledgeDockerUpdateRecord(input: {
+  targetVersion: string;
+  fromVersion?: string;
+}): Promise<{ ok: true; created: boolean } | { ok: false; error: string }> {
+  const target = normalizeVersion(input.targetVersion);
+  if (!target) return { ok: false, error: 'invalid_target' };
+  if (!versionsMatch(getAppVersion(), target)) {
+    return { ok: false, error: 'version_not_installed' };
+  }
+
+  const existing = await prisma.updateLog.findFirst({
+    where: { toVersion: target, status: 'success' },
+  });
+  await recordDockerUpdateSuccess(target, input.fromVersion);
+  return { ok: true, created: !existing };
 }
 
 export async function applyDockerUpdate(targetVersion: string): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -138,6 +251,9 @@ export async function applyDockerUpdate(targetVersion: string): Promise<{ ok: tr
     return { ok: false, error: 'License domain not configured' };
   }
 
+  const fromVersion = getAppVersion();
+  await markDockerUpdatePending(fromVersion, targetVersion);
+
   dockerUpdateInProgress = true;
   writeProgress({ phase: 'downloading', percent: 5, message: 'Starting remote update…' });
 
@@ -151,6 +267,7 @@ export async function applyDockerUpdate(targetVersion: string): Promise<{ ok: tr
     if (!res.ok || !data.ok) {
       const err = data.error ?? `Request failed (${res.status})`;
       writeProgress({ phase: 'failed', percent: 0, message: 'Update failed', error: err });
+      await clearDockerUpdatePending();
       clearDockerUpdateState();
       return { ok: false, error: err };
     }
@@ -168,6 +285,7 @@ export async function applyDockerUpdate(targetVersion: string): Promise<{ ok: tr
   } catch (e) {
     const err = e instanceof Error ? e.message : 'Unknown error';
     writeProgress({ phase: 'failed', percent: 0, message: 'Update failed', error: err });
+    await clearDockerUpdatePending();
     dockerUpdateInProgress = false;
     activeJobId = null;
     return { ok: false, error: err };
@@ -213,10 +331,11 @@ async function pollDockerUpdateJob(
 
       if (data.status === 'failed') {
         const error = String(data.error ?? 'update_failed').slice(0, 2000);
+        const fromVersion = await resolveFromVersionForUpdate(targetVersion);
         await prisma.updateLog.create({
           data: {
-            fromVersion: getAppVersion(),
-            toVersion: targetVersion,
+            fromVersion,
+            toVersion: normalizeVersion(targetVersion),
             status: 'failed',
             error,
           },
@@ -227,6 +346,7 @@ async function pollDockerUpdateJob(
           message: 'Update failed',
           error,
         });
+        await clearDockerUpdatePending();
         clearDockerUpdateState();
         return;
       }
@@ -235,6 +355,7 @@ async function pollDockerUpdateJob(
     }
   }
 
+  // Keep pending* in DB when timed out — VPS may have finished; reconcile on next page load.
   writeProgress({
     phase: 'failed',
     percent: 0,

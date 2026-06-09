@@ -74,10 +74,25 @@ export function SystemPanel({ initial }: Props) {
     ? Math.min(100, Math.max(0, progress?.percent ?? 0))
     : 0;
 
+  const updateFromVersionRef = React.useRef<string | null>(null);
+
   const finishUpdate = React.useCallback((phase: 'done' | 'failed') => {
     setUpdating(false);
     if (phase === 'done') showMessage('success', UPDATE_SUCCESS_MESSAGE);
     if (phase === 'failed') showMessage('error', UPDATE_FAILED_MESSAGE);
+  }, []);
+
+  const acknowledgeUpdateRecord = React.useCallback(async (targetVersion: string) => {
+    try {
+      await fetch('/api/admin/system/update-acknowledge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetVersion,
+          fromVersion: updateFromVersionRef.current ?? undefined,
+        }),
+      });
+    } catch { /* best effort */ }
   }, []);
 
   // Poll progress while updating
@@ -103,19 +118,23 @@ export function SystemPanel({ initial }: Props) {
         const data = await res.json();
         setProgress(data);
         if (data.phase === 'done' || data.phase === 'failed') {
+          if (data.phase === 'done' && updateInfo?.latestVersion) {
+            await acknowledgeUpdateRecord(updateInfo.latestVersion);
+          }
           finishUpdate(data.phase);
           return;
         }
         // Container recreate clears /tmp progress — recover when the new image is already live.
         if (data.phase === 'idle' && updateInfo?.latestVersion) {
           if (await checkInstalledVersion(updateInfo.latestVersion)) {
+            await acknowledgeUpdateRecord(updateInfo.latestVersion);
             finishUpdate('done');
           }
         }
       } catch { /* silent */ }
     }, 2000);
     return () => clearInterval(interval);
-  }, [updating, updateInfo?.latestVersion, finishUpdate]);
+  }, [updating, updateInfo?.latestVersion, finishUpdate, acknowledgeUpdateRecord]);
 
   const handleActivate = async () => {
     if (!licenseKey.trim()) return;
@@ -195,6 +214,13 @@ export function SystemPanel({ initial }: Props) {
   const handleApplyUpdate = async () => {
     if (!updateInfo?.latestVersion) return;
     if (updateInfo.deployMode === 'zip' && !updateInfo.downloadUrl) return;
+    try {
+      const sysRes = await fetch('/api/admin/system');
+      if (sysRes.ok) {
+        const sys = await sysRes.json();
+        updateFromVersionRef.current = String(sys.currentVersion ?? '');
+      }
+    } catch { /* silent */ }
     setUpdating(true);
     setProgress({ phase: 'downloading', percent: 0, message: UPDATE_WAIT_MESSAGE });
     try {

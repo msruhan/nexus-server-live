@@ -610,6 +610,9 @@ model SiteSettings {
   licenseRenewalDeskUrl     String?
   lastUpdateVersion      String?
   lastUpdateAt           DateTime?
+  /// Set when a Docker update starts; used to record history after container recreate.
+  pendingUpdateFromVersion   String?
+  pendingUpdateTargetVersion String?
 
   // ─── SMTP / Email ──────────────────────────────────────────────
   // OPT-IN. With smtpEnabled=false (default), the email service is a
