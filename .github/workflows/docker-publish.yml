@@ -33,6 +33,9 @@ jobs:
             echo "tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Sync package.json version with image tag
+        run: npm pkg set version="${{ steps.meta.outputs.tag }}"
+
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
