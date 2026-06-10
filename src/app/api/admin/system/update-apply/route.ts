@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const mode = resolveDeployMode(deployMode);
 
   if (mode === 'docker') {
-    if (isDockerUpdateInProgress()) {
+    if (await isDockerUpdateInProgress()) {
       return NextResponse.json(
         { error: 'An update is already in progress. Please wait.' },
         { status: 409 },

@@ -89,9 +89,9 @@ export function SystemPanel({ initial }: Props) {
     if (phase === 'failed') showMessage('error', UPDATE_FAILED_MESSAGE);
   }, [router]);
 
-  const acknowledgeUpdateRecord = React.useCallback(async (targetVersion: string) => {
+  const acknowledgeUpdateRecord = React.useCallback(async (targetVersion: string): Promise<boolean> => {
     try {
-      await fetch('/api/admin/system/update-acknowledge', {
+      const res = await fetch('/api/admin/system/update-acknowledge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -99,7 +99,12 @@ export function SystemPanel({ initial }: Props) {
           fromVersion: updateFromVersionRef.current ?? undefined,
         }),
       });
-    } catch { /* best effort */ }
+      if (!res.ok) return false;
+      const data = await res.json();
+      return Boolean(data.ok);
+    } catch {
+      return false;
+    }
   }, []);
 
   // Poll progress while updating
@@ -122,6 +127,21 @@ export function SystemPanel({ initial }: Props) {
       }
     };
 
+    const tryCompleteUpdate = async (activeTarget: string | null) => {
+      if (!activeTarget) return false;
+      if (await acknowledgeUpdateRecord(activeTarget)) {
+        finishUpdate('done');
+        return true;
+      }
+      if (await checkInstalledVersion(activeTarget)) {
+        if (await acknowledgeUpdateRecord(activeTarget)) {
+          finishUpdate('done');
+          return true;
+        }
+      }
+      return false;
+    };
+
     const pollOnce = async () => {
       try {
         const res = await fetch('/api/admin/system/update-progress');
@@ -132,8 +152,14 @@ export function SystemPanel({ initial }: Props) {
         const activeTarget = updateTargetVersionRef.current ?? updateInfo?.latestVersion ?? null;
 
         if (data.phase === 'done') {
-          if (activeTarget) await acknowledgeUpdateRecord(activeTarget);
-          finishUpdate('done');
+          const completed = await tryCompleteUpdate(activeTarget);
+          if (!completed) {
+            setProgress({
+              phase: 'restarting',
+              percent: Math.max(data.percent ?? 0, 85),
+              message: UPDATE_WAIT_MESSAGE,
+            });
+          }
           return;
         }
         if (data.phase === 'failed') {
@@ -142,10 +168,7 @@ export function SystemPanel({ initial }: Props) {
         }
 
         // Container recreate / 502 during restart — recover when target is already installed.
-        if (activeTarget && (await checkInstalledVersion(activeTarget))) {
-          await acknowledgeUpdateRecord(activeTarget);
-          finishUpdate('done');
-        }
+        await tryCompleteUpdate(activeTarget);
       } catch { /* silent — retry on next tick */ }
     };
 

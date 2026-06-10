@@ -22,18 +22,31 @@ function clearDockerUpdateState() {
   activeJobId = null;
 }
 
+async function hasPendingDockerUpdateTarget(): Promise<boolean> {
+  const settings = await prisma.siteSettings.findUnique({
+    where: { id: 'singleton' },
+    select: { pendingUpdateTargetVersion: true },
+  });
+  return Boolean(settings?.pendingUpdateTargetVersion?.trim());
+}
+
 /** Drop stale in-memory lock when progress file shows a terminal state. */
-function syncDockerUpdateInProgress(): boolean {
+async function syncDockerUpdateInProgress(): Promise<boolean> {
   if (!dockerUpdateInProgress) return false;
   const { phase } = getDockerUpdateProgress();
-  if (phase === 'failed' || phase === 'done') {
+  if (phase === 'failed') {
+    clearDockerUpdateState();
+    return false;
+  }
+  if (phase === 'done') {
+    if (await hasPendingDockerUpdateTarget()) return true;
     clearDockerUpdateState();
     return false;
   }
   return true;
 }
 
-export function isDockerUpdateInProgress(): boolean {
+export async function isDockerUpdateInProgress(): Promise<boolean> {
   return syncDockerUpdateInProgress();
 }
 
@@ -260,7 +273,17 @@ export async function resolveUpdateProgressForPoll(): Promise<UpdateProgress> {
   }
 
   const fileProgress = getDockerUpdateProgress();
-  if (fileProgress.phase === 'done' || fileProgress.phase === 'failed') {
+  if (fileProgress.phase === 'done') {
+    if (target && !versionsMatch(getAppVersion(), target)) {
+      return {
+        phase: 'restarting',
+        percent: 85,
+        message: 'Waiting for new version to start…',
+      };
+    }
+    return fileProgress;
+  }
+  if (fileProgress.phase === 'failed') {
     return fileProgress;
   }
   if (fileProgress.phase !== 'idle') {
@@ -268,7 +291,11 @@ export async function resolveUpdateProgressForPoll(): Promise<UpdateProgress> {
   }
 
   if (target) {
-    return { phase: 'restarting', percent: 55, message: 'Applying update…' };
+    return {
+      phase: 'restarting',
+      percent: 75,
+      message: 'Applying update — container may restart briefly…',
+    };
   }
 
   return fileProgress;
@@ -292,7 +319,7 @@ export async function acknowledgeDockerUpdateRecord(input: {
 }
 
 export async function applyDockerUpdate(targetVersion: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (dockerUpdateInProgress) {
+  if (await isDockerUpdateInProgress()) {
     return { ok: false, error: 'An update is already in progress' };
   }
 
@@ -380,11 +407,19 @@ async function pollDockerUpdateJob(
         error: data.error ?? undefined,
       });
 
-      // Portal job may lag or callback may fail while Hermes already recreated the container.
       const installed = versionsMatch(getAppVersion(), targetVersion);
-      if (data.status === 'success' || (installed && data.status === 'running')) {
+      if (installed) {
         await recordDockerUpdateSuccess(targetVersion);
         return;
+      }
+
+      if (data.status === 'success') {
+        writeProgress({
+          phase: 'restarting',
+          percent: 90,
+          message: 'Update applied — waiting for new version to start…',
+        });
+        continue;
       }
 
       if (data.status === 'failed') {
@@ -411,6 +446,11 @@ async function pollDockerUpdateJob(
     } catch {
       // keep polling
     }
+  }
+
+  if (versionsMatch(getAppVersion(), targetVersion)) {
+    await recordDockerUpdateSuccess(targetVersion);
+    return;
   }
 
   // Keep pending* in DB when timed out — VPS may have finished; reconcile on next page load.
