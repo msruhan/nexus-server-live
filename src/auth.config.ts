@@ -1,5 +1,8 @@
 import type { NextAuthConfig } from 'next-auth';
 
+/** Idle session lifetime for admin and user roles (seconds). */
+export const SESSION_MAX_AGE_SEC = 60 * 60;
+
 const authUrl =
   process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
 const useSecureCookies = authUrl.startsWith('https://');
@@ -12,7 +15,7 @@ const cookiePrefix = useSecureCookies ? '__Secure-nexus.' : 'nexus.';
 export const authConfig = {
   trustHost: true,
   secret: process.env.AUTH_SECRET,
-  session: { strategy: 'jwt' },
+  session: { strategy: 'jwt', maxAge: SESSION_MAX_AGE_SEC, updateAge: SESSION_MAX_AGE_SEC },
   pages: { signIn: '/login' },
   cookies: {
     sessionToken: {
