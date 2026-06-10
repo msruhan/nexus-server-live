@@ -17,7 +17,7 @@ You do **not** need to upload `usdtportal_callback.php`; NexusServer implements 
 | Field | Value |
 |-------|--------|
 | Website type | DHRU FUSION / PHP / OTHER |
-| Callback URL | `yourdomain.com/api/payment/usdt-portal/callback` *(no https/www)* |
+| Callback URL | `yourdomain.com/api/payment/usdt-portal/callback` *(no https/www)* — **not** `usdtportal_callback.php` |
 | Secret Callback Password | Same as Admin → Payments |
 | Website security | `https` |
 | URL version | `without www` |

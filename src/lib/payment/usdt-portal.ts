@@ -187,7 +187,7 @@ export async function verifyUsdtPortalTransaction(
     const data = (await res.json()) as { transaction_status?: string; amount?: string | number };
     if (data.transaction_status !== 'paid') return false;
     if (data.amount === undefined || data.amount === null) return false;
-    return Number(data.amount) === Number(amount);
+    return Number(data.amount) >= Number(amount) - 0.01;
   } catch {
     return false;
   }

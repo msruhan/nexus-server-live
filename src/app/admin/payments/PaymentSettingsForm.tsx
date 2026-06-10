@@ -128,7 +128,8 @@ export function PaymentSettingsForm({ initial }: { initial: Initial }) {
               <code className="font-mono">DHRU FUSION / PHP / OTHER</code>
             </div>
             <div>
-              <span className="font-semibold">Callback URL</span> (no https or www):{' '}
+              <span className="font-semibold">Callback URL</span> (no https or www, not{' '}
+              <code className="font-mono">usdtportal_callback.php</code>):{' '}
               <code className="font-mono break-all">{usdtCallbackPathForPanel}</code>
             </div>
             <div>

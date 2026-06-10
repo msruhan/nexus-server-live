@@ -49,14 +49,23 @@ export async function POST(req: Request) {
   } catch {
     return ok({ is_success: false, code: 400, message: 'Empty body' });
   }
-  if (!raw.trim()) return ok({ is_success: false, code: 400, message: 'Empty body' });
+  // PHP reference: empty POST body → exit("OK!") — USDT panel "Test Callback URL" probe.
+  if (!raw.trim()) {
+    return new Response('OK!', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  }
 
   // Parse form-urlencoded body.
   const params = new URLSearchParams(raw);
   const get = (k: string) => params.get(k) ?? '';
 
+  const isHandshake =
+    Boolean(get('test_callback')) ||
+    (params.has('email') &&
+      params.has('callback_url_password') &&
+      !params.has('order_id'));
+
   // ── Test callback handshake (called from merchant panel) ───────
-  if (get('test_callback')) {
+  if (isHandshake) {
     if (
       !constantEquals(get('email'), settings.email) ||
       !constantEquals(get('callback_url_password'), settings.callbackPassword)
