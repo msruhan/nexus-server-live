@@ -80,6 +80,7 @@ export async function createUsdtPortalIntent(
       userId: input.userId,
       gateway: 'usdt_portal',
       amount: new Prisma.Decimal(amountUsd),
+      purpose: input.purpose ?? 'wallet_topup',
       cryptoAsset: 'USDT',
       cryptoAmount: usdtAmount.toFixed(2),
       expiresAt,

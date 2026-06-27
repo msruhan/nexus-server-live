@@ -18,6 +18,7 @@ type Initial = {
   brandInvoicePrefix: string;
   copyrightText: string;
   enableRegistration: boolean;
+  registrationActivationMode: 'AUTO' | 'MANUAL' | 'EMAIL';
   enableDirectPayment: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
@@ -242,6 +243,28 @@ export function SettingsForm({ initial }: { initial: Initial }) {
             checked={state.enableRegistration}
             onChange={(v) => patch('enableRegistration', v)}
           />
+          {state.enableRegistration && (
+            <label className="block rounded-xl border border-line px-4 py-3 text-sm">
+              <div className="font-medium text-ink">Registration activation</div>
+              <p className="mt-1 text-xs text-ink-muted">
+                Choose how new accounts become usable after sign-up.
+              </p>
+              <select
+                className="mt-3 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                value={state.registrationActivationMode}
+                onChange={(e) =>
+                  patch(
+                    'registrationActivationMode',
+                    e.target.value as Initial['registrationActivationMode'],
+                  )
+                }
+              >
+                <option value="AUTO">Auto active — sign in immediately</option>
+                <option value="MANUAL">Manual — admin activates in Users menu</option>
+                <option value="EMAIL">Email link — account active after verification click</option>
+              </select>
+            </label>
+          )}
           <Toggle
             label="Enable direct payment (gateway)"
             checked={state.enableDirectPayment}

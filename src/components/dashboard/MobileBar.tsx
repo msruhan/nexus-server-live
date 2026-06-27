@@ -5,6 +5,7 @@ import { signOut } from 'next-auth/react';
 import { List, SignOut, X } from '@phosphor-icons/react';
 import { formatAppVersion } from '@/lib/app-version';
 import { useSidebarMobileNav } from '@/components/dashboard/sidebar-mobile-context';
+import { NotificationBell } from '@/components/dashboard/NotificationBell';
 
 export function MobileBar({ user }: { user: { name: string; email: string; role: string } }) {
   const { open, toggle } = useSidebarMobileNav();
@@ -36,6 +37,7 @@ export function MobileBar({ user }: { user: { name: string; email: string; role:
         </Link>
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        <NotificationBell />
         <span className="hidden max-w-[120px] truncate font-mono text-[10px] uppercase tracking-wider text-ink-muted sm:inline">
           {user.email}
         </span>

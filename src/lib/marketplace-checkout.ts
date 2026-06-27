@@ -7,6 +7,13 @@ import { scheduleImeiOrderFollowUp } from '@/lib/imei-order-scheduler';
 import { scheduleServerOrderFollowUp } from '@/lib/server-order-scheduler';
 import { pollImeiOrderFromSupplier, submitImeiOrderToSupplier } from '@/lib/imei-order-worker';
 import { pollServerOrderFromSupplier, submitServerOrderToSupplier } from '@/lib/server-order-worker';
+import { resolveSupplierCostAtOrder } from '@/lib/supplier-cost';
+import { isMarketplacePaymentReference } from '@/lib/marketplace-order-guard';
+import { toNum } from '@/lib/supplier-sync/money';
+import { logActivity } from '@/lib/activity';
+import { isMarketplaceSystemGuestUser, displayNameFromEmail } from '@/lib/marketplace-guest-user';
+import { notifyOrderCreated } from '@/lib/email/notify';
+import { createInvoice } from '@/lib/invoice/service';
 
 function safeJsonParse(input: string): Record<string, string> {
   try {
@@ -20,217 +27,262 @@ function safeJsonParse(input: string): Record<string, string> {
   }
 }
 
-export async function finalizeMarketplaceCheckoutByIntent(intentId: string): Promise<void> {
+function amountsMatch(a: Prisma.Decimal | number, b: Prisma.Decimal | number): boolean {
+  return Math.abs(toNum(a) - toNum(b)) < 0.01;
+}
+
+/**
+ * Fulfill a guest marketplace checkout after payment is verified.
+ * Does NOT credit the user wallet — payment goes straight to order creation.
+ */
+export async function fulfillMarketplaceCheckoutByIntent(
+  intentId: string,
+  txHash?: string | null,
+): Promise<{ ok: boolean; reason?: string }> {
   const checkout = await prisma.marketplaceCheckout.findFirst({
-    where: {
-      paymentIntentId: intentId,
-      status: { in: ['AWAITING_PAYMENT', 'PROCESSING'] },
-    },
-    include: {
-      paymentIntent: true,
+    where: { paymentIntentId: intentId },
+    include: { paymentIntent: true },
+  });
+
+  if (!checkout) return { ok: true };
+  if (checkout.status === 'COMPLETED') return { ok: true };
+  if (checkout.status === 'FAILED') return { ok: false, reason: 'checkout_failed' };
+
+  const intent = checkout.paymentIntent;
+  if (!intent) {
+    await markCheckoutFailed(checkout.id, 'Missing payment intent');
+    return { ok: false, reason: 'missing_intent' };
+  }
+
+  if (intent.purpose !== 'marketplace') {
+    await markCheckoutFailed(checkout.id, 'Payment is not a marketplace checkout');
+    return { ok: false, reason: 'invalid_purpose' };
+  }
+
+  if (!isMarketplacePaymentReference(intent.reference)) {
+    await markCheckoutFailed(checkout.id, 'Invalid marketplace payment reference');
+    return { ok: false, reason: 'invalid_reference' };
+  }
+
+  if (!amountsMatch(intent.amount, checkout.quotedAmount)) {
+    await markCheckoutFailed(checkout.id, 'Paid amount does not match quoted service price');
+    return { ok: false, reason: 'amount_mismatch' };
+  }
+
+  if (intent.status === 'CANCELLED' || intent.status === 'EXPIRED' || intent.status === 'FAILED') {
+    await markCheckoutFailed(checkout.id, `Payment intent ${intent.status.toLowerCase()}`);
+    return { ok: false, reason: `intent_${intent.status.toLowerCase()}` };
+  }
+
+  const locked = await prisma.marketplaceCheckout.updateMany({
+    where: { id: checkout.id, status: { in: ['AWAITING_PAYMENT', 'PROCESSING'] } },
+    data: { status: 'PROCESSING' },
+  });
+  if (locked.count === 0 && checkout.status !== 'PROCESSING') {
+    return { ok: false, reason: 'checkout_locked' };
+  }
+
+  try {
+    if (intent.status === 'PENDING') {
+      await prisma.paymentIntent.update({
+        where: { id: intent.id, status: 'PENDING' },
+        data: {
+          status: 'CONFIRMED',
+          confirmedAt: new Date(),
+          txHash: txHash ?? intent.txHash,
+        },
+      });
+    } else if (intent.status !== 'CONFIRMED') {
+      await markCheckoutFailed(checkout.id, `Unexpected payment status: ${intent.status}`);
+      return { ok: false, reason: 'intent_not_confirmed' };
+    }
+
+    const freshIntent = await prisma.paymentIntent.findUnique({ where: { id: intent.id } });
+    if (!freshIntent || freshIntent.status !== 'CONFIRMED') {
+      await markCheckoutFailed(checkout.id, 'Payment confirmation failed');
+      return { ok: false, reason: 'confirm_failed' };
+    }
+
+    const payload = safeJsonParse(checkout.payload);
+    const effectivePrice = new Prisma.Decimal(checkout.quotedAmount);
+
+    if (checkout.kind === 'imei') {
+      await fulfillImeiCheckout(checkout, payload, effectivePrice);
+    } else {
+      await fulfillServerCheckout(checkout, payload, effectivePrice);
+    }
+
+    const activityUserId = (await isMarketplaceSystemGuestUser(checkout.userId))
+      ? null
+      : checkout.userId;
+
+    await logActivity({
+      userId: activityUserId,
+      action: 'marketplace.checkout_completed',
+      entity: 'MarketplaceCheckout',
+      entityId: checkout.id,
+      metadata: { kind: checkout.kind, serviceId: checkout.serviceId, intentId: intent.id },
+    });
+
+    return { ok: true };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Fulfillment failed';
+    await markCheckoutFailed(checkout.id, message);
+    console.error('[MARKETPLACE_FULFILL]', intentId, e);
+    return { ok: false, reason: message };
+  }
+}
+
+async function markCheckoutFailed(checkoutId: string, message: string) {
+  await prisma.marketplaceCheckout.updateMany({
+    where: { id: checkoutId, status: { in: ['AWAITING_PAYMENT', 'PROCESSING'] } },
+    data: { status: 'FAILED', errorMessage: message },
+  });
+}
+
+async function fulfillImeiCheckout(
+  checkout: { id: string; userId: string; serviceId: string; email: string },
+  payload: Record<string, string>,
+  effectivePrice: Prisma.Decimal,
+) {
+  const isGuest = await isMarketplaceSystemGuestUser(checkout.userId);
+  const service = await prisma.imeiService.findFirst({
+    where: { id: checkout.serviceId, status: 'ACTIVE' },
+    select: {
+      id: true,
+      title: true,
+      price: true,
+      supplierPrice: true,
+      requiresImei: true,
+      requiresNetwork: true,
+      requiresModel: true,
+      requiresProvider: true,
+      requiresPin: true,
+      requiresKbh: true,
+      requiresMep: true,
+      requiresPrd: true,
+      requiresSn: true,
+      requiresEcid: true,
     },
   });
-  if (!checkout || !checkout.paymentIntent) return;
-  if (checkout.status === 'COMPLETED') return;
-  if (checkout.paymentIntent.status !== 'CONFIRMED') return;
+  if (!service) throw new Error('Service not found or inactive');
 
-  // Opportunistic lock by marking as processing.
-  if (checkout.status === 'AWAITING_PAYMENT') {
-    await prisma.marketplaceCheckout.updateMany({
-      where: { id: checkout.id, status: 'AWAITING_PAYMENT' },
-      data: { status: 'PROCESSING' },
-    });
+  const deviceInput = validateImeiOrderDeviceInput(service, payload);
+  if (deviceInput.error) throw new Error(deviceInput.error);
+
+  const required: Array<{ key: string; label: string; flag: boolean }> = [
+    { key: 'network', label: 'Network', flag: service.requiresNetwork },
+    { key: 'model', label: 'Model', flag: service.requiresModel },
+    { key: 'provider', label: 'Provider', flag: service.requiresProvider },
+    { key: 'pin', label: 'PIN', flag: service.requiresPin },
+    { key: 'kbh', label: 'KBH', flag: service.requiresKbh },
+    { key: 'mep', label: 'MEP', flag: service.requiresMep },
+    { key: 'prd', label: 'PRD', flag: service.requiresPrd },
+    { key: 'serialNumber', label: 'Serial Number', flag: service.requiresSn },
+    { key: 'ecid', label: 'ECID', flag: service.requiresEcid },
+  ];
+  for (const r of required) {
+    if (r.flag && !`${payload[r.key] ?? ''}`.trim()) {
+      throw new Error(`Field ${r.label} is required`);
+    }
   }
 
-  const payload = safeJsonParse(checkout.payload);
-  const effectivePrice = new Prisma.Decimal(checkout.quotedAmount);
-
-  if (checkout.kind === 'imei') {
-    const service = await prisma.imeiService.findFirst({
-      where: { id: checkout.serviceId, status: 'ACTIVE' },
-      select: {
-        id: true,
-        title: true,
-        apiId: true,
-        requiresImei: true,
-        requiresNetwork: true,
-        requiresModel: true,
-        requiresProvider: true,
-        requiresPin: true,
-        requiresKbh: true,
-        requiresMep: true,
-        requiresPrd: true,
-        requiresSn: true,
-        requiresEcid: true,
+  const order = await prisma.$transaction(async (tx) => {
+    const created = await tx.imeiOrder.create({
+      data: {
+        orderCode: generateOrderCode(),
+        userId: checkout.userId,
+        serviceId: service.id,
+        imei: deviceInput.imei,
+        price: effectivePrice,
+        supplierCost: resolveSupplierCostAtOrder(service),
+        status: 'PENDING',
+        network: payload.network || null,
+        model: payload.model || null,
+        provider: payload.provider || null,
+        pin: payload.pin || null,
+        kbh: payload.kbh || null,
+        mep: payload.mep || null,
+        prd: payload.prd || null,
+        serialNumber: deviceInput.serialNumber,
+        ecid: deviceInput.ecid,
+        note: payload.note || null,
+        guestEmail: isGuest ? checkout.email : null,
       },
     });
-    if (!service) {
-      await prisma.marketplaceCheckout.update({
-        where: { id: checkout.id },
-        data: { status: 'FAILED', errorMessage: 'Service not found or inactive' },
-      });
-      return;
-    }
 
-    const deviceInput = validateImeiOrderDeviceInput(service, payload);
-    if (deviceInput.error) {
-      await prisma.marketplaceCheckout.update({
-        where: { id: checkout.id },
-        data: { status: 'FAILED', errorMessage: deviceInput.error },
-      });
-      return;
-    }
-
-    const required: Array<{ key: string; label: string; flag: boolean }> = [
-      { key: 'network', label: 'Network', flag: service.requiresNetwork },
-      { key: 'model', label: 'Model', flag: service.requiresModel },
-      { key: 'provider', label: 'Provider', flag: service.requiresProvider },
-      { key: 'pin', label: 'PIN', flag: service.requiresPin },
-      { key: 'kbh', label: 'KBH', flag: service.requiresKbh },
-      { key: 'mep', label: 'MEP', flag: service.requiresMep },
-      { key: 'prd', label: 'PRD', flag: service.requiresPrd },
-      { key: 'serialNumber', label: 'Serial Number', flag: service.requiresSn },
-      { key: 'ecid', label: 'ECID', flag: service.requiresEcid },
-    ];
-    for (const r of required) {
-      if (r.flag && !`${payload[r.key] ?? ''}`.trim()) {
-        await prisma.marketplaceCheckout.update({
-          where: { id: checkout.id },
-          data: { status: 'FAILED', errorMessage: `Field ${r.label} is required` },
-        });
-        return;
-      }
-    }
-
-    const order = await prisma.$transaction(async (tx) => {
-      const wallet = await tx.wallet.upsert({
-        where: { userId: checkout.userId },
-        update: {},
-        create: { userId: checkout.userId, balance: 0 },
-      });
-      if (wallet.balance.lessThan(effectivePrice)) {
-        throw new Error('INSUFFICIENT_BALANCE');
-      }
-      const newBalance = wallet.balance.sub(effectivePrice);
-      await tx.wallet.update({ where: { id: wallet.id }, data: { balance: newBalance } });
-
-      const created = await tx.imeiOrder.create({
-        data: {
-          orderCode: generateOrderCode(),
-          userId: checkout.userId,
-          serviceId: service.id,
-          imei: deviceInput.imei,
-          price: effectivePrice,
-          status: 'PENDING',
-          network: payload.network || null,
-          model: payload.model || null,
-          provider: payload.provider || null,
-          pin: payload.pin || null,
-          kbh: payload.kbh || null,
-          mep: payload.mep || null,
-          prd: payload.prd || null,
-          serialNumber: deviceInput.serialNumber,
-          ecid: deviceInput.ecid,
-          note: payload.note || null,
-        },
-      });
-
-      await tx.walletLedger.create({
-        data: {
-          walletId: wallet.id,
-          type: 'PAYMENT',
-          amount: effectivePrice.neg(),
-          balance: newBalance,
-          description: `Marketplace IMEI order: ${service.title}`,
-          referenceId: created.id,
-        },
-      });
-
-      await tx.marketplaceCheckout.update({
-        where: { id: checkout.id },
-        data: {
-          status: 'COMPLETED',
-          orderType: 'imei',
-          orderId: created.id,
-          errorMessage: null,
-        },
-      });
-
-      return created;
+    await tx.marketplaceCheckout.update({
+      where: { id: checkout.id },
+      data: {
+        status: 'COMPLETED',
+        orderType: 'imei',
+        orderId: created.id,
+        errorMessage: null,
+      },
     });
 
-    try {
-      const submitted = await submitImeiOrderToSupplier(order.id);
-      if (submitted.ok && submitted.referenceId) {
-        void pollImeiOrderFromSupplier(order.id).catch(() => null);
-      }
-      scheduleImeiOrderFollowUp(order.id);
-    } catch {
-      // No-op: order exists and will be picked up by scheduler retries.
+    return created;
+  });
+
+  try {
+    const submitted = await submitImeiOrderToSupplier(order.id);
+    if (submitted.ok && submitted.referenceId) {
+      void pollImeiOrderFromSupplier(order.id).catch(() => null);
     }
-    return;
+    scheduleImeiOrderFollowUp(order.id);
+  } catch {
+    scheduleImeiOrderFollowUp(order.id);
   }
 
+  void notifyOrderCreated({ kind: 'imei', orderId: order.id });
+  void createInvoice({
+    userId: checkout.userId,
+    kind: 'ORDER',
+    amount: effectivePrice,
+    description: `Marketplace order ${order.orderCode} — ${service.title}`,
+    refType: 'ImeiOrder',
+    refId: order.id,
+    orderCode: order.orderCode,
+    buyerEmail: isGuest ? checkout.email : undefined,
+    buyerName: isGuest ? displayNameFromEmail(checkout.email) : undefined,
+  });
+}
+
+async function fulfillServerCheckout(
+  checkout: { id: string; userId: string; serviceId: string; email: string },
+  payload: Record<string, string>,
+  effectivePrice: Prisma.Decimal,
+) {
+  const isGuest = await isMarketplaceSystemGuestUser(checkout.userId);
   const service = await prisma.serverService.findFirst({
     where: { id: checkout.serviceId, status: 'ACTIVE' },
     select: {
       id: true,
       title: true,
+      price: true,
+      supplierPrice: true,
       requiredFields: true,
     },
   });
-  if (!service) {
-    await prisma.marketplaceCheckout.update({
-      where: { id: checkout.id },
-      data: { status: 'FAILED', errorMessage: 'Service not found or inactive' },
-    });
-    return;
-  }
+  if (!service) throw new Error('Service not found or inactive');
 
   const fieldDefs = parseServerFieldDefs(service.requiredFields);
   const validation = validateServerOrderFields(fieldDefs, payload);
-  if (!validation.ok) {
-    await prisma.marketplaceCheckout.update({
-      where: { id: checkout.id },
-      data: { status: 'FAILED', errorMessage: validation.error ?? 'Invalid order fields' },
-    });
-    return;
-  }
+  if (!validation.ok) throw new Error(validation.error ?? 'Invalid order fields');
 
   const order = await prisma.$transaction(async (tx) => {
-    const wallet = await tx.wallet.upsert({
-      where: { userId: checkout.userId },
-      update: {},
-      create: { userId: checkout.userId, balance: 0 },
-    });
-    if (wallet.balance.lessThan(effectivePrice)) {
-      throw new Error('INSUFFICIENT_BALANCE');
-    }
-    const newBalance = wallet.balance.sub(effectivePrice);
-    await tx.wallet.update({ where: { id: wallet.id }, data: { balance: newBalance } });
-
     const created = await tx.serverOrder.create({
       data: {
         orderCode: generateOrderCode(),
         userId: checkout.userId,
         serviceId: service.id,
         price: effectivePrice,
+        supplierCost: resolveSupplierCostAtOrder(service),
         status: 'PENDING',
         email: validation.email || checkout.email,
         notes: validation.notes,
         requiredFields:
           Object.keys(validation.fields).length > 0 ? JSON.stringify(validation.fields) : null,
-      },
-    });
-
-    await tx.walletLedger.create({
-      data: {
-        walletId: wallet.id,
-        type: 'PAYMENT',
-        amount: effectivePrice.neg(),
-        balance: newBalance,
-        description: `Marketplace server order: ${service.title}`,
-        referenceId: created.id,
       },
     });
 
@@ -254,7 +306,24 @@ export async function finalizeMarketplaceCheckoutByIntent(intentId: string): Pro
     }
     scheduleServerOrderFollowUp(order.id);
   } catch {
-    // No-op: order exists and will be picked up by scheduler retries.
+    scheduleServerOrderFollowUp(order.id);
   }
+
+  void notifyOrderCreated({ kind: 'server', orderId: order.id });
+  void createInvoice({
+    userId: checkout.userId,
+    kind: 'ORDER',
+    amount: effectivePrice,
+    description: `Marketplace order ${order.orderCode} — ${service.title}`,
+    refType: 'ServerOrder',
+    refId: order.id,
+    orderCode: order.orderCode,
+    buyerEmail: isGuest ? checkout.email : undefined,
+    buyerName: isGuest ? displayNameFromEmail(checkout.email) : undefined,
+  });
 }
 
+/** @deprecated use fulfillMarketplaceCheckoutByIntent */
+export async function finalizeMarketplaceCheckoutByIntent(intentId: string): Promise<void> {
+  await fulfillMarketplaceCheckoutByIntent(intentId);
+}

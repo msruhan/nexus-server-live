@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SettingsForm } from './SettingsForm';
+import { parseRegistrationActivationMode } from '@/lib/auth/registration-activation';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,9 @@ export default async function AdminSettingsPage() {
           brandInvoicePrefix: settings?.brandInvoicePrefix ?? 'INV',
           copyrightText: settings?.copyrightText ?? '',
           enableRegistration: settings?.enableRegistration ?? true,
+          registrationActivationMode: parseRegistrationActivationMode(
+            settings?.registrationActivationMode,
+          ),
           enableDirectPayment: settings?.enableDirectPayment ?? false,
           maintenanceMode: settings?.maintenanceMode ?? false,
           maintenanceMessage: settings?.maintenanceMessage ?? '',

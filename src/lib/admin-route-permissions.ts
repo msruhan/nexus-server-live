@@ -27,6 +27,7 @@ const ROUTE_PERMISSIONS: Array<{ prefix: string; perm: PermissionKey }> = [
   { prefix: '/admin/sub-admins', perm: 'manageSubAdmins' },
   { prefix: '/admin/tickets', perm: 'viewTickets' },
   { prefix: '/admin/logs', perm: 'viewActivityLog' },
+  { prefix: '/admin/audit', perm: 'viewActivityLog' },
   { prefix: '/admin/api-keys', perm: 'manageApiKeys' },
   { prefix: '/admin/ip-management', perm: 'manageApiKeys' },
   { prefix: '/admin/email', perm: 'manageEmailSettings' },
@@ -42,6 +43,8 @@ const ROUTE_PERMISSIONS: Array<{ prefix: string; perm: PermissionKey }> = [
   { prefix: '/admin/payments', perm: 'managePaymentGateways' },
 
   // CMS (all sub-routes need editCms; overview needs viewCms)
+  { prefix: '/admin/cms/email-templates', perm: 'editCms' },
+  { prefix: '/admin/cms/announcements', perm: 'editCms' },
   { prefix: '/admin/cms/landing-builder', perm: 'editCms' },
   { prefix: '/admin/cms/palette', perm: 'editCms' },
   { prefix: '/admin/cms/banners', perm: 'editCms' },

@@ -11,6 +11,8 @@ import {
   FilePlus,
   Palette,
   Rows,
+  Broadcast,
+  Envelope,
 } from '@phosphor-icons/react/dist/ssr';
 import { prisma } from '@/lib/db';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -22,6 +24,7 @@ export default async function CmsHub() {
     sectionCount,
     bannerCount,
     runningAdCount,
+    announcementCount,
     menuCount,
     faqCount,
     testimonialCount,
@@ -31,6 +34,7 @@ export default async function CmsHub() {
     prisma.pageSection.count(),
     prisma.banner.count(),
     prisma.runningAd.count(),
+    prisma.siteAnnouncement.count(),
     prisma.navigationMenu.count(),
     prisma.faqItem.count(),
     prisma.testimonial.count(),
@@ -72,6 +76,22 @@ export default async function CmsHub() {
       desc: 'Ticker text running across the top.',
       count: runningAdCount,
       countLabel: 'ads',
+    },
+    {
+      href: '/admin/cms/announcements',
+      icon: Broadcast,
+      title: 'Announcements',
+      desc: 'Global banner · schedule maintenance windows.',
+      count: announcementCount,
+      countLabel: 'banners',
+    },
+    {
+      href: '/admin/cms/email-templates',
+      icon: Envelope,
+      title: 'Email templates',
+      desc: 'Order, wallet &amp; ticket notification copy.',
+      count: 9,
+      countLabel: 'templates',
     },
     {
       href: '/admin/cms/menus',

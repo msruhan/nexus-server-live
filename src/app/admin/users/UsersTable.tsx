@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { formatUSD, formatDate } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { StatusPill } from '@/components/ui/StatusPill';
-import { UserToggle } from './UserToggle';
+import { UserActivationStatus } from './UserActivationStatus';
+import { UserWalletCredit } from './UserWalletCredit';
 import { UserGroupSelect, type UserGroupOption } from './UserGroupSelect';
 import { CatalogTableToolbar } from '@/components/admin/CatalogTableToolbar';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
@@ -17,6 +18,8 @@ type Row = {
   orders: number;
   joined: Date;
   active: boolean;
+  emailVerifiedAt: Date | null;
+  emailVerificationToken: string | null;
   groupId: string;
   group: string;
 };
@@ -100,11 +103,22 @@ export function UsersTable({
                 <td className="px-4 py-3">
                   <StatusPill status={u.role} />
                 </td>
-                <td className="px-4 py-3 text-right font-mono">{formatUSD(u.wallet)}</td>
+                <td className="px-4 py-3 text-right">
+                  <UserWalletCredit
+                    userId={u.id}
+                    userName={u.name}
+                    currentBalance={u.wallet}
+                  />
+                </td>
                 <td className="px-4 py-3 text-right font-mono text-xs">{u.orders}</td>
                 <td className="px-4 py-3 font-mono text-xs text-ink-muted">{formatDate(u.joined)}</td>
                 <td className="px-4 py-3 text-right">
-                  <UserToggle userId={u.id} active={u.active} />
+                  <UserActivationStatus
+                    userId={u.id}
+                    active={u.active}
+                    emailVerifiedAt={u.emailVerifiedAt}
+                    emailVerificationToken={u.emailVerificationToken}
+                  />
                 </td>
               </tr>
             ))}

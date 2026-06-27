@@ -49,6 +49,10 @@ export async function generateMetadata(): Promise<Metadata> {
       statusBarStyle: 'default',
       title: brand.siteName,
     },
+    other: {
+      'mobile-web-app-capable': 'yes',
+      'apple-mobile-web-app-capable': 'yes',
+    },
     icons: brand.faviconUrl
       ? { icon: brand.faviconUrl, apple: brand.faviconUrl }
       : { icon: '/brand/icon-nexus.png', apple: '/brand/icon-nexus.png' },

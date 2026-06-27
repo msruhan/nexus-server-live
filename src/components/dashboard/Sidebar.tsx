@@ -51,6 +51,7 @@ import {
 import { cn } from '@/lib/cn';
 import { formatAppVersion } from '@/lib/app-version';
 import { SidebarMobileNavProvider } from '@/components/dashboard/sidebar-mobile-context';
+import { NotificationBell } from '@/components/dashboard/NotificationBell';
 import type { Icon } from '@phosphor-icons/react';
 
 type Item = {
@@ -138,6 +139,7 @@ const adminSections: Section[] = [
     title: 'Security & logs',
     items: [
       { href: '/admin/logs', label: 'Activity log', icon: Scroll, perm: 'viewActivityLog' },
+      { href: '/admin/audit', label: 'Staff audit', icon: Shield, perm: 'viewActivityLog' },
       { href: '/admin/api-keys', label: 'API keys', icon: Key, perm: 'manageApiKeys' },
       { href: '/admin/ip-management', label: 'IP management', icon: Shield, perm: 'manageApiKeys' },
     ],
@@ -146,6 +148,7 @@ const adminSections: Section[] = [
     title: 'Notifications',
     items: [
       { href: '/admin/email', label: 'Email / SMTP', icon: Envelope, perm: 'manageEmailSettings' },
+      { href: '/admin/cms/email-templates', label: 'Email templates', icon: Envelope, perm: 'editCms' },
       { href: '/admin/telegram', label: 'Telegram bot', icon: TelegramLogo, perm: 'manageTelegram' },
     ],
   },
@@ -167,6 +170,7 @@ const adminSections: Section[] = [
       { href: '/admin/cms/landing-builder', label: 'Landing builder', icon: Layout, perm: 'editCms' },
       { href: '/admin/cms/banners', label: 'Banners', icon: ImageIcon, perm: 'editCms' },
       { href: '/admin/cms/running-ads', label: 'Running ads', icon: TextAa, perm: 'editCms' },
+      { href: '/admin/cms/announcements', label: 'Announcements', icon: Broadcast, perm: 'editCms' },
       { href: '/admin/cms/menus', label: 'Menus', icon: ListBullets, perm: 'editCms' },
       { href: '/admin/cms/footer', label: 'Footer', icon: Rows, perm: 'editCms' },
       { href: '/admin/cms/faq', label: 'FAQ', icon: Question, perm: 'editCms' },
@@ -485,6 +489,11 @@ export function Sidebar({
 
       {/* User block */}
       <div className="border-t border-line px-3 py-4">
+        {variant === 'user' && (
+          <div className="mb-3 hidden justify-end lg:flex">
+            <NotificationBell />
+          </div>
+        )}
         <div className="rounded-lg bg-paper-100 p-3">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink font-display font-bold text-paper">

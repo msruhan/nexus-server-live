@@ -19,6 +19,9 @@ model User {
   password  String
   role      String   @default("USER") // ADMIN | SUB_ADMIN | USER
   isActive  Boolean  @default(true)
+  emailVerifiedAt DateTime?
+  emailVerificationToken String?
+  emailVerificationExpiresAt DateTime?
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String? @db.Text
 
@@ -32,6 +35,7 @@ model User {
   telegramLinkExpiresAt DateTime?
   telegramLinkedAt      DateTime?
   telegramNotifyEnabled Boolean @default(true)
+  pushNotifyEnabled     Boolean @default(true)
 
   // Per-account dashboard palette (member desk / admin bureau — independent per user)
   paletteTemplate String  @default("editorial")
@@ -55,6 +59,8 @@ model User {
   invoices       Invoice[]
   webhookEndpoints WebhookEndpoint[]
   apiIpWhitelist   IpWhitelistEntry?
+  notifications    UserNotification[]
+  pushSubscriptions PushSubscription[]
 
   @@index([priceGroupId])
 }
@@ -429,6 +435,9 @@ model ImeiOrder {
   comments    String? @db.Text
   referenceId String?
 
+  /// Contact email for guest marketplace orders (no user account).
+  guestEmail String?
+
   // ─── Reseller callback (Dhru-compatible, additive) ──────────────
   // Caller-supplied idempotency key + feedback URL. All optional; when
   // absent the order behaves exactly as before. quantity defaults to 1.
@@ -448,6 +457,7 @@ model ImeiOrder {
   @@index([userId, status])
   @@index([status, createdAt])
   @@index([imei])
+  @@index([guestEmail])
 }
 
 model ServerServiceBox {
@@ -584,6 +594,8 @@ model SiteSettings {
 
   enableDarkMode      Boolean  @default(true)
   enableRegistration  Boolean  @default(true)
+  /// AUTO = active immediately · MANUAL = admin enables in Users · EMAIL = active but must verify email
+  registrationActivationMode String @default("AUTO")
   enableDirectPayment Boolean  @default(false)
   maintenanceMode     Boolean  @default(false)
   maintenanceMessage  String?
@@ -708,6 +720,14 @@ model SiteSettings {
   /// JSON map of currency code → rate from USD base, e.g. {"IDR":16000,"EUR":0.92}
   currencyRates       String? @db.Text
 
+  // ─── Scheduled analytics report email ───────────────────────────
+  reportEmailEnabled    Boolean   @default(false)
+  reportEmailTo         String?
+  reportEmailFrequency  String    @default("weekly") // daily | weekly
+  reportEmailHour       Int       @default(8)
+  reportEmailLastSentAt DateTime?
+  reportEmailNextRunAt  DateTime?
+
   updatedAt           DateTime @updatedAt
 }
 
@@ -785,6 +805,66 @@ model RunningAd {
   updatedAt DateTime  @updatedAt
 
   @@index([isActive, sortOrder])
+}
+
+model SiteAnnouncement {
+  id          String    @id @default(cuid())
+  title       String?
+  message     String    @db.Text
+  tone        String    @default("info") // info | warning | maintenance
+  linkUrl     String?
+  linkLabel   String?
+  isActive    Boolean   @default(true)
+  startAt     DateTime?
+  endAt       DateTime?
+  showOnAdmin Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive, startAt, endAt, sortOrder])
+}
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  event       String   @unique
+  label       String
+  subject     String
+  bodyText    String   @db.Text
+  description String?  @db.Text
+  updatedAt   DateTime @updatedAt
+}
+
+model UserNotification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String?   @db.Text
+  href      String?
+  readAt    DateTime?
+  metadata  String?   @db.Text
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([userId, createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model NavigationMenu {
@@ -911,6 +991,9 @@ model PaymentIntent {
 
   // Wallet credit on success (USD).
   amount          Decimal  @db.Decimal(14, 2)
+
+  /// wallet_topup = credit user balance · marketplace = guest instant order (no wallet credit)
+  purpose         String   @default("wallet_topup")
 
   // Source asset details (crypto). null for fiat gateways.
   cryptoAsset     String?  // "USDT-TRC20"

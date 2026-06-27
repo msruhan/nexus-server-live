@@ -5,6 +5,7 @@ import { ProfileForm } from './ProfileForm';
 import { PasswordForm } from './PasswordForm';
 import { TwoFactorForm } from './TwoFactorForm';
 import { TelegramLinkForm } from './TelegramLinkForm';
+import { PushNotificationForm } from './PushNotificationForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,15 @@ export default async function SettingsPage() {
           </h2>
           <div className="mt-6">
             <TelegramLinkForm />
+          </div>
+        </div>
+
+        <div>
+          <h2 className="border-b border-ink/15 pb-3 font-display text-lg font-extrabold tracking-tight text-ink">
+            Push notifications
+          </h2>
+          <div className="mt-6">
+            <PushNotificationForm />
           </div>
         </div>
       </section>

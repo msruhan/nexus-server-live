@@ -13,10 +13,12 @@ export function RegisterForm() {
   const router = useRouter();
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
 
     const fd = new FormData(e.currentTarget);
@@ -32,15 +34,37 @@ export function RegisterForm() {
       body: JSON.stringify(payload),
     });
 
+    const json = await res.json().catch(() => ({}));
+
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      setError(j.error ?? 'Registration failed');
+      setError(json.error ?? 'Registration failed');
       setLoading(false);
       toast.error('Registration failed');
       return;
     }
 
-    // Auto sign-in
+    const activation = String(json.activation ?? 'auto');
+
+    if (activation === 'manual') {
+      setSuccess(
+        'Account created. An administrator must activate your account before you can sign in.',
+      );
+      setLoading(false);
+      toast.success('Registration submitted', {
+        description: 'Waiting for admin approval.',
+      });
+      return;
+    }
+
+    if (activation === 'email') {
+      setSuccess(
+        'Account created. We sent a verification link to your email — click it to activate your account, then sign in.',
+      );
+      setLoading(false);
+      toast.success('Check your email', { description: 'Verification link sent.' });
+      return;
+    }
+
     await signIn('credentials', {
       email: payload.email,
       password: payload.password,
@@ -50,6 +74,23 @@ export function RegisterForm() {
     toast.success('Account created', { description: 'Welcome to the platform.' });
     router.push('/user/dashboard');
     router.refresh();
+  }
+
+  if (success) {
+    return (
+      <div className="space-y-5">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+          {success}
+        </div>
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-1 text-sm font-medium text-ink hover:text-primary-600"
+        >
+          Go to sign in
+          <ArrowUpRight weight="bold" size={14} />
+        </Link>
+      </div>
+    );
   }
 
   return (

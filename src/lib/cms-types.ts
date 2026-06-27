@@ -134,6 +134,9 @@ export type CatalogServiceRow = {
   popular?: boolean;
   tag?: string;
   orderHref?: string;
+  /** Linked marketplace service — title/price/delivery sync on publish. */
+  serviceId?: string;
+  kind?: 'imei' | 'server';
 };
 
 export type ServiceCatalogContent = {

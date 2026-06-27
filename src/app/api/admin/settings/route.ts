@@ -17,6 +17,7 @@ const schema = z.object({
   brandInvoicePrefix: z.string().optional().nullable(),
   copyrightText: z.string().optional().nullable(),
   enableRegistration: z.boolean().optional(),
+  registrationActivationMode: z.enum(['AUTO', 'MANUAL', 'EMAIL']).optional(),
   enableDirectPayment: z.boolean().optional(),
   maintenanceMode: z.boolean().optional(),
   maintenanceMessage: z.string().optional(),

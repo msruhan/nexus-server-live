@@ -166,6 +166,29 @@ Sign in: ${input.loginUrl}`;
   return { text, html };
 }
 
+export function emailVerificationTemplate(input: {
+  siteName: string;
+  recipientName: string;
+  verifyUrl: string;
+}) {
+  const text = `Hi ${input.recipientName},
+
+Thanks for registering at ${input.siteName}. Please verify your email to activate your account:
+
+${input.verifyUrl}
+
+This link expires in 48 hours.`;
+  const html = shell(
+    input.siteName,
+    `<h2 style="margin:0 0 12px;font-size:18px">Verify your email</h2>
+<p style="margin:0 0 12px">Hi ${input.recipientName}, click the button below to activate your ${input.siteName} account.</p>
+<p><a href="${input.verifyUrl}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">Verify email</a></p>
+<p style="margin:0;font-size:12px;color:#64748b">Or copy this link: ${input.verifyUrl}</p>`,
+    'You received this because someone registered with this email address.',
+  );
+  return { text, html };
+}
+
 export function orderCreatedTemplate(input: {
   siteName: string;
   recipientName: string;
@@ -178,13 +201,16 @@ export function orderCreatedTemplate(input: {
 
 We received your order ${input.orderCode} for ${input.serviceName} (${input.amount}).
 
+Your order is now being processed.
+
 Track your order: ${input.url}`;
   const html = shell(
     input.siteName,
     `<h2 style="margin:0 0 12px;font-size:18px">Order received — ${input.orderCode}</h2>
 <p style="margin:0 0 12px">${input.serviceName}</p>
 <p style="margin:0 0 12px"><strong>${input.amount}</strong></p>
-<p><a href="${input.url}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">View order</a></p>`,
+<p style="margin:0 0 12px">Your order is now being processed.</p>
+<p><a href="${input.url}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">Track order</a></p>`,
   );
   return { text, html };
 }

@@ -62,6 +62,7 @@ export async function POST(req: Request) {
     userId: session.user.id,
     amount: parsed.data.amount,
     reference,
+    purpose: 'wallet_topup',
   });
   if (!result.ok) return apiError(result.reason, 400);
 

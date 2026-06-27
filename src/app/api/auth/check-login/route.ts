@@ -17,6 +17,10 @@ import {
   isLicenseRuntimeLocked,
 } from '@/lib/license-state';
 import { attachLicenseLockCookie } from '@/lib/license-lock-cookie';
+import {
+  userNeedsEmailVerification,
+  userPendingAdminActivation,
+} from '@/lib/auth/registration-activation';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +73,8 @@ export async function POST(req: Request) {
         isActive: true,
         twoFactorEnabled: true,
         role: true,
+        emailVerifiedAt: true,
+        emailVerificationToken: true,
       },
     });
 
@@ -78,6 +84,15 @@ export async function POST(req: Request) {
     }
 
     if (!user.isActive) {
+      if (userPendingAdminActivation(user)) {
+        await logActivity({
+          userId: user.id,
+          action: 'auth.login_pending_admin',
+          ipAddress: ip,
+        });
+        return apiError('Account pending admin approval. You will be notified when activated.', 403);
+      }
+
       // Don't increment counter on disabled accounts (might be admin action,
       // not abuse) but do log so admin sees attempts.
       await logActivity({
@@ -97,6 +112,15 @@ export async function POST(req: Request) {
         ipAddress: ip,
       });
       return apiError('Invalid email or password', 401);
+    }
+
+    if (userNeedsEmailVerification(user)) {
+      await logActivity({
+        userId: user.id,
+        action: 'auth.login_unverified_email',
+        ipAddress: ip,
+      });
+      return apiError('Please verify your email before signing in. Check your inbox for the activation link.', 403);
     }
 
     const licenseState = await getLicenseEnforcementState();

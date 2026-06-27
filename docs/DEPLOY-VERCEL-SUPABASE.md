@@ -91,6 +91,12 @@ Setiap push ke branch production (biasanya `main`) → Vercel build otomatis.
 | Supabase project paused | Buka dashboard Supabase → Resume (Free tier pause setelah 1 minggu idle) |
 | Tabel tidak ada | Jalankan `npm run db:setup:supabase` lagi |
 
-## 8. Production platform (nanti)
+## 8. Production platform (GHCR / VPS)
 
-Gunakan **Contabo Cloud VPS 10 + Coolify** (atau PM2). Lihat diskusi deploy production terpisah; jangan mengandalkan Vercel untuk order/wallet/backup production.
+Gunakan **Contabo Cloud VPS 10 + Coolify** (atau PM2) dengan image **GHCR** yang terdaftar di Nexus Portal — bukan Vercel.
+
+- Env template: [`.env.coolify.example`](../.env.coolify.example)
+- **Web Push:** generate VAPID keys (`npx web-push generate-vapid-keys`) per install customer
+- Schedulers, backup, order polling: aktif di VPS (`ENABLE_BACKGROUND_JOBS=true`)
+
+Jangan mengandalkan Vercel untuk order/wallet/backup production.

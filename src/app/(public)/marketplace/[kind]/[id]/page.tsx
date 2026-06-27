@@ -51,10 +51,13 @@ type ImeiRequireFlags = {
 
 export default async function MarketplaceDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ kind: string; id: string }>;
+  searchParams: Promise<{ service?: string }>;
 }) {
   const { kind, id } = await params;
+  const { service: initialServiceId } = await searchParams;
   if (kind !== 'imei' && kind !== 'server') notFound();
 
   const session = await auth();
@@ -177,6 +180,7 @@ export default async function MarketplaceDetailPage({
         isAuthenticated={isAuthenticated}
         loginNext={loginNext}
         guestGateways={guestGateways}
+        initialServiceId={initialServiceId ?? null}
       />
     </section>
   );

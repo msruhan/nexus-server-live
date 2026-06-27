@@ -15,13 +15,21 @@ export function MarketplaceServices({
   isAuthenticated,
   loginNext,
   guestGateways,
+  initialServiceId,
 }: {
   rows: ServiceRow[];
   isAuthenticated: boolean;
   loginNext: string;
   guestGateways: Array<{ id: string; label: string }>;
+  initialServiceId?: string | null;
 }) {
   const [selected, setSelected] = React.useState<ModalService | null>(null);
+
+  React.useEffect(() => {
+    if (!initialServiceId) return;
+    const row = rows.find((r) => r.modal.id === initialServiceId);
+    if (row) setSelected(row.modal);
+  }, [initialServiceId, rows]);
 
   if (rows.length === 0) {
     return (

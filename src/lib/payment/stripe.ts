@@ -90,6 +90,7 @@ export async function createStripeIntent(
       userId: input.userId,
       gateway: 'stripe',
       amount: new Prisma.Decimal(amountUsd),
+      purpose: input.purpose ?? 'wallet_topup',
       cryptoAsset: 'USD',
       cryptoAmount: amountUsd.toFixed(2),
       expiresAt,

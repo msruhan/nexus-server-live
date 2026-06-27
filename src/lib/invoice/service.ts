@@ -20,6 +20,8 @@ type CreateInvoiceInput = {
   refType?: string | null;
   refId?: string | null;
   orderCode?: string | null;
+  buyerEmail?: string | null;
+  buyerName?: string | null;
 };
 
 /**
@@ -88,8 +90,8 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<{ id: st
         orderCode: input.orderCode ?? null,
         sellerName: brand.siteName,
         sellerEmail: brand.supportEmail,
-        buyerName: user?.name ?? null,
-        buyerEmail: user?.email ?? null,
+        buyerName: input.buyerName ?? user?.name ?? null,
+        buyerEmail: input.buyerEmail ?? user?.email ?? null,
       },
       select: { id: true, number: true },
     });

@@ -1,8 +1,12 @@
 'use client';
 
 import * as React from 'react';
+import { toast } from 'sonner';
 import { Input, Textarea } from '@/components/ui/Input';
 import type { CatalogServiceRow, HowToOrderStep, RunningAdsTickerItem } from '@/lib/cms-types';
+import type { CatalogPickService } from '@/lib/catalog-services-shared';
+import { refreshRowsFromPickList } from '@/lib/catalog-services-shared';
+import { CatalogServicePicker, CatalogSyncToolbar } from './CatalogServicePicker';
 
 type FieldsProps = {
   content: Record<string, unknown>;
@@ -72,6 +76,9 @@ function ListEditor<T extends Record<string, unknown>>({
 }
 
 export function CatalogFields({ content, setContent }: FieldsProps) {
+  const [pickerKind, setPickerKind] = React.useState<'imei' | 'server' | null>(null);
+  const [refreshing, setRefreshing] = React.useState<'imei' | 'server' | null>(null);
+
   function setField(key: string, value: unknown) {
     setContent((prev) => ({ ...prev, [key]: value }));
   }
@@ -79,8 +86,42 @@ export function CatalogFields({ content, setContent }: FieldsProps) {
   const imei = ((content.imeiServices as CatalogServiceRow[]) ?? []).map((r) => ({ ...r }));
   const server = ((content.serverServices as CatalogServiceRow[]) ?? []).map((r) => ({ ...r }));
 
+  const imeiLinkedIds = new Set(imei.filter((r) => r.serviceId).map((r) => r.serviceId!));
+  const serverLinkedIds = new Set(server.filter((r) => r.serviceId).map((r) => r.serviceId!));
+
+  async function refreshTab(kind: 'imei' | 'server') {
+    setRefreshing(kind);
+    try {
+      const res = await fetch('/api/admin/cms/catalog-services');
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error ?? 'Failed to load services');
+      const pool = (json.services?.[kind] as CatalogPickService[]) ?? [];
+      const rows = kind === 'imei' ? imei : server;
+      const next = refreshRowsFromPickList(rows, pool, kind);
+      setField(kind === 'imei' ? 'imeiServices' : 'serverServices', next);
+      toast.success('Linked rows refreshed from marketplace');
+    } catch (e) {
+      toast.error('Refresh failed', {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRefreshing(null);
+    }
+  }
+
+  function addRows(kind: 'imei' | 'server', rows: CatalogServiceRow[]) {
+    const key = kind === 'imei' ? 'imeiServices' : 'serverServices';
+    const current = kind === 'imei' ? imei : server;
+    setField(key, [...current, ...rows]);
+  }
+
   const serviceRowFields = (row: CatalogServiceRow, patch: (p: Partial<CatalogServiceRow>) => void) => (
     <div className="space-y-2">
+      {row.serviceId && (
+        <div className="rounded-md bg-primary-50 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-primary-800">
+          Linked · live sync · {row.kind ?? 'service'} · {row.serviceId.slice(0, 8)}…
+        </div>
+      )}
       <div className="grid gap-2 sm:grid-cols-2">
         <Input label="Ref" value={row.ref} onChange={(e) => patch({ ref: e.target.value })} />
         <Input label="Price" value={row.price} onChange={(e) => patch({ price: e.target.value })} />
@@ -101,6 +142,15 @@ export function CatalogFields({ content, setContent }: FieldsProps) {
       </label>
       {row.popular && (
         <Input label="Badge text" value={row.tag ?? ''} onChange={(e) => patch({ tag: e.target.value })} />
+      )}
+      {row.serviceId && (
+        <button
+          type="button"
+          onClick={() => patch({ serviceId: undefined, kind: undefined })}
+          className="font-mono text-[10px] uppercase tracking-wider text-red-600 hover:underline"
+        >
+          Unlink (keep as manual row)
+        </button>
       )}
     </div>
   );
@@ -130,12 +180,26 @@ export function CatalogFields({ content, setContent }: FieldsProps) {
         <Input label="Catalog link text" value={(content.catalogLinkText as string) ?? ''} onChange={(e) => setField('catalogLinkText', e.target.value)} />
         <Input label="Catalog link href" value={(content.catalogLinkHref as string) ?? ''} onChange={(e) => setField('catalogLinkHref', e.target.value)} />
       </div>
+      <CatalogSyncToolbar
+        kind="imei"
+        linkedCount={imeiLinkedIds.size}
+        onBrowse={() => setPickerKind('imei')}
+        onRefresh={() => void refreshTab('imei')}
+        refreshing={refreshing === 'imei'}
+      />
       <ListEditor
         label="Unlock services (IMEI tab)"
         items={imei}
         onChange={(next) => setField('imeiServices', next)}
         makeEmpty={() => ({ ref: '', title: '', meta: '', delivery: '', price: '', orderHref: '/marketplace' })}
         renderItem={(row, _idx, patch) => serviceRowFields(row, patch)}
+      />
+      <CatalogSyncToolbar
+        kind="server"
+        linkedCount={serverLinkedIds.size}
+        onBrowse={() => setPickerKind('server')}
+        onRefresh={() => void refreshTab('server')}
+        refreshing={refreshing === 'server'}
       />
       <ListEditor
         label="Remote services (Server tab)"
@@ -144,6 +208,15 @@ export function CatalogFields({ content, setContent }: FieldsProps) {
         makeEmpty={() => ({ ref: '', title: '', meta: '', delivery: '', price: '', orderHref: '/marketplace' })}
         renderItem={(row, _idx, patch) => serviceRowFields(row, patch)}
       />
+
+      {pickerKind && (
+        <CatalogServicePicker
+          kind={pickerKind}
+          existingIds={pickerKind === 'imei' ? imeiLinkedIds : serverLinkedIds}
+          onAdd={(rows) => addRows(pickerKind, rows)}
+          onClose={() => setPickerKind(null)}
+        />
+      )}
     </>
   );
 }

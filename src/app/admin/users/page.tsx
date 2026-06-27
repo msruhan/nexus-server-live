@@ -30,7 +30,7 @@ export default async function AdminUsersPage() {
             All <span className="font-serif italic font-normal">members</span>.
           </>
         }
-        subtitle={`${users.length} accounts · assign a user group for special pricing · click status to toggle active.`}
+        subtitle="Assign user groups · add wallet credit · manage activation status."
       />
 
       <UsersTable
@@ -44,6 +44,8 @@ export default async function AdminUsersPage() {
           orders: u._count.imeiOrders + u._count.serverOrders,
           joined: u.createdAt,
           active: u.isActive,
+          emailVerifiedAt: u.emailVerifiedAt,
+          emailVerificationToken: u.emailVerificationToken,
           groupId: u.priceGroupId ?? '',
           group: u.priceGroup?.name ?? 'Retail',
         }))}

@@ -23,6 +23,7 @@ import {
   isOrderSubmitWindowExpired,
   STALE_SUBMIT_REJECT_MESSAGE,
 } from '@/lib/order-submit-policy'
+import { assertOrderPaidBeforeSupplierSubmit } from '@/lib/marketplace-order-guard'
 import {
   extractServerStressEmail,
   isServerStressCredit,
@@ -357,6 +358,11 @@ export async function submitServerOrderToSupplier(orderId: string): Promise<{
 
   if (await rejectExpiredPendingServerOrder(snapshot)) {
     return { ok: false, error: STALE_SUBMIT_REJECT_MESSAGE }
+  }
+
+  const paid = await assertOrderPaidBeforeSupplierSubmit(orderId, 'server')
+  if (!paid.ok) {
+    return { ok: false, error: paid.error }
   }
 
   if (snapshot.processedAt) {

@@ -16,6 +16,7 @@ import {
   STALE_SUBMIT_REJECT_MESSAGE,
 } from '@/lib/order-submit-policy'
 import { isStressTestMode } from '@/lib/stress-mode'
+import { assertOrderPaidBeforeSupplierSubmit } from '@/lib/marketplace-order-guard'
 import type { ImeiOrder, ImeiOrderStatus, Prisma } from '@prisma/client'
 
 function extractSupplierCode(remote: { code?: string; comments?: string }): string | null {
@@ -221,6 +222,11 @@ export async function submitImeiOrderToSupplier(orderId: string): Promise<{
 
   if (await rejectExpiredPendingImeiOrder(snapshot)) {
     return { ok: false, error: STALE_SUBMIT_REJECT_MESSAGE }
+  }
+
+  const paid = await assertOrderPaidBeforeSupplierSubmit(orderId, 'imei')
+  if (!paid.ok) {
+    return { ok: false, error: paid.error }
   }
 
   if (snapshot.processedAt) {

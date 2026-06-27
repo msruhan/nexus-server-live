@@ -17,6 +17,7 @@ import { Ticker } from './Ticker';
 import { SectionFrame } from './SectionFrame';
 import { resolveSettings } from '@/lib/cms-style';
 import { resolveSectionContent } from '@/lib/cms-content';
+import { resolveLiveCatalogContent } from '@/lib/catalog-services';
 import type {
   ServiceCatalogContent,
   PartnersContent,
@@ -62,11 +63,26 @@ export async function SectionRenderer({ sections }: { sections: StoredSection[] 
     getBranding(),
   ]);
 
+  const catalogLiveBySectionId = new Map<string, ServiceCatalogContent>();
+  await Promise.all(
+    sections
+      .filter((s) => s.sectionType === 'service_catalog')
+      .map(async (s) => {
+        const raw = parseJson<Record<string, unknown>>(s.content, {});
+        const merged = resolveSectionContent(s.sectionType, raw) as ServiceCatalogContent;
+        const live = await resolveLiveCatalogContent(merged);
+        catalogLiveBySectionId.set(s.id, live);
+      }),
+  );
+
   return (
     <>
       {sections.map((s) => {
         const raw = parseJson<Record<string, unknown>>(s.content, {});
-        const content = resolveSectionContent(s.sectionType, raw);
+        let content: Record<string, unknown> = resolveSectionContent(s.sectionType, raw);
+        if (s.sectionType === 'service_catalog') {
+          content = catalogLiveBySectionId.get(s.id) ?? content;
+        }
         const { style, variant } = resolveSettings(s.settings, s.sectionType);
         const key = `${s.sectionType}-${s.id}`;
         const inner = renderSection(s.sectionType, key, content, variant, {

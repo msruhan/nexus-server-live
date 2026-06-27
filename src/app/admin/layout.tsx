@@ -16,6 +16,8 @@ import {
   isLicenseRuntimeLocked,
 } from '@/lib/license-state';
 import { guardAgainstBlockedIp } from '@/lib/ip-block-guard';
+import { getActiveAnnouncements } from '@/lib/announcements';
+import { GlobalAnnouncementBar } from '@/components/announcements/GlobalAnnouncementBar';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await guardAgainstBlockedIp();
@@ -98,6 +100,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const navBadges = await getAdminNavBadges();
   const brand = await getBranding();
+  const announcements = await getActiveAnnouncements(true);
 
   return (
     <AccountThemeShell userId={session.user.id}>
@@ -109,6 +112,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         brand={{ siteName: brand.siteName, logoUrl: brand.logoUrl }}
         licenseLockdown={licenseLockdown}
       >
+        <GlobalAnnouncementBar items={announcements} />
         <MobileBar user={userInfo} />
         <LicenseBanner
           status={settings?.licenseStatus ?? 'not_activated'}

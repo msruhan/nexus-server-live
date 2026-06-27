@@ -15,6 +15,7 @@ import {
   paymentCreditedTemplate,
   passwordChangedTemplate,
   welcomeTemplate,
+  emailVerificationTemplate,
   orderCreatedTemplate,
   ticketStatusTemplate,
   topupRejectedTemplate,
@@ -27,6 +28,18 @@ import {
   notifyTelegramPaymentCredited,
   notifyTelegramTicketReply,
 } from '@/lib/telegram/notify';
+import {
+  resolveImeiOrderNotifyTarget,
+  resolveServerOrderNotifyTarget,
+} from '@/lib/email/order-contact';
+import { resolveEmailContent } from '@/lib/email/template-store';
+import type { EmailEvent } from '@/lib/email/types';
+import {
+  pushInAppOrderCreated,
+  pushInAppOrderStatus,
+  pushInAppTicketReply,
+  pushInAppTopupApproved,
+} from '@/lib/notify-user-inapp';
 
 async function loadSiteName(): Promise<string> {
   const row = await prisma.siteSettings.findUnique({
@@ -72,6 +85,26 @@ async function resolveAdminEmail(): Promise<string | null> {
   return from || null;
 }
 
+async function sendTemplatedEmail(input: {
+  event: EmailEvent;
+  to: string;
+  vars: Record<string, string>;
+  fallback: () => { subject: string; text: string; html: string };
+  refType?: string;
+  refId?: string;
+}) {
+  const content = await resolveEmailContent(input.event, input.vars, input.fallback);
+  await sendEmail({
+    to: input.to,
+    subject: content.subject,
+    text: content.text,
+    html: content.html,
+    event: input.event,
+    refType: input.refType,
+    refId: input.refId,
+  });
+}
+
 
 export async function notifyTicketReply(input: {
   ticketId: string;
@@ -104,23 +137,39 @@ export async function notifyTicketReply(input: {
 
     const siteName = await loadSiteName();
     const url = `${resolveBaseUrl()}/user/tickets/${ticket.id}`;
-    const { text, html } = ticketReplyTemplate({
+    const vars = {
       siteName,
       recipientName: ticket.user.name ?? 'there',
       ticketCode: ticket.ticketCode,
       subject: ticket.subject,
-      authorRole: lastReply.authorRole,
       body: lastReply.body.slice(0, 1500),
       url,
-    });
-    await sendEmail({
-      to: ticket.user.email,
-      subject: `Reply on ${ticket.ticketCode} — ${ticket.subject}`,
-      text,
-      html,
+    };
+    await sendTemplatedEmail({
       event: 'ticket.reply',
+      to: ticket.user.email,
+      vars,
+      fallback: () => {
+        const { text, html } = ticketReplyTemplate({
+          siteName,
+          recipientName: ticket.user!.name ?? 'there',
+          ticketCode: ticket.ticketCode,
+          subject: ticket.subject,
+          authorRole: lastReply.authorRole,
+          body: lastReply.body.slice(0, 1500),
+          url,
+        });
+        return { subject: `Reply on ${ticket.ticketCode} — ${ticket.subject}`, text, html };
+      },
       refType: 'SupportTicket',
       refId: ticket.id,
+    });
+
+    pushInAppTicketReply({
+      userId: ticket.userId,
+      ticketCode: ticket.ticketCode,
+      subject: ticket.subject,
+      ticketId: ticket.id,
     });
 
     // Fire-and-forget Telegram notification alongside email
@@ -144,32 +193,56 @@ export async function notifyOrderStatus(input: {
           status: true,
           code: true,
           comments: true,
-          user: { select: { email: true, name: true } },
+          guestEmail: true,
+          user: { select: { id: true, email: true, name: true } },
           service: { select: { title: true } },
         },
       });
-      if (!order?.user?.email) return;
+      const target = order ? await resolveImeiOrderNotifyTarget(order) : null;
+      if (!order || !target) return;
       if (order.status !== 'SUCCESS' && order.status !== 'REJECTED') return;
       const siteName = await loadSiteName();
-      const url = `${resolveBaseUrl()}/user/orders`;
-      const { text, html } = orderStatusTemplate({
+      const event: EmailEvent =
+        order.status === 'SUCCESS' ? 'order.imei.success' : 'order.imei.rejected';
+      const vars = {
         siteName,
-        recipientName: order.user.name ?? 'there',
+        recipientName: target.name,
         orderCode: order.orderCode,
         serviceName: order.service?.title ?? '—',
         status: order.status,
-        resultCode: order.code,
-        comments: order.comments,
-        url,
-      });
-      await sendEmail({
-        to: order.user.email,
-        subject: `Order ${order.orderCode} — ${order.status}`,
-        text,
-        html,
-        event: order.status === 'SUCCESS' ? 'order.imei.success' : 'order.imei.rejected',
+        resultCode: order.code ?? '',
+        comments: order.comments ?? '',
+        url: target.trackUrl,
+      };
+      await sendTemplatedEmail({
+        event,
+        to: target.email,
+        vars,
+        fallback: () => {
+          const { text, html } = orderStatusTemplate({
+            siteName,
+            recipientName: target.name,
+            orderCode: order.orderCode,
+            serviceName: order.service?.title ?? '—',
+            status: order.status,
+            resultCode: order.code,
+            comments: order.comments,
+            url: target.trackUrl,
+          });
+          return { subject: `Order ${order.orderCode} — ${order.status}`, text, html };
+        },
         refType: 'ImeiOrder',
         refId: order.id,
+      });
+
+      void pushInAppOrderStatus({
+        userId: order.user.id,
+        kind: 'imei',
+        orderId: order.id,
+        orderCode: order.orderCode,
+        status: order.status,
+        serviceTitle: order.service?.title ?? 'Order',
+        href: target.isGuest ? target.trackUrl : `/user/orders/${order.id}?type=imei`,
       });
 
       // Fire-and-forget Telegram
@@ -183,32 +256,56 @@ export async function notifyOrderStatus(input: {
           status: true,
           code: true,
           comments: true,
-          user: { select: { email: true, name: true } },
+          email: true,
+          user: { select: { id: true, email: true, name: true } },
           service: { select: { title: true } },
         },
       });
-      if (!order?.user?.email) return;
+      const target = order ? await resolveServerOrderNotifyTarget(order) : null;
+      if (!order || !target) return;
       if (order.status !== 'SUCCESS' && order.status !== 'REJECTED') return;
       const siteName = await loadSiteName();
-      const url = `${resolveBaseUrl()}/user/orders`;
-      const { text, html } = orderStatusTemplate({
+      const event: EmailEvent =
+        order.status === 'SUCCESS' ? 'order.server.success' : 'order.server.rejected';
+      const vars = {
         siteName,
-        recipientName: order.user.name ?? 'there',
+        recipientName: target.name,
         orderCode: order.orderCode,
         serviceName: order.service?.title ?? '—',
         status: order.status,
-        resultCode: order.code,
-        comments: order.comments,
-        url,
-      });
-      await sendEmail({
-        to: order.user.email,
-        subject: `Order ${order.orderCode} — ${order.status}`,
-        text,
-        html,
-        event: order.status === 'SUCCESS' ? 'order.server.success' : 'order.server.rejected',
+        resultCode: order.code ?? '',
+        comments: order.comments ?? '',
+        url: target.trackUrl,
+      };
+      await sendTemplatedEmail({
+        event,
+        to: target.email,
+        vars,
+        fallback: () => {
+          const { text, html } = orderStatusTemplate({
+            siteName,
+            recipientName: target.name,
+            orderCode: order.orderCode,
+            serviceName: order.service?.title ?? '—',
+            status: order.status,
+            resultCode: order.code,
+            comments: order.comments,
+            url: target.trackUrl,
+          });
+          return { subject: `Order ${order.orderCode} — ${order.status}`, text, html };
+        },
         refType: 'ServerOrder',
         refId: order.id,
+      });
+
+      void pushInAppOrderStatus({
+        userId: order.user.id,
+        kind: 'server',
+        orderId: order.id,
+        orderCode: order.orderCode,
+        status: order.status,
+        serviceTitle: order.service?.title ?? 'Order',
+        href: target.isGuest ? target.trackUrl : `/user/orders/${order.id}?type=server`,
       });
 
       // Fire-and-forget Telegram
@@ -232,20 +329,31 @@ export async function notifyTopupApproved(input: {
     if (!user?.email) return;
     const siteName = await loadSiteName();
     const url = `${resolveBaseUrl()}/user/wallet`;
-    const { text, html } = topupApprovedTemplate({
-      siteName,
-      recipientName: user.name ?? 'there',
-      amount: fmtUsd(input.amount),
-      newBalance: fmtUsd(input.newBalance),
-      url,
-    });
-    await sendEmail({
-      to: user.email,
-      subject: `Top-up of ${fmtUsd(input.amount)} approved`,
-      text,
-      html,
+    const amountLabel = fmtUsd(input.amount);
+    const balanceLabel = fmtUsd(input.newBalance);
+    await sendTemplatedEmail({
       event: 'wallet.topup_approved',
+      to: user.email,
+      vars: {
+        siteName,
+        recipientName: user.name ?? 'there',
+        amount: amountLabel,
+        newBalance: balanceLabel,
+        url,
+      },
+      fallback: () => {
+        const { text, html } = topupApprovedTemplate({
+          siteName,
+          recipientName: user!.name ?? 'there',
+          amount: amountLabel,
+          newBalance: balanceLabel,
+          url,
+        });
+        return { subject: `Top-up of ${amountLabel} approved`, text, html };
+      },
     });
+
+    pushInAppTopupApproved({ userId: input.userId, amount: amountLabel });
   } catch (e) {
     console.error('[notify] topup.approved', e);
   }
@@ -339,6 +447,34 @@ export async function notifyRegistered(input: { userId: string; email: string; n
   }
 }
 
+export async function notifyEmailVerification(input: {
+  userId: string;
+  email: string;
+  name: string;
+  token: string;
+}) {
+  try {
+    const siteName = await loadSiteName();
+    const verifyUrl = `${resolveBaseUrl()}/verify-email?token=${encodeURIComponent(input.token)}`;
+    const { text, html } = emailVerificationTemplate({
+      siteName,
+      recipientName: input.name || 'there',
+      verifyUrl,
+    });
+    await sendEmail({
+      to: input.email,
+      subject: `Verify your ${siteName} account`,
+      text,
+      html,
+      event: 'auth.email_verification',
+      refType: 'User',
+      refId: input.userId,
+    });
+  } catch (e) {
+    console.error('[notify] auth.email_verification', e);
+  }
+}
+
 export async function notifyOrderCreated(input: {
   kind: 'imei' | 'server';
   orderId: string;
@@ -351,29 +487,49 @@ export async function notifyOrderCreated(input: {
           id: true,
           orderCode: true,
           price: true,
-          user: { select: { email: true, name: true } },
+          guestEmail: true,
+          user: { select: { id: true, email: true, name: true } },
           service: { select: { title: true } },
         },
       });
-      if (!order?.user?.email) return;
+      const target = order ? await resolveImeiOrderNotifyTarget(order) : null;
+      if (!order || !target) return;
       const siteName = await loadSiteName();
-      const url = `${resolveBaseUrl()}/user/orders`;
-      const { text, html } = orderCreatedTemplate({
+      const amountLabel = fmtUsd(order.price.toString());
+      const vars = {
         siteName,
-        recipientName: order.user.name ?? 'there',
+        recipientName: target.name,
         orderCode: order.orderCode,
         serviceName: order.service?.title ?? '—',
-        amount: fmtUsd(order.price.toString()),
-        url,
-      });
-      await sendEmail({
-        to: order.user.email,
-        subject: `Order received — ${order.orderCode}`,
-        text,
-        html,
+        amount: amountLabel,
+        url: target.trackUrl,
+      };
+      await sendTemplatedEmail({
         event: 'order.imei.created',
+        to: target.email,
+        vars,
+        fallback: () => {
+          const { text, html } = orderCreatedTemplate({
+            siteName,
+            recipientName: target.name,
+            orderCode: order.orderCode,
+            serviceName: order.service?.title ?? '—',
+            amount: amountLabel,
+            url: target.trackUrl,
+          });
+          return { subject: `Order received — ${order.orderCode}`, text, html };
+        },
         refType: 'ImeiOrder',
         refId: order.id,
+      });
+
+      void pushInAppOrderCreated({
+        userId: order.user.id,
+        kind: 'imei',
+        orderId: order.id,
+        orderCode: order.orderCode,
+        serviceTitle: order.service?.title ?? 'Order',
+        href: target.isGuest ? target.trackUrl : `/user/orders/${order.id}?type=imei`,
       });
     } else {
       const order = await prisma.serverOrder.findUnique({
@@ -382,29 +538,49 @@ export async function notifyOrderCreated(input: {
           id: true,
           orderCode: true,
           price: true,
-          user: { select: { email: true, name: true } },
+          email: true,
+          user: { select: { id: true, email: true, name: true } },
           service: { select: { title: true } },
         },
       });
-      if (!order?.user?.email) return;
+      const target = order ? await resolveServerOrderNotifyTarget(order) : null;
+      if (!order || !target) return;
       const siteName = await loadSiteName();
-      const url = `${resolveBaseUrl()}/user/orders`;
-      const { text, html } = orderCreatedTemplate({
+      const amountLabel = fmtUsd(order.price.toString());
+      const vars = {
         siteName,
-        recipientName: order.user.name ?? 'there',
+        recipientName: target.name,
         orderCode: order.orderCode,
         serviceName: order.service?.title ?? '—',
-        amount: fmtUsd(order.price.toString()),
-        url,
-      });
-      await sendEmail({
-        to: order.user.email,
-        subject: `Order received — ${order.orderCode}`,
-        text,
-        html,
+        amount: amountLabel,
+        url: target.trackUrl,
+      };
+      await sendTemplatedEmail({
         event: 'order.server.created',
+        to: target.email,
+        vars,
+        fallback: () => {
+          const { text, html } = orderCreatedTemplate({
+            siteName,
+            recipientName: target.name,
+            orderCode: order.orderCode,
+            serviceName: order.service?.title ?? '—',
+            amount: amountLabel,
+            url: target.trackUrl,
+          });
+          return { subject: `Order received — ${order.orderCode}`, text, html };
+        },
         refType: 'ServerOrder',
         refId: order.id,
+      });
+
+      void pushInAppOrderCreated({
+        userId: order.user.id,
+        kind: 'server',
+        orderId: order.id,
+        orderCode: order.orderCode,
+        serviceTitle: order.service?.title ?? 'Order',
+        href: target.isGuest ? target.trackUrl : `/user/orders/${order.id}?type=server`,
       });
     }
   } catch (e) {

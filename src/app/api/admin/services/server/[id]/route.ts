@@ -32,12 +32,18 @@ export async function PUT(
   });
 
   await prisma.serverService.update({ where: { id }, data: parsed.data });
+  const auditMeta: Record<string, unknown> = { ...parsed.data };
+  if (before && parsed.data.price !== undefined && Number(before.price) !== parsed.data.price) {
+    auditMeta.oldPrice = Number(before.price);
+    auditMeta.newPrice = parsed.data.price;
+    auditMeta.title = parsed.data.title ?? before.title;
+  }
   await logActivity({
     userId: session?.user.id,
     action: 'service.updated',
     entity: 'ServerService',
     entityId: id,
-    metadata: parsed.data,
+    metadata: auditMeta,
   });
 
   // Fire-and-forget channel auto-posts

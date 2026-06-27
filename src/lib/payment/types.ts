@@ -15,10 +15,13 @@ import type { Decimal } from '@prisma/client/runtime/library';
 
 export type PaymentGatewayId = 'usdt_portal' | 'paypal' | 'stripe';
 
+export type PaymentIntentPurpose = 'wallet_topup' | 'marketplace';
+
 export type CreateIntentInput = {
   userId: string;
   amount: Decimal | number; // USD
   reference: string;
+  purpose?: PaymentIntentPurpose;
   successUrl?: string;
   cancelUrl?: string;
 };

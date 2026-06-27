@@ -5,6 +5,7 @@
  */
 export type EmailEvent =
   | 'auth.registered'
+  | 'auth.email_verification'
   | 'auth.password_changed'
   | 'ticket.reply'
   | 'ticket.status_changed'
@@ -20,10 +21,12 @@ export type EmailEvent =
   | 'backup.created'
   | 'admin.order.new'
   | 'admin.topup.new'
-  | 'admin.ticket.new';
+  | 'admin.ticket.new'
+  | 'admin.report.scheduled';
 
 export const ALL_EMAIL_EVENTS: EmailEvent[] = [
   'auth.registered',
+  'auth.email_verification',
   'auth.password_changed',
   'ticket.reply',
   'ticket.status_changed',
@@ -50,6 +53,7 @@ export const EMAIL_EVENT_GROUPS: Array<{
     title: 'Account',
     events: [
       { key: 'auth.registered', label: 'Welcome — new registration' },
+      { key: 'auth.email_verification', label: 'Email verification link' },
       { key: 'auth.password_changed', label: 'Password changed' },
     ],
   },

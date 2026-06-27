@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { verifySecondFactor } from '@/lib/auth/verify-2fa';
+import { userNeedsEmailVerification } from '@/lib/auth/registration-activation';
 import { authConfig } from './auth.config';
 import {
   canSignInDuringLicenseLock,
@@ -40,6 +41,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const ok = await bcrypt.compare(parsed.data.password, user.password);
         if (!ok) return null;
+
+        if (userNeedsEmailVerification(user)) return null;
 
         if (user.twoFactorEnabled) {
           const ok2fa = await verifySecondFactor({

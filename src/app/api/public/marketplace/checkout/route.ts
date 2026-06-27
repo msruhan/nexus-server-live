@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
@@ -10,6 +9,7 @@ import { createImeiOrderSchema } from '@/lib/validations/imei';
 import { createServerOrderSchema } from '@/lib/validations/server';
 import { validateImeiOrderDeviceInput } from '@/lib/imei-order-input';
 import { parseServerFieldDefs, validateServerOrderFields } from '@/lib/server-fields';
+import { resolveMarketplaceCheckoutActor } from '@/lib/marketplace-guest-user';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,15 +29,6 @@ function appBaseUrl() {
     process.env.AUTH_URL?.trim() ??
     'http://localhost:3000'
   ).replace(/\/$/, '');
-}
-
-function randomPassword() {
-  return `Guest-${randomBytes(12).toString('base64url')}`;
-}
-
-function displayNameFromEmail(email: string) {
-  const local = email.split('@')[0] || 'Guest';
-  return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 48);
 }
 
 export async function GET() {
@@ -64,26 +55,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Selected gateway is not available' }, { status: 400 });
   }
 
-  let user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-  if (!user) {
-    const hashed = await bcrypt.hash(randomPassword(), 12);
-    user = await prisma.user.create({
-      data: {
-        name: displayNameFromEmail(email),
-        email,
-        password: hashed,
-        role: 'USER',
-      },
-      select: { id: true },
-    });
-    await prisma.wallet.create({ data: { userId: user.id, balance: 0 } });
-  } else {
-    await prisma.wallet.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, balance: 0 },
-    });
-  }
+  const actor = await resolveMarketplaceCheckoutActor(email);
 
   let quotedAmount = 0;
   let payload: Record<string, string> = {};
@@ -175,7 +147,7 @@ export async function POST(req: Request) {
     data: {
       token,
       kind,
-      userId: user.id,
+      userId: actor.userId,
       serviceId,
       email,
       gateway,
@@ -186,9 +158,10 @@ export async function POST(req: Request) {
   });
 
   const intentResult = await createIntent(gateway, {
-    userId: user.id,
+    userId: actor.userId,
     amount: quotedAmount,
     reference,
+    purpose: 'marketplace',
     successUrl,
     cancelUrl,
   });
@@ -204,7 +177,7 @@ export async function POST(req: Request) {
   }
 
   const intent = await prisma.paymentIntent.findFirst({
-    where: { reference, userId: user.id },
+    where: { reference, userId: actor.userId },
     orderBy: { createdAt: 'desc' },
     select: { id: true, externalUrl: true },
   });
