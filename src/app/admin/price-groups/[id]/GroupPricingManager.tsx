@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 import { formatUSD } from '@/lib/format';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type ServiceOption = {
   id: string;
@@ -40,6 +41,7 @@ export function GroupPricingManager({
   serverServices: ServiceOption[];
   initialOverrides: OverrideRow[];
 }) {
+  const confirmDialog = useConfirm();
   const [overrides, setOverrides] = React.useState(initialOverrides);
   const [kind, setKind] = React.useState<'imei' | 'server'>('imei');
   const [serviceId, setServiceId] = React.useState('');
@@ -96,7 +98,13 @@ export function GroupPricingManager({
   }
 
   async function removeOverride(overrideId: string) {
-    if (!confirm('Remove this custom price? The group default rule will apply again.')) return;
+    const ok = await confirmDialog({
+      title: 'Remove custom price',
+      description: 'Remove this custom price? The group default rule will apply again.',
+      confirmLabel: 'Remove',
+      tone: 'warning',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/price-groups/${groupId}/overrides/${overrideId}`, {
       method: 'DELETE',
     });

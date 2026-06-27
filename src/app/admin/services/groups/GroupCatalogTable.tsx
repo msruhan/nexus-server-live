@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { MagnifyingGlass, PencilSimple, Star, Trash } from '@phosphor-icons/react';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 export type GroupCatalogRow = {
   id: string;
@@ -57,6 +58,7 @@ export function GroupCatalogTable({
   onDelete: (id: string) => void;
   onBulkDelete: (ids: string[]) => Promise<void>;
 }) {
+  const confirmDialog = useConfirm();
   const [search, setSearch] = React.useState('');
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
 
@@ -96,13 +98,13 @@ export function GroupCatalogTable({
   async function removeSelected() {
     const ids = [...selectedIds];
     if (ids.length === 0) return;
-    if (
-      !confirm(
-        `Delete ${ids.length} selected group(s)? Groups with linked services will be skipped.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: 'Delete selected groups',
+      description: `Delete ${ids.length} selected group(s)? Groups with linked services will be skipped.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     await onBulkDelete(ids);
     setSelectedIds(new Set());
   }

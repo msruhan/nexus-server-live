@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, Instrument_Serif, JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
+import { ClientProviders } from '@/components/ClientProviders';
 import { Toaster } from '@/components/ui/Toaster';
 import { getSitePaletteCss } from '@/lib/active-palette';
 import { getBranding } from '@/lib/branding';
@@ -42,9 +43,24 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
-    icons: brand.faviconUrl ? { icon: brand.faviconUrl } : undefined,
+    manifest: '/manifest.json',
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'default',
+      title: brand.siteName,
+    },
+    icons: brand.faviconUrl
+      ? { icon: brand.faviconUrl, apple: brand.faviconUrl }
+      : { icon: '/brand/icon-nexus.png', apple: '/brand/icon-nexus.png' },
   };
 }
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#2f63ff',
+};
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <style id="palette-vars" dangerouslySetInnerHTML={{ __html: `:root{${paletteCss}}` }} />
       </head>
       <body className="bg-paper text-ink font-sans">
-        {children}
+        <ClientProviders>{children}</ClientProviders>
         <Toaster />
       </body>
     </html>

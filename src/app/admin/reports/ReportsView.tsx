@@ -54,16 +54,30 @@ export function ReportsView({ data, period }: { data: AnalyticsSummary; period: 
       {/* KPI cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Total revenue" value={fmtUsd(data.revenue.total)} accent />
+        <Kpi
+          label="Gross profit"
+          value={fmtUsd(data.profit.total)}
+          hint={
+            data.profit.ordersWithCost > 0
+              ? `${data.profit.marginPercent}% margin · ${data.profit.ordersWithCost} orders with cost`
+              : 'Enable supplier cost tracking on new orders'
+          }
+        />
         <Kpi label="Successful orders" value={String(data.orders.success)} />
         <Kpi label="Success rate" value={`${data.orders.successRate}%`} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi label="IMEI profit" value={fmtUsd(data.profit.imei)} />
+        <Kpi label="Server profit" value={fmtUsd(data.profit.server)} />
         <Kpi label="Top-ups received" value={fmtUsd(data.topups.total)} />
+        <Kpi label="Refunds" value={fmtUsd(data.refunds.total)} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="IMEI revenue" value={fmtUsd(data.revenue.imei)} />
         <Kpi label="Server revenue" value={fmtUsd(data.revenue.server)} />
         <Kpi label="Total orders" value={String(data.orders.total)} />
-        <Kpi label="Refunds" value={fmtUsd(data.refunds.total)} />
       </div>
 
       {/* Revenue chart */}
@@ -124,8 +138,10 @@ export function ReportsView({ data, period }: { data: AnalyticsSummary; period: 
                     transition={{ duration: 0.6 }}
                   />
                 </div>
-                <div className="w-28 shrink-0 text-right font-mono text-xs text-ink-muted">
+                <div className="w-48 shrink-0 text-right font-mono text-xs text-ink-muted">
                   {p.successRate}% · {p.success}/{p.total}
+                  {p.avgDeliveryMinutes != null && ` · ~${p.avgDeliveryMinutes}m`}
+                  {p.profit > 0 && ` · ${fmtUsd(p.profit)} profit`}
                 </div>
               </div>
             ))}
@@ -155,7 +171,17 @@ export function ReportsView({ data, period }: { data: AnalyticsSummary; period: 
   );
 }
 
-function Kpi({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Kpi({
+  label,
+  value,
+  accent,
+  hint,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  hint?: string;
+}) {
   return (
     <div
       className={`rounded-2xl border p-5 ${
@@ -170,6 +196,9 @@ function Kpi({ label, value, accent }: { label: string; value: string; accent?: 
         {label}
       </div>
       <div className="mt-2 font-display text-2xl font-black tracking-tight">{value}</div>
+      {hint && (
+        <div className={`mt-1 text-xs ${accent ? 'text-paper/70' : 'text-ink-muted'}`}>{hint}</div>
+      )}
     </div>
   );
 }

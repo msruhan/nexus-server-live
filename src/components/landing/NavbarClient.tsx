@@ -98,6 +98,13 @@ export function NavbarClient({
     setScrolled(y > 8);
   });
 
+  const wordmarkLogo = Boolean(
+    logoUrl &&
+      (logoUrl.includes('icon-nexus-text') ||
+        logoUrl.includes('logo-full-text') ||
+        logoUrl.includes('full-text')),
+  );
+
   return (
     <>
       <motion.header
@@ -113,18 +120,28 @@ export function NavbarClient({
           <Link href="/" className="flex items-center gap-2.5">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={siteName} className="h-9 w-auto max-w-[160px] object-contain" />
+              <img
+                src={logoUrl}
+                alt={siteName}
+                className={
+                  wordmarkLogo
+                    ? 'h-10 w-auto max-w-[min(220px,52vw)] object-contain object-left'
+                    : 'h-9 w-auto max-w-[160px] object-contain'
+                }
+              />
             ) : (
               <Logo />
             )}
-            <div className="hidden flex-col leading-none sm:flex">
-              <span className="font-display text-[15px] font-extrabold tracking-tight text-ink">
-                {siteName}
-              </span>
-              <span className="mt-0.5 font-display text-[10px] font-semibold uppercase tracking-[0.22em] text-primary-700/70">
-                {tagline}
-              </span>
-            </div>
+            {!wordmarkLogo ? (
+              <div className="hidden flex-col leading-none sm:flex">
+                <span className="font-display text-[15px] font-extrabold tracking-tight text-ink">
+                  {siteName}
+                </span>
+                <span className="mt-0.5 text-xs font-semibold text-primary-700/80">
+                  {tagline}
+                </span>
+              </div>
+            ) : null}
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex">

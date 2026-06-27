@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Plus, Trash, Eye, EyeSlash, PencilSimple, ArrowSquareOut } from '@phosphor-icons/react';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Tool = {
   id: string;
@@ -23,6 +24,7 @@ const PLATFORMS = ['Windows', 'macOS', 'Linux', 'Android', 'Multi'];
 
 export function DownloadToolsManager({ initial }: { initial: Tool[] }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [items, setItems] = React.useState(initial);
   const [editing, setEditing] = React.useState<Tool | 'new' | null>(null);
   const [filter, setFilter] = React.useState('all');
@@ -63,7 +65,13 @@ export function DownloadToolsManager({ initial }: { initial: Tool[] }) {
   }
 
   async function remove(item: Tool) {
-    if (!confirm(`Delete "${item.title}"?`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete download tool',
+      description: `Delete "${item.title}"?`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/download-tools/${item.id}`, { method: 'DELETE' });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.success) {

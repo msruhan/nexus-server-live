@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { apiError, apiSuccess, requireApiRole } from '@/lib/api-auth'
+import { computeImportPricing } from '@/lib/supplier-sync/apply-catalog'
 import { parseServerFieldDefs, serializeServerFieldDefs } from '@/lib/server-fields'
 import { z } from 'zod'
 
@@ -18,6 +19,7 @@ const importSchema = z.object({
       title: z.string(),
       groupName: z.string(),
       price: z.number(),
+      supplierPrice: z.number().optional(),
       deliveryTime: z.string().optional().default(''),
       requiredFields: z.string().optional().default(''),
     }),
@@ -72,16 +74,26 @@ export async function POST(
       return apiSuccess({ imported: 0, skipped: services.length, message: 'All services were already imported' })
     }
 
-    const createData = toImport.map((svc) => ({
+    const defaultMargin =
+      api.defaultFixedMargin != null ? Number(api.defaultFixedMargin) : null
+
+    const createData = toImport.map((svc) => {
+      const supplier = svc.supplierPrice ?? svc.price
+      const retail = svc.price
+      const computed = computeImportPricing(supplier, retail, defaultMargin)
+      return {
       apiId: id,
       boxId: boxMap.get(svc.groupName)!,
       toolId: svc.toolId,
       title: svc.title,
-      price: svc.price,
+      price: computed.price,
+      supplierPrice: computed.supplierPrice,
+      fixedMargin: computed.fixedMargin,
       deliveryTime: svc.deliveryTime || null,
       requiredFields: normalizeRequiredFields(svc.requiredFields) || null,
       status: 'ACTIVE' as const,
-    }))
+    }
+    })
 
     await prisma.serverService.createMany({ data: createData })
 

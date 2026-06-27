@@ -40,6 +40,7 @@ import {
   type SectionType,
 } from '@/lib/cms-types';
 import { SectionEditor } from './SectionEditor';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Item = {
   id: string;
@@ -78,6 +79,7 @@ type Device = (typeof DEVICES)[number]['key'];
 
 export function LandingBuilder({ initial }: { initial: Item[] }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [items, setItems] = React.useState(initial);
   const [editing, setEditing] = React.useState<string | null>(null);
   const [adding, setAdding] = React.useState(false);
@@ -127,8 +129,14 @@ export function LandingBuilder({ initial }: { initial: Item[] }) {
   }
 
   async function remove(item: Item) {
-    if (!confirm(`Delete ${SECTION_LABELS[item.sectionType as SectionType] ?? item.sectionType}?`))
-      return;
+    const label = SECTION_LABELS[item.sectionType as SectionType] ?? item.sectionType;
+    const ok = await confirmDialog({
+      title: 'Delete section',
+      description: `Delete ${label}?`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/cms/sections/${item.id}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');
@@ -140,8 +148,14 @@ export function LandingBuilder({ initial }: { initial: Item[] }) {
   }
 
   async function resetDefaults() {
-    if (!confirm('Reset the home page to the default editorial composition? This deletes all current sections.'))
-      return;
+    const ok = await confirmDialog({
+      title: 'Reset home page',
+      description:
+        'Reset the home page to the default editorial composition? This deletes all current sections.',
+      confirmLabel: 'Reset',
+      tone: 'warning',
+    });
+    if (!ok) return;
     const res = await fetch('/api/admin/cms/sections/reset?page=home', { method: 'POST' });
     if (!res.ok) {
       toast.error('Reset failed');

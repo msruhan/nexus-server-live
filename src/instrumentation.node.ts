@@ -7,6 +7,7 @@ import { startWebhookScheduler } from '@/lib/webhook/scheduler';
 import { startLicenseScheduler } from '@/lib/license/scheduler';
 import { startLicenseBootstrap } from '@/lib/license/bootstrap';
 import { startBackupScheduler } from '@/lib/backup/scheduler';
+import { startSupplierSyncScheduler } from '@/lib/supplier-sync/scheduler';
 
 export function startOrderSchedulers(): void {
   startImeiOrderScheduler();
@@ -15,4 +16,5 @@ export function startOrderSchedulers(): void {
   startLicenseBootstrap();
   startLicenseScheduler();
   startBackupScheduler();
+  startSupplierSyncScheduler();
 }

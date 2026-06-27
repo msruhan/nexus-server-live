@@ -1,0 +1,24 @@
+{
+  "name": "Recovero",
+  "short_name": "Recovero",
+  "description": "IMEI & Server unlock services",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf9f7",
+  "theme_color": "#2f63ff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/brand/icon-nexus.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/logo-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import { Plus, Trash, Eye, EyeSlash, X, Upload } from '@phosphor-icons/react/dis
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { UPLOAD_MAX_LABEL } from '@/lib/upload-limits';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Banner = {
   id: string;
@@ -46,6 +47,7 @@ function resolveBannerImageUrl(url: string) {
 
 export function BannerManager({ initial }: { initial: Banner[] }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [items, setItems] = React.useState(initial);
   const [editing, setEditing] = React.useState<Banner | 'new' | null>(null);
 
@@ -62,7 +64,13 @@ export function BannerManager({ initial }: { initial: Banner[] }) {
   }
 
   async function remove(b: Banner) {
-    if (!confirm(`Delete banner "${b.title}"?`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete banner',
+      description: `Delete banner "${b.title}"?`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/cms/banners/${b.id}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');

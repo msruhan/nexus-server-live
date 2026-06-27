@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { apiError, apiSuccess, requireApiRole } from '@/lib/api-auth'
+import { computeImportPricing } from '@/lib/supplier-sync/apply-catalog'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,7 @@ const importSchema = z.object({
       title: z.string(),
       groupName: z.string(),
       price: z.number(),
+      supplierPrice: z.number().optional(),
       deliveryTime: z.string().optional().default(''),
       requiresNetwork: z.boolean().default(false),
       requiresModel: z.boolean().default(false),
@@ -79,25 +81,35 @@ export async function POST(
     }
 
     // Batch create
-    const createData = toImport.map((svc) => ({
-      apiId: id,
-      groupId: groupMap.get(svc.groupName)!,
-      toolId: svc.toolId,
-      title: svc.title,
-      price: svc.price,
-      deliveryTime: svc.deliveryTime || null,
-      status: 'ACTIVE' as const,
-      requiresNetwork: svc.requiresNetwork,
-      requiresModel: svc.requiresModel,
-      requiresProvider: svc.requiresProvider,
-      requiresPin: svc.requiresPin,
-      requiresKbh: svc.requiresKbh,
-      requiresMep: svc.requiresMep,
-      requiresPrd: svc.requiresPrd,
-      requiresSn: svc.requiresSn,
-      requiresEcid: svc.requiresEcid,
-      requiresImei: !(svc.requiresSn || svc.requiresEcid),
-    }))
+    const defaultMargin =
+      api.defaultFixedMargin != null ? Number(api.defaultFixedMargin) : null
+
+    const createData = toImport.map((svc) => {
+      const supplier = svc.supplierPrice ?? svc.price
+      const retail = svc.price
+      const computed = computeImportPricing(supplier, retail, defaultMargin)
+      return {
+        apiId: id,
+        groupId: groupMap.get(svc.groupName)!,
+        toolId: svc.toolId,
+        title: svc.title,
+        price: computed.price,
+        supplierPrice: computed.supplierPrice,
+        fixedMargin: computed.fixedMargin,
+        deliveryTime: svc.deliveryTime || null,
+        status: 'ACTIVE' as const,
+        requiresNetwork: svc.requiresNetwork,
+        requiresModel: svc.requiresModel,
+        requiresProvider: svc.requiresProvider,
+        requiresPin: svc.requiresPin,
+        requiresKbh: svc.requiresKbh,
+        requiresMep: svc.requiresMep,
+        requiresPrd: svc.requiresPrd,
+        requiresSn: svc.requiresSn,
+        requiresEcid: svc.requiresEcid,
+        requiresImei: !(svc.requiresSn || svc.requiresEcid),
+      }
+    })
 
     await prisma.imeiService.createMany({ data: createData })
 

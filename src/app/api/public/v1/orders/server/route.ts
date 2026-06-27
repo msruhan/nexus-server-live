@@ -1,3 +1,4 @@
+import { resolveSupplierCostAtOrder } from '@/lib/supplier-cost';
 import { prisma } from '@/lib/db';
 import { apiError, apiSuccess } from '@/lib/api-auth';
 import { requireApiKeyAuth } from '@/lib/api-key-auth';
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
           userId,
           serviceId: service.id,
           price: effectivePrice,
+          supplierCost: resolveSupplierCostAtOrder(service),
           status: 'PENDING',
           email: validation.email,
           notes: validation.notes,

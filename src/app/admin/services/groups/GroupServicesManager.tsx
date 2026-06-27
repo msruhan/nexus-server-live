@@ -8,6 +8,7 @@ import { Plus, Star, Upload, Image as ImageIcon } from '@phosphor-icons/react';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { GroupCatalogTable } from './GroupCatalogTable';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type ImeiGroup = {
   id: string;
@@ -169,6 +170,7 @@ export function GroupServicesManager({
   serverBoxes: ServerBox[];
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [imeiGroups, setImeiGroups] = React.useState(initialImei);
   const [serverBoxes, setServerBoxes] = React.useState(initialServer);
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -269,7 +271,13 @@ export function GroupServicesManager({
   }
 
   async function deleteImeiGroup(id: string) {
-    if (!confirm('Delete this IMEI group? It must have no linked services.')) return;
+    const ok = await confirmDialog({
+      title: 'Delete IMEI group',
+      description: 'Delete this IMEI group? It must have no linked services.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusy(id);
     const res = await fetch(`/api/admin/imei/groups/${id}`, { method: 'DELETE' });
     const json = await res.json().catch(() => ({}));
@@ -386,7 +394,13 @@ export function GroupServicesManager({
   }
 
   async function deleteServerBox(id: string) {
-    if (!confirm('Delete this server group? It must have no linked services.')) return;
+    const ok = await confirmDialog({
+      title: 'Delete server group',
+      description: 'Delete this server group? It must have no linked services.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusy(id);
     const res = await fetch(`/api/admin/imei/server-boxes/${id}`, { method: 'DELETE' });
     const json = await res.json().catch(() => ({}));

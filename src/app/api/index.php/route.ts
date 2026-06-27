@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from 'crypto';
+import { resolveSupplierCostAtOrder } from '@/lib/supplier-cost';
 import { prisma } from '@/lib/db';
 import { pollImeiOrderFromSupplier, submitImeiOrderToSupplier } from '@/lib/imei-order-worker';
 import { scheduleImeiOrderFollowUp } from '@/lib/imei-order-scheduler';
@@ -317,6 +318,7 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
           serviceId: imeiSvc.id,
           imei: imei || serial || ecid,
           price: effectivePrice,
+          supplierCost: resolveSupplierCostAtOrder(imeiSvc),
           status: 'PENDING',
           network: merged.NETWORK ?? null,
           model: merged.MODEL ?? null,
@@ -408,6 +410,7 @@ async function placeImeiStyleOrder(userId: string, params: Record<string, string
         userId,
         serviceId: srvSvc.id,
         price: effectivePrice,
+        supplierCost: resolveSupplierCostAtOrder(srvSvc),
         status: 'PENDING',
         email: validation.email,
         notes: validation.notes,

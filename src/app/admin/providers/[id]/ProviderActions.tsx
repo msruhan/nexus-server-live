@@ -9,6 +9,7 @@ import {
   formatDhruSupplierUserMessage,
 } from '@/lib/dhru-supplier-messages';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type SyncedBase = {
   toolId: string;
@@ -110,15 +111,16 @@ export function ProviderActions({ providerId }: { providerId: string }) {
     const byToolId = new Map(catalog.map((s) => [s.toolId, s]));
 
     const services = selectedItems
-      .map(({ toolId, price }) => {
+      .map(({ toolId, price: retailPrice }) => {
         const s = byToolId.get(toolId);
         if (!s) return null;
         return {
           ...s,
-          price: roundPrice(price),
+          supplierPrice: roundPrice(Number(s.price)),
+          price: roundPrice(retailPrice),
         };
       })
-      .filter((s): s is SyncedImei | SyncedServer => s !== null);
+      .filter((s): s is (SyncedImei | SyncedServer) & { supplierPrice: number } => s !== null);
 
     const importPath =
       kind === 'imei'
@@ -255,6 +257,7 @@ function SyncServicesDialog({
   onClose: () => void;
   onConfirm: (items: Array<{ toolId: string; price: number }>) => void;
 }) {
+  const confirmDialog = useConfirm();
   const [search, setSearch] = React.useState('');
   const [selected, setSelected] = React.useState<Set<string>>(() => new Set());
   const [retailPrices, setRetailPrices] = React.useState<Map<string, number>>(() => new Map());
@@ -351,7 +354,7 @@ function SyncServicesDialog({
     });
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     const items = Array.from(selected).map((toolId) => ({
       toolId,
       price: getRetailPrice(toolId),
@@ -362,9 +365,12 @@ function SyncServicesDialog({
     }
 
     const kindLabel = kind === 'imei' ? 'IMEI' : 'server';
-    const ok = confirm(
-      `Import ${items.length} selected ${kindLabel} service(s) into your catalog?\n\nOnly checked items will be added with the retail prices shown in the table.`,
-    );
+    const ok = await confirmDialog({
+      title: `Import ${kindLabel} services`,
+      description: `Import ${items.length} selected ${kindLabel} service(s) into your catalog?\n\nOnly checked items will be added with the retail prices shown in the table.`,
+      confirmLabel: 'Import',
+      tone: 'default',
+    });
     if (!ok) return;
 
     onConfirm(items);

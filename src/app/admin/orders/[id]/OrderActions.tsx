@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 export function OrderActions({
   orderId,
@@ -14,10 +15,19 @@ export function OrderActions({
   cancellable: boolean;
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [busy, setBusy] = React.useState(false);
 
   async function call(action: 'cancel' | 'retry') {
-    if (action === 'cancel' && !confirm('Cancel order and refund the user?')) return;
+    if (action === 'cancel') {
+      const ok = await confirmDialog({
+        title: 'Cancel order',
+        description: 'Cancel order and refund the user?',
+        confirmLabel: 'Cancel order',
+        tone: 'warning',
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     const res = await fetch(`/api/admin/orders/${orderId}/${action}?type=${type}`, {
       method: 'POST',

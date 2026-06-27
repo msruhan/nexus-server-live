@@ -15,6 +15,7 @@ import {
   X,
 } from '@phosphor-icons/react/dist/ssr';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type EventDef = { key: string; label: string; description: string };
 
@@ -194,6 +195,7 @@ function EndpointCard({
   onChange: () => void;
   onSecret: (secret: string) => void;
 }) {
+  const confirmDialog = useConfirm();
   const [busy, setBusy] = React.useState(false);
   const [showLog, setShowLog] = React.useState(false);
   const [deliveries, setDeliveries] = React.useState<Delivery[] | null>(null);
@@ -241,7 +243,13 @@ function EndpointCard({
   };
 
   const rotate = async () => {
-    if (!confirm('Rotate the signing secret? Your current secret will stop working immediately.')) return;
+    const ok = await confirmDialog({
+      title: 'Rotate signing secret',
+      description: 'Rotate the signing secret? Your current secret will stop working immediately.',
+      confirmLabel: 'Rotate',
+      tone: 'warning',
+    });
+    if (!ok) return;
     const { res, data } = await act({ action: 'rotate' });
     if (res.ok && data.secret) {
       onSecret(data.secret);
@@ -250,7 +258,13 @@ function EndpointCard({
   };
 
   const remove = async () => {
-    if (!confirm(`Delete endpoint "${endpoint.name}"? This cannot be undone.`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete webhook endpoint',
+      description: `Delete endpoint "${endpoint.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/user/webhooks/${endpoint.id}`, { method: 'DELETE' });

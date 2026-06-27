@@ -269,6 +269,11 @@ enum ImeiApiStatus {
   INACTIVE
 }
 
+enum SupplierPriceChangePolicy {
+  AUTO_FIXED_MARGIN
+  REQUIRE_RECONNECT
+}
+
 enum ImeiServiceStatus {
   ACTIVE
   INACTIVE
@@ -300,13 +305,36 @@ model ImeiApi {
   libraryId Int           @default(1)
   status    ImeiApiStatus @default(ACTIVE)
   notes     String?       @db.Text
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+
+  /// Scheduled supplier catalog sync
+  syncScheduleEnabled  Boolean   @default(false)
+  syncIntervalHours    Int       @default(24)
+  syncImeiServices     Boolean   @default(true)
+  syncServerServices   Boolean   @default(true)
+  lastSyncAt           DateTime?
+  lastSyncError        String?   @db.Text
+  syncRequiresReconnect Boolean  @default(false)
+
+  /// When supplier cost rises: auto-adjust retail to keep fixed margin, or require admin reconnect
+  priceChangePolicy SupplierPriceChangePolicy @default(AUTO_FIXED_MARGIN)
+  defaultFixedMargin Decimal?                  @db.Decimal(12, 2)
+
+  autoDisableRemoved   Boolean  @default(true)
+  autoDisableHighReject Boolean @default(false)
+  rejectRateThreshold  Decimal? @db.Decimal(5, 2)
+
+  cachedBalance   Decimal?  @db.Decimal(12, 2)
+  cachedBalanceAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   services       ImeiService[]
   serverServices ServerService[]
+  syncLogs       SupplierSyncLog[]
 
   @@index([status])
+  @@index([syncScheduleEnabled, lastSyncAt])
 }
 
 model ImeiServiceGroup {
@@ -331,6 +359,9 @@ model ImeiService {
   title        String
   description  String?           @db.Text
   price        Decimal           @db.Decimal(12, 2)
+  supplierPrice Decimal?         @db.Decimal(12, 2)
+  fixedMargin   Decimal?          @db.Decimal(12, 2)
+  supplierMissingSince DateTime?
   deliveryTime String?
   status       ImeiServiceStatus @default(ACTIVE)
 
@@ -356,6 +387,23 @@ model ImeiService {
   @@index([apiId])
 }
 
+model SupplierSyncLog {
+  id        String   @id @default(cuid())
+  apiId     String
+  trigger   String   @default("manual")
+  kind      String
+  status    String
+  summary   String?  @db.Text
+  changes   String?  @db.Text
+  error     String?  @db.Text
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+
+  api ImeiApi @relation(fields: [apiId], references: [id], onDelete: Cascade)
+
+  @@index([apiId, startedAt])
+}
+
 model ImeiOrder {
   id        String          @id @default(cuid())
   orderCode String          @unique
@@ -363,6 +411,7 @@ model ImeiOrder {
   serviceId String
   imei      String
   price     Decimal         @db.Decimal(12, 2)
+  supplierCost Decimal?       @db.Decimal(12, 2)
   status    ImeiOrderStatus @default(PENDING)
 
   network      String?
@@ -423,6 +472,9 @@ model ServerService {
   title          String
   description    String?           @db.Text
   price          Decimal           @db.Decimal(12, 2)
+  supplierPrice  Decimal?          @db.Decimal(12, 2)
+  fixedMargin    Decimal?          @db.Decimal(12, 2)
+  supplierMissingSince DateTime?
   deliveryTime   String?
   quantity       Int               @default(1)
   requiredFields String?           @db.Text
@@ -444,6 +496,7 @@ model ServerOrder {
   userId         String
   serviceId      String
   price          Decimal           @db.Decimal(12, 2)
+  supplierCost   Decimal?          @db.Decimal(12, 2)
   status         ServerOrderStatus @default(PENDING)
   requiredFields String?           @db.Text
   email          String?
@@ -647,6 +700,13 @@ model SiteSettings {
   // Bookkeeping for the scheduler.
   backupLastRunAt         DateTime?
   backupNextRunAt         DateTime?
+
+  // ─── Locale & currency display ─────────────────────────────────
+  defaultLocale       String  @default("en")
+  enabledLocales      String? @db.Text
+  displayCurrency     String  @default("USD")
+  /// JSON map of currency code → rate from USD base, e.g. {"IDR":16000,"EUR":0.92}
+  currencyRates       String? @db.Text
 
   updatedAt           DateTime @updatedAt
 }

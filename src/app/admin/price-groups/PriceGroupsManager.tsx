@@ -8,6 +8,7 @@ import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 import { formatPriceGroupRule, type PriceGroupAdjustmentType } from '@/lib/price-group';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Group = {
   id: string;
@@ -22,6 +23,7 @@ type Group = {
 };
 
 export function PriceGroupsManager({ initial }: { initial: Group[] }) {
+  const confirmDialog = useConfirm();
   const [groups, setGroups] = React.useState<Group[]>(initial);
   const [creating, setCreating] = React.useState(false);
   const [editing, setEditing] = React.useState<Group | null>(null);
@@ -122,7 +124,13 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
   }
 
   async function remove(id: string) {
-    if (!confirm('Delete this user group? Members will return to retail pricing.')) return;
+    const ok = await confirmDialog({
+      title: 'Delete user group',
+      description: 'Delete this user group? Members will return to retail pricing.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/price-groups/${id}`, { method: 'DELETE' });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.success) {

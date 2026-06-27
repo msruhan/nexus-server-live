@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ArrowClockwise, Shield, Trash } from '@phosphor-icons/react/dist/ssr';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Entry = {
   id: string;
@@ -19,6 +20,7 @@ function fmt(date: string) {
 }
 
 export function UserApiIpWhitelistPanel() {
+  const confirmDialog = useConfirm();
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [entry, setEntry] = React.useState<Entry | null>(null);
@@ -63,7 +65,14 @@ export function UserApiIpWhitelistPanel() {
   }
 
   async function resetIp() {
-    if (!confirm('Reset your whitelisted IP? API calls from this IP will stop working until you register a new one.')) {
+    const ok = await confirmDialog({
+      title: 'Reset whitelisted IP',
+      description:
+        'Reset your whitelisted IP? API calls from this IP will stop working until you register a new one.',
+      confirmLabel: 'Reset',
+      tone: 'warning',
+    });
+    if (!ok) {
       return;
     }
     setBusy(true);

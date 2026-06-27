@@ -9,6 +9,7 @@ import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 import { formatDate } from '@/lib/format';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Entry = {
   id: string;
@@ -35,6 +36,7 @@ export function IpManagementPanel({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const confirmDialog = useConfirm();
   const tab: Tab = searchParams.get('tab') === 'whitelist' ? 'whitelist' : 'block';
 
   const [blocked, setBlocked] = React.useState(initialBlocked);
@@ -88,7 +90,13 @@ export function IpManagementPanel({
   }
 
   async function removeEntry(id: string) {
-    if (!confirm('Remove this IP entry?')) return;
+    const ok = await confirmDialog({
+      title: 'Remove IP entry',
+      description: 'Remove this IP entry?',
+      confirmLabel: 'Remove',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusy(true);
     const path =
       tab === 'block'

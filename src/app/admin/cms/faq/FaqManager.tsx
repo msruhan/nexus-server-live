@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Plus, Eye, EyeSlash, Trash, X } from '@phosphor-icons/react/dist/ssr';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Faq = {
   id: string;
@@ -17,6 +18,7 @@ type Faq = {
 
 export function FaqManager({ initial }: { initial: Faq[] }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [items, setItems] = React.useState(initial);
   const [editing, setEditing] = React.useState<Faq | 'new' | null>(null);
   const [filter, setFilter] = React.useState('all');
@@ -36,7 +38,13 @@ export function FaqManager({ initial }: { initial: Faq[] }) {
   }
 
   async function remove(item: Faq) {
-    if (!confirm('Delete this FAQ?')) return;
+    const ok = await confirmDialog({
+      title: 'Delete FAQ',
+      description: 'Delete this FAQ?',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/cms/faq/${item.id}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');

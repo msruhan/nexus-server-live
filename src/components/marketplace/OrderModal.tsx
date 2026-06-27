@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { ImeiOrderFields, type ImeiRequires } from '@/components/orders/ImeiOrderFields';
 import { ServerOrderFields } from '@/components/orders/ServerOrderFields';
 import type { ServerFieldDef } from '@/lib/server-fields';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 export type ModalService =
   | {
@@ -43,6 +44,7 @@ export function OrderModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [loading, setLoading] = React.useState(false);
   const [serverValues, setServerValues] = React.useState<Record<string, string>>({});
   const [guestEmail, setGuestEmail] = React.useState('');
@@ -69,9 +71,12 @@ export function OrderModal({
     const j = await res.json().catch(() => ({}));
 
     if (res.status === 409 && j.code === 'DUPLICATE_ORDER' && !acknowledgeDuplicate) {
-      const proceed = window.confirm(
-        `${j.error ?? 'This device already has an active order.'}\n\nContinue anyway?`,
-      );
+      const proceed = await confirmDialog({
+        title: 'Duplicate order',
+        description: `${j.error ?? 'This device already has an active order.'}\n\nContinue anyway?`,
+        confirmLabel: 'Continue',
+        tone: 'warning',
+      });
       if (proceed) return placeImeiOrder(payload, true);
       return false;
     }
@@ -103,9 +108,12 @@ export function OrderModal({
       const checkRes = await fetch(`/api/imei/orders/check-duplicate?${params.toString()}`);
       const checkJson = await checkRes.json().catch(() => ({}));
       if (checkRes.ok && checkJson.success && checkJson.data?.duplicate && checkJson.data?.existing) {
-        const proceed = window.confirm(
-          `${checkJson.data.message ?? 'This device already has an active order.'}\n\nContinue anyway?`,
-        );
+        const proceed = await confirmDialog({
+          title: 'Duplicate order',
+          description: `${checkJson.data.message ?? 'This device already has an active order.'}\n\nContinue anyway?`,
+          confirmLabel: 'Continue',
+          tone: 'warning',
+        });
         if (!proceed) return;
         await placeImeiOrder(payload, true);
         return;

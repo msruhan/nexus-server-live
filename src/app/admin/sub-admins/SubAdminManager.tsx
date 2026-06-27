@@ -7,6 +7,7 @@ import { Plus, Trash, ShieldCheck } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/Button';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
 import type { PermissionKey } from '@/lib/sub-admin';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type PermissionRecord = Record<string, unknown>;
 
@@ -35,6 +36,7 @@ export function SubAdminManager({
   permissionGroups: PermGroup[];
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [subAdmins, setSubAdmins] = React.useState(initial);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const { pageRows, currentPage, pageCount, setPage } = useTablePagination(subAdmins, [subAdmins.length]);
@@ -61,7 +63,13 @@ export function SubAdminManager({
   }
 
   async function revoke(id: string) {
-    if (!confirm('Revoke sub-admin access? User will be demoted back to regular USER.')) return;
+    const ok = await confirmDialog({
+      title: 'Revoke sub-admin',
+      description: 'Revoke sub-admin access? User will be demoted back to regular USER.',
+      confirmLabel: 'Revoke',
+      tone: 'warning',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/sub-admins/${id}`, { method: 'DELETE' });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.success) {

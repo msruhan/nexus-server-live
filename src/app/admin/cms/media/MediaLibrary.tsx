@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Upload, Trash, Copy, Check, X } from '@phosphor-icons/react/dist/ssr';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type MediaItem = {
   id: string;
@@ -24,6 +25,7 @@ export function MediaLibrary({
   folders: string[];
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [items, setItems] = React.useState(initial);
   const [folder, setFolder] = React.useState<string>('all');
   const [uploadFolder, setUploadFolder] = React.useState('general');
@@ -55,7 +57,13 @@ export function MediaLibrary({
   }
 
   async function remove(item: MediaItem) {
-    if (!confirm(`Delete "${item.filename}"?`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete media',
+      description: `Delete "${item.filename}"?`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/cms/media/${item.id}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');

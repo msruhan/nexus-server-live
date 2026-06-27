@@ -82,9 +82,11 @@ export async function DELETE(
     const { id } = await context.params
     // Check if there are services attached
     const servicesCount = await prisma.imeiService.count({ where: { apiId: id } })
-    if (servicesCount > 0) {
+    const serverServicesCount = await prisma.serverService.count({ where: { apiId: id } })
+    const linked = servicesCount + serverServicesCount
+    if (linked > 0) {
       return apiError(
-        `${servicesCount} service(s) still linked to this API. Delete the services first.`,
+        `${linked} service(s) still linked to this API. Delete the services first.`,
         409,
       )
     }

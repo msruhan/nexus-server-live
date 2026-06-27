@@ -54,6 +54,13 @@ export type AnalyticsSummary = {
     server: number;
     total: number;
   };
+  profit: {
+    imei: number;
+    server: number;
+    total: number;
+    marginPercent: number;
+    ordersWithCost: number;
+  };
   orders: {
     total: number;
     success: number;
@@ -71,7 +78,15 @@ export type AnalyticsSummary = {
   };
   revenueByDay: Array<{ date: string; imei: number; server: number }>;
   topServices: Array<{ id: string; title: string; kind: 'imei' | 'server'; orders: number; revenue: number }>;
-  providerPerformance: Array<{ id: string; title: string; total: number; success: number; successRate: number }>;
+  providerPerformance: Array<{
+    id: string;
+    title: string;
+    total: number;
+    success: number;
+    successRate: number;
+    avgDeliveryMinutes: number | null;
+    profit: number;
+  }>;
   topCustomers: Array<{ id: string; name: string; email: string; orders: number; spend: number }>;
 };
 
@@ -89,8 +104,10 @@ export async function getAnalyticsSummary(period = '30d'): Promise<AnalyticsSumm
       select: {
         id: true,
         price: true,
+        supplierCost: true,
         status: true,
         createdAt: true,
+        completedAt: true,
         userId: true,
         serviceId: true,
         service: { select: { title: true, apiId: true, api: { select: { title: true } } } },
@@ -102,8 +119,10 @@ export async function getAnalyticsSummary(period = '30d'): Promise<AnalyticsSumm
       select: {
         id: true,
         price: true,
+        supplierCost: true,
         status: true,
         createdAt: true,
+        completedAt: true,
         userId: true,
         serviceId: true,
         service: { select: { title: true, apiId: true, api: { select: { title: true } } } },
@@ -123,6 +142,26 @@ export async function getAnalyticsSummary(period = '30d'): Promise<AnalyticsSumm
   const serverRevenue = serverOrders
     .filter((o) => o.status === SUCCESS)
     .reduce((s, o) => s + toNum(o.price), 0);
+
+  const successfulImei = imeiOrders.filter((o) => o.status === SUCCESS);
+  const successfulServer = serverOrders.filter((o) => o.status === SUCCESS);
+  const imeiProfit = successfulImei.reduce(
+    (s, o) => s + (o.supplierCost != null ? toNum(o.price) - toNum(o.supplierCost) : 0),
+    0,
+  );
+  const serverProfit = successfulServer.reduce(
+    (s, o) => s + (o.supplierCost != null ? toNum(o.price) - toNum(o.supplierCost) : 0),
+    0,
+  );
+  const ordersWithCost =
+    successfulImei.filter((o) => o.supplierCost != null).length +
+    successfulServer.filter((o) => o.supplierCost != null).length;
+  const totalProfit = imeiProfit + serverProfit;
+  const totalRevenue = imeiRevenue + serverRevenue;
+  const marginPercent =
+    totalRevenue > 0 && ordersWithCost > 0
+      ? Math.round((totalProfit / totalRevenue) * 1000) / 10
+      : 0;
 
   // ── Order counts ──
   const allOrders = [
@@ -187,14 +226,31 @@ export async function getAnalyticsSummary(period = '30d'): Promise<AnalyticsSumm
     .slice(0, 10);
 
   // ── Provider performance (success rate per ImeiApi) ──
-  const provMap = new Map<string, { title: string; total: number; success: number }>();
+  const provMap = new Map<
+    string,
+    { title: string; total: number; success: number; deliveryMs: number[]; profit: number }
+  >();
   for (const o of allOrders) {
     const apiId = o.service?.apiId;
     if (!apiId) continue;
-    if (o.status !== SUCCESS && o.status !== REJECTED) continue; // only completed
-    const cur = provMap.get(apiId) ?? { title: o.service?.api?.title ?? '—', total: 0, success: 0 };
+    if (o.status !== SUCCESS && o.status !== REJECTED) continue;
+    const cur = provMap.get(apiId) ?? {
+      title: o.service?.api?.title ?? '—',
+      total: 0,
+      success: 0,
+      deliveryMs: [],
+      profit: 0,
+    };
     cur.total += 1;
-    if (o.status === SUCCESS) cur.success += 1;
+    if (o.status === SUCCESS) {
+      cur.success += 1;
+      if ('completedAt' in o && o.completedAt) {
+        cur.deliveryMs.push(o.completedAt.getTime() - o.createdAt.getTime());
+      }
+      if ('supplierCost' in o && o.supplierCost != null) {
+        cur.profit += toNum(o.price) - toNum(o.supplierCost);
+      }
+    }
     provMap.set(apiId, cur);
   }
   const providerPerformance = Array.from(provMap.entries())
@@ -204,6 +260,11 @@ export async function getAnalyticsSummary(period = '30d'): Promise<AnalyticsSumm
       total: v.total,
       success: v.success,
       successRate: v.total === 0 ? 0 : Math.round((v.success / v.total) * 1000) / 10,
+      avgDeliveryMinutes:
+        v.deliveryMs.length > 0
+          ? Math.round(v.deliveryMs.reduce((a, b) => a + b, 0) / v.deliveryMs.length / 60_000)
+          : null,
+      profit: Math.round(v.profit * 100) / 100,
     }))
     .sort((a, b) => b.total - a.total);
 
@@ -232,7 +293,14 @@ export async function getAnalyticsSummary(period = '30d'): Promise<AnalyticsSumm
     revenue: {
       imei: Math.round(imeiRevenue * 100) / 100,
       server: Math.round(serverRevenue * 100) / 100,
-      total: Math.round((imeiRevenue + serverRevenue) * 100) / 100,
+      total: Math.round(totalRevenue * 100) / 100,
+    },
+    profit: {
+      imei: Math.round(imeiProfit * 100) / 100,
+      server: Math.round(serverProfit * 100) / 100,
+      total: Math.round(totalProfit * 100) / 100,
+      marginPercent,
+      ordersWithCost,
     },
     orders: { total, success, rejected, pending, successRate },
     topups: { count: topupEntries.length, total: Math.round(topupsTotal * 100) / 100 },

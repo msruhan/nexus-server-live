@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Eye, Trash } from '@phosphor-icons/react';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 export function TicketRowActions({
   ticketId,
@@ -14,10 +15,17 @@ export function TicketRowActions({
   ticketCode: string;
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [busy, setBusy] = useState(false);
 
   async function remove() {
-    if (!confirm(`Delete ticket ${ticketCode}? This cannot be undone.`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete ticket',
+      description: `Delete ticket ${ticketCode}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/tickets/${ticketId}`, { method: 'DELETE' });

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Plus, Eye, EyeSlash, Trash, X, Star } from '@phosphor-icons/react/dist/ssr';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Testimonial = {
   id: string;
@@ -19,6 +20,7 @@ type Testimonial = {
 
 export function TestimonialManager({ initial }: { initial: Testimonial[] }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [items, setItems] = React.useState(initial);
   const [editing, setEditing] = React.useState<Testimonial | 'new' | null>(null);
 
@@ -34,7 +36,13 @@ export function TestimonialManager({ initial }: { initial: Testimonial[] }) {
   }
 
   async function remove(item: Testimonial) {
-    if (!confirm(`Delete testimonial from "${item.name}"?`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete testimonial',
+      description: `Delete testimonial from "${item.name}"?`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/cms/testimonials/${item.id}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');

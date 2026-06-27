@@ -1,3 +1,4 @@
+import { resolveSupplierCostAtOrder } from '@/lib/supplier-cost'
 import { prisma } from '@/lib/db'
 import { apiError, apiSuccess, requireApiAuth } from '@/lib/api-auth'
 import { scheduleImeiOrderFollowUp } from '@/lib/imei-order-scheduler'
@@ -118,6 +119,7 @@ export async function POST(req: Request) {
         id: true,
         apiId: true,
         price: true,
+        supplierPrice: true,
         title: true,
         requiresImei: true,
         requiresNetwork: true,
@@ -209,6 +211,7 @@ export async function POST(req: Request) {
           serviceId: service.id,
           imei: deviceInput.imei,
           price: effectivePrice,
+          supplierCost: resolveSupplierCostAtOrder(service),
           status: 'PENDING',
           network: parsed.data.network ?? null,
           model: parsed.data.model ?? null,

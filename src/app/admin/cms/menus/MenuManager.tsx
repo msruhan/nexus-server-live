@@ -7,6 +7,7 @@ import { Plus, Eye, EyeSlash, Trash, X, ArrowSquareOut } from '@phosphor-icons/r
 import { SortableList } from '@/components/dashboard/SortableList';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Menu = {
   id: string;
@@ -29,6 +30,7 @@ type Location = (typeof LOCATIONS)[number];
 
 export function MenuManager({ initial, pageOptions }: { initial: Menu[]; pageOptions: PageOption[] }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [items, setItems] = React.useState(initial);
   const [tab, setTab] = React.useState<Location>('header');
   const [editing, setEditing] = React.useState<Menu | 'new' | null>(null);
@@ -57,7 +59,13 @@ export function MenuManager({ initial, pageOptions }: { initial: Menu[]; pageOpt
   }
 
   async function remove(item: Menu) {
-    if (!confirm(`Delete "${item.label}"?`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete menu item',
+      description: `Delete "${item.label}"?`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/cms/menus/${item.id}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { FloppyDisk, Trash, Eye } from '@phosphor-icons/react/dist/ssr';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { renderMarkdown } from '@/lib/markdown';
 
 type PageState = {
@@ -20,6 +21,7 @@ type PageState = {
 
 export function CustomPageEditor({ initial }: { initial: PageState }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [state, setState] = React.useState(initial);
   const [saving, setSaving] = React.useState(false);
   const [showPreview, setShowPreview] = React.useState(false);
@@ -46,7 +48,13 @@ export function CustomPageEditor({ initial }: { initial: PageState }) {
   }
 
   async function remove() {
-    if (!confirm('Delete this page permanently?')) return;
+    const ok = await confirmDialog({
+      title: 'Delete page',
+      description: 'Delete this page permanently?',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/cms/pages/${state.id}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');

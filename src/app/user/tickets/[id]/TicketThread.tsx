@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { CheckCircle, Lock } from '@phosphor-icons/react/dist/ssr';
 import { Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Reply = {
   id: string;
@@ -34,6 +35,7 @@ export function TicketThread({
   replies: Reply[];
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [body, setBody] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
   const [resolving, setResolving] = React.useState(false);
@@ -58,7 +60,13 @@ export function TicketThread({
   }
 
   async function resolve() {
-    if (!confirm('Mark this ticket as resolved?')) return;
+    const ok = await confirmDialog({
+      title: 'Resolve ticket',
+      description: 'Mark this ticket as resolved?',
+      confirmLabel: 'Resolve',
+      tone: 'default',
+    });
+    if (!ok) return;
     setResolving(true);
     const res = await fetch(`/api/user/tickets/${ticketId}/resolve`, { method: 'POST' });
     const json = await res.json().catch(() => ({}));

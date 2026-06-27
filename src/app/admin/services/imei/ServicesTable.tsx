@@ -13,6 +13,7 @@ import {
   type CatalogGroupOption,
 } from '@/components/admin/CatalogTableToolbar';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Row = {
   id: string;
@@ -38,12 +39,16 @@ export function ServicesTable({
   groups: CatalogGroupOption[];
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
   const [editing, setEditing] = React.useState<Row | null>(null);
   const [search, setSearch] = React.useState('');
   const [groupFilter, setGroupFilter] = React.useState('');
+  const [findText, setFindText] = React.useState('');
+  const [replaceText, setReplaceText] = React.useState('');
+  const [bulkReplacing, setBulkReplacing] = React.useState(false);
 
   const filtered = React.useMemo(
     () => filterCatalogRows(rows, search, groupFilter, 'A'),
@@ -110,7 +115,13 @@ export function ServicesTable({
   }
 
   async function remove(id: string) {
-    if (!confirm('Delete this service? If orders exist, disable it instead.')) return;
+    const ok = await confirmDialog({
+      title: 'Delete service',
+      description: 'Delete this service? If orders exist, disable it instead.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusy(id);
     const res = await fetch(`/api/admin/imei/services/${id}`, { method: 'DELETE' });
     const j = await res.json().catch(() => ({}));
@@ -128,16 +139,95 @@ export function ServicesTable({
     router.refresh();
   }
 
+  function countTitleMatches(ids: string[]) {
+    const idSet = new Set(ids);
+    const find = findText.trim();
+    if (!find) return 0;
+    return rows.filter((r) => idSet.has(r.id) && r.title.includes(find)).length;
+  }
+
+  async function applyTitleReplace(targetIds: string[], scopeLabel: string) {
+    const find = findText.trim();
+    if (!find) {
+      toast.error('Enter text to find');
+      return;
+    }
+    if (targetIds.length === 0) {
+      toast.error('No services targeted');
+      return;
+    }
+
+    const matchCount = countTitleMatches(targetIds);
+    if (matchCount === 0) {
+      toast.error('No matching titles', {
+        description: `None of the ${scopeLabel} titles contain "${find}".`,
+      });
+      return;
+    }
+
+    const preview =
+      replaceText.trim().length > 0
+        ? `"${find}" → "${replaceText}"`
+        : `Remove "${find}" from titles`;
+
+    const ok = await confirmDialog({
+      title: 'Replace text in titles',
+      description: `Apply to ${matchCount} of ${targetIds.length} ${scopeLabel} service(s)?\n\n${preview}`,
+      confirmLabel: 'Replace',
+      tone: 'default',
+    });
+    if (!ok) return;
+
+    setBulkReplacing(true);
+    const res = await fetch('/api/admin/imei/services/bulk-replace-title', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ids: targetIds,
+        find,
+        replace: replaceText,
+      }),
+    });
+    const j = await res.json().catch(() => ({}));
+    setBulkReplacing(false);
+
+    if (!res.ok || !j.success) {
+      toast.error('Replace failed', { description: j.error ?? 'Unknown error' });
+      return;
+    }
+
+    const updatedCount = j.data?.updatedCount ?? 0;
+    const skipped = (j.data?.skipped ?? []) as Array<{ id: string; reason: string }>;
+    toast.success(`Updated ${updatedCount} title(s)`);
+    if (skipped.length > 0) {
+      toast.info(`Skipped ${skipped.length} service(s)`, {
+        description: 'Find text not present or title would become too short.',
+      });
+    }
+    router.refresh();
+  }
+
+  async function replaceInSelected() {
+    await applyTitleReplace([...selectedIds], 'selected');
+  }
+
+  async function replaceInFiltered() {
+    await applyTitleReplace(
+      filtered.map((r) => r.id),
+      'filtered',
+    );
+  }
+
   async function removeSelected() {
     const ids = [...selectedIds];
     if (ids.length === 0) return;
-    if (
-      !confirm(
-        `Delete ${ids.length} selected service(s)? Entries with existing orders will be skipped.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: 'Delete selected services',
+      description: `Delete ${ids.length} selected service(s)? Entries with existing orders will be skipped.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     setBulkDeleting(true);
     const res = await fetch('/api/admin/imei/services/bulk-delete', {
@@ -180,6 +270,63 @@ export function ServicesTable({
         resultCount={filtered.length}
       />
 
+      <div className="mb-3 rounded-xl border border-line bg-paper-50 px-4 py-3">
+        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+          Find & replace in titles
+        </div>
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="min-w-[160px] flex-1">
+            <span className="mb-1 block font-mono text-[9px] uppercase tracking-wider text-ink-muted">
+              Find
+            </span>
+            <input
+              type="text"
+              value={findText}
+              onChange={(e) => setFindText(e.target.value)}
+              placeholder='e.g. iRemoval Pro 6 Year'
+              className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none"
+            />
+          </label>
+          <label className="min-w-[160px] flex-1">
+            <span className="mb-1 block font-mono text-[9px] uppercase tracking-wider text-ink-muted">
+              Replace with
+            </span>
+            <input
+              type="text"
+              value={replaceText}
+              onChange={(e) => setReplaceText(e.target.value)}
+              placeholder="e.g. iRemoval"
+              className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none"
+            />
+          </label>
+          {selectedIds.size > 0 && (
+            <button
+              type="button"
+              onClick={replaceInSelected}
+              disabled={bulkReplacing || bulkDeleting || !findText.trim()}
+              className="rounded-full border border-line bg-paper px-4 py-2 text-xs font-semibold text-ink hover:border-ink disabled:opacity-60"
+            >
+              {bulkReplacing ? 'Replacing…' : `Replace in selected (${selectedIds.size})`}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={replaceInFiltered}
+            disabled={bulkReplacing || bulkDeleting || !findText.trim() || filtered.length === 0}
+            className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-paper hover:bg-primary-600 disabled:opacity-60"
+          >
+            {bulkReplacing ? 'Replacing…' : `Replace in all filtered (${filtered.length})`}
+          </button>
+        </div>
+        {findText.trim() && (
+          <p className="mt-2 text-xs text-ink-muted">
+            {selectedIds.size > 0
+              ? `${countTitleMatches([...selectedIds])} selected · ${countTitleMatches(filtered.map((r) => r.id))} filtered titles contain "${findText.trim()}".`
+              : `${countTitleMatches(filtered.map((r) => r.id))} filtered title(s) contain "${findText.trim()}".`}
+          </p>
+        )}
+      </div>
+
       {selectedIds.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-paper-100 px-4 py-3">
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
@@ -190,7 +337,7 @@ export function ServicesTable({
               type="button"
               onClick={selectAllFiltered}
               className="font-mono text-[10px] uppercase tracking-wider text-ink-muted hover:text-ink"
-              disabled={bulkDeleting}
+              disabled={bulkDeleting || bulkReplacing}
             >
               Select all {filtered.length} filtered
             </button>
@@ -199,14 +346,14 @@ export function ServicesTable({
             type="button"
             onClick={clearSelection}
             className="font-mono text-[10px] uppercase tracking-wider text-ink-muted hover:text-ink"
-            disabled={bulkDeleting}
+            disabled={bulkDeleting || bulkReplacing}
           >
             Clear
           </button>
           <button
             type="button"
             onClick={removeSelected}
-            disabled={bulkDeleting || busy !== null}
+            disabled={bulkDeleting || busy !== null || bulkReplacing}
             className="ml-auto rounded-full border border-red-200 bg-paper px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider text-red-700 hover:border-red-300 hover:bg-red-50 disabled:opacity-60"
           >
             {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.size})`}
@@ -227,7 +374,7 @@ export function ServicesTable({
                     if (el) el.indeterminate = somePageSelected && !allPageSelected;
                   }}
                   onChange={togglePageSelection}
-                  disabled={pageIds.length === 0 || bulkDeleting}
+                  disabled={pageIds.length === 0 || bulkDeleting || bulkReplacing}
                   className="h-4 w-4 rounded border-line"
                 />
               </th>
@@ -261,7 +408,7 @@ export function ServicesTable({
                       aria-label={`Select ${r.title}`}
                       checked={selectedIds.has(r.id)}
                       onChange={() => toggleRow(r.id)}
-                      disabled={bulkDeleting}
+                      disabled={bulkDeleting || bulkReplacing}
                       className="h-4 w-4 rounded border-line"
                     />
                   </td>
@@ -288,21 +435,21 @@ export function ServicesTable({
                           })
                         }
                         className="font-mono text-[10px] uppercase tracking-wider text-ink-muted hover:text-ink"
-                        disabled={busy === r.id || bulkDeleting}
+                        disabled={busy === r.id || bulkDeleting || bulkReplacing}
                       >
                         {r.status === 'ACTIVE' ? 'Disable' : 'Enable'}
                       </button>
                       <button
                         onClick={() => setEditing(r)}
                         className="font-mono text-[10px] uppercase tracking-wider text-ink-muted hover:text-ink"
-                        disabled={busy === r.id || bulkDeleting}
+                        disabled={busy === r.id || bulkDeleting || bulkReplacing}
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => remove(r.id)}
                         className="font-mono text-[10px] uppercase tracking-wider text-red-700 hover:text-red-800"
-                        disabled={busy === r.id || bulkDeleting}
+                        disabled={busy === r.id || bulkDeleting || bulkReplacing}
                       >
                         Delete
                       </button>

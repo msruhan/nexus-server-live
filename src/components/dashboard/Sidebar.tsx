@@ -46,6 +46,7 @@ import {
   Archive,
   Rows,
   Shield,
+  Copy,
 } from '@phosphor-icons/react/dist/ssr';
 import { cn } from '@/lib/cn';
 import { formatAppVersion } from '@/lib/app-version';
@@ -121,6 +122,7 @@ const adminSections: Section[] = [
       { href: '/admin/services/groups', label: 'Group services', icon: Folders, perm: 'manageServiceGroups' },
       { href: '/admin/services/imei', label: 'IMEI services', icon: ListChecks, perm: 'viewImeiServices' },
       { href: '/admin/services/server', label: 'Server services', icon: Buildings, perm: 'viewServerServices' },
+      { href: '/admin/services/duplicates', label: 'Duplicates', icon: Copy, perm: 'viewImeiServices' },
       { href: '/admin/price-groups', label: 'User groups', icon: Tag, perm: 'managePriceGroups' },
     ],
   },

@@ -18,6 +18,7 @@ import {
   type CatalogGroupOption,
 } from '@/components/admin/CatalogTableToolbar';
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Row = {
   id: string;
@@ -40,6 +41,7 @@ export function ServerServicesTable({
   groups: CatalogGroupOption[];
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [editing, setEditing] = React.useState<Row | null>(null);
   const [search, setSearch] = React.useState('');
@@ -72,7 +74,13 @@ export function ServerServicesTable({
   }
 
   async function remove(id: string) {
-    if (!confirm('Delete this service? If orders exist, disable it instead.')) return;
+    const ok = await confirmDialog({
+      title: 'Delete service',
+      description: 'Delete this service? If orders exist, disable it instead.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusy(id);
     const res = await fetch(`/api/admin/imei/server-services/${id}`, { method: 'DELETE' });
     const j = await res.json().catch(() => ({}));

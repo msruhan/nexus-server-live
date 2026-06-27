@@ -5,6 +5,7 @@ import { formatDate } from '@/lib/format';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { ProviderForm } from './ProviderForm';
 import { ProviderActions } from './ProviderActions';
+import { ProviderSyncSettings } from './ProviderSyncSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +46,18 @@ export default async function ProviderDetailPage({
         </h2>
         <div className="mt-4">
           <ProviderActions providerId={provider.id} />
+        </div>
+      </div>
+
+      <div className="mt-12">
+        <h2 className="border-b border-ink/15 pb-3 font-display text-lg font-extrabold tracking-tight text-ink">
+          Sync schedule & pricing
+        </h2>
+        <p className="mt-2 text-sm text-ink-muted">
+          Auto-sync catalog, adjust retail when supplier cost rises, or require reconnect on price changes.
+        </p>
+        <div className="mt-4">
+          <ProviderSyncSettings providerId={provider.id} />
         </div>
       </div>
 

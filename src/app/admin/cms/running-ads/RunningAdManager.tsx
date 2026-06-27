@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Plus, Eye, EyeSlash, Trash, X } from '@phosphor-icons/react/dist/ssr';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Ad = {
   id: string;
@@ -19,6 +20,7 @@ type Ad = {
 
 export function RunningAdManager({ initial }: { initial: Ad[] }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [items, setItems] = React.useState(initial);
   const [editing, setEditing] = React.useState<Ad | 'new' | null>(null);
 
@@ -32,7 +34,13 @@ export function RunningAdManager({ initial }: { initial: Ad[] }) {
   }
 
   async function remove(item: Ad) {
-    if (!confirm('Delete this running ad?')) return;
+    const ok = await confirmDialog({
+      title: 'Delete running ad',
+      description: 'Delete this running ad?',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/cms/running-ads/${item.id}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');

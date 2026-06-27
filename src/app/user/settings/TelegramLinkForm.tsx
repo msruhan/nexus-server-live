@@ -2,8 +2,10 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 export function TelegramLinkForm() {
+  const confirmDialog = useConfirm();
   const [status, setStatus] = React.useState<{
     botEnabled: boolean;
     botUsername: string;
@@ -65,7 +67,13 @@ export function TelegramLinkForm() {
   };
 
   const handleUnlink = async () => {
-    if (!confirm('Are you sure you want to unlink your Telegram account?')) return;
+    const ok = await confirmDialog({
+      title: 'Unlink Telegram',
+      description: 'Are you sure you want to unlink your Telegram account?',
+      confirmLabel: 'Unlink',
+      tone: 'warning',
+    });
+    if (!ok) return;
     setUnlinking(true);
     try {
       const res = await fetch('/api/user/telegram', {

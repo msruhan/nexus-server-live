@@ -18,6 +18,7 @@ import {
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Frequency = 'daily' | 'weekly' | 'monthly';
 
@@ -73,6 +74,7 @@ function formatDateTime(iso: string | null): string {
 
 export function BackupManager({ initial }: { initial: Initial }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [schedule, setSchedule] = React.useState<Schedule>(initial.schedule);
   const [backups, setBackups] = React.useState<Backup[]>(initial.backups);
   const { pageRows, currentPage, pageCount, setPage } = useTablePagination(backups, [backups.length]);
@@ -118,8 +120,14 @@ export function BackupManager({ initial }: { initial: Initial }) {
     const warn =
       'RESTORE WILL OVERWRITE the entire current database with the contents of:\n\n' +
       `${file.name}\n\n` +
-      'A safety backup of the current state will be taken first. Continue?';
-    if (!confirm(warn)) {
+      'A safety backup of the current state will be taken first.';
+    const ok = await confirmDialog({
+      title: 'Restore database',
+      description: warn,
+      confirmLabel: 'Restore',
+      tone: 'warning',
+    });
+    if (!ok) {
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -145,8 +153,14 @@ export function BackupManager({ initial }: { initial: Initial }) {
     const warn =
       'RESTORE WILL OVERWRITE the entire current database with this backup:\n\n' +
       `${b.filename}\n(${formatDateTime(b.startedAt)})\n\n` +
-      'A safety backup of the current state will be taken first. Continue?';
-    if (!confirm(warn)) return;
+      'A safety backup of the current state will be taken first.';
+    const ok = await confirmDialog({
+      title: 'Restore database',
+      description: warn,
+      confirmLabel: 'Restore',
+      tone: 'warning',
+    });
+    if (!ok) return;
     setRestoringId(b.id);
     toast.info('Restoring…', { description: 'Taking a safety backup, then applying the restore.' });
     try {
@@ -224,7 +238,13 @@ export function BackupManager({ initial }: { initial: Initial }) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this backup? The file will be permanently removed.')) return;
+    const ok = await confirmDialog({
+      title: 'Delete backup',
+      description: 'Delete this backup? The file will be permanently removed.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/backup/${id}`, { method: 'DELETE' });
       const data = await res.json();

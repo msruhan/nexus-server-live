@@ -1,3 +1,4 @@
+import { resolveSupplierCostAtOrder } from '@/lib/supplier-cost';
 import { prisma } from '@/lib/db';
 import { apiError, apiSuccess } from '@/lib/api-auth';
 import { requireApiKeyAuth } from '@/lib/api-key-auth';
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
         id: true,
         apiId: true,
         price: true,
+        supplierPrice: true,
         title: true,
         requiresImei: true,
         requiresNetwork: true,
@@ -126,6 +128,7 @@ export async function POST(req: Request) {
           serviceId: service.id,
           imei: deviceInput.imei,
           price: effectivePrice,
+          supplierCost: resolveSupplierCostAtOrder(service),
           status: 'PENDING',
           network: parsed.data.network ?? null,
           model: parsed.data.model ?? null,
