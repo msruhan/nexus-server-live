@@ -4,10 +4,10 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { PencilSimple, Plus, Trash, Star, Upload, Image as ImageIcon } from '@phosphor-icons/react';
+import { Plus, Star, Upload, Image as ImageIcon } from '@phosphor-icons/react';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { TablePagination, useTablePagination } from '@/components/ui/TablePagination';
+import { GroupCatalogTable } from './GroupCatalogTable';
 
 type ImeiGroup = {
   id: string;
@@ -171,9 +171,8 @@ export function GroupServicesManager({
   const router = useRouter();
   const [imeiGroups, setImeiGroups] = React.useState(initialImei);
   const [serverBoxes, setServerBoxes] = React.useState(initialServer);
-  const imeiPagination = useTablePagination(imeiGroups, [imeiGroups.length]);
-  const serverPagination = useTablePagination(serverBoxes, [serverBoxes.length]);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = React.useState<'imei' | 'server' | null>(null);
   const [editingImei, setEditingImei] = React.useState<ImeiGroup | null>(null);
   const [editingServer, setEditingServer] = React.useState<ServerBox | null>(null);
 
@@ -284,6 +283,31 @@ export function GroupServicesManager({
     router.refresh();
   }
 
+  async function bulkDeleteImeiGroups(ids: string[]) {
+    setBulkDeleting('imei');
+    const res = await fetch('/api/admin/imei/groups/bulk-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setBulkDeleting(null);
+    if (!res.ok || !json.success) {
+      toast.error('Bulk delete failed', { description: json.error });
+      return;
+    }
+    const deletedIds = (json.data?.deletedIds ?? []) as string[];
+    const skipped = (json.data?.skipped ?? []) as Array<{ id: string; reason: string }>;
+    setImeiGroups((g) => g.filter((x) => !deletedIds.includes(x.id)));
+    if (deletedIds.length > 0) toast.success(`Deleted ${deletedIds.length} group(s)`);
+    if (skipped.length > 0) {
+      toast.warning(`Skipped ${skipped.length} group(s)`, {
+        description: 'They still have linked services.',
+      });
+    }
+    router.refresh();
+  }
+
   async function createServerBox(e: React.FormEvent) {
     e.preventDefault();
     setBusy('create-server');
@@ -376,6 +400,31 @@ export function GroupServicesManager({
     router.refresh();
   }
 
+  async function bulkDeleteServerBoxes(ids: string[]) {
+    setBulkDeleting('server');
+    const res = await fetch('/api/admin/imei/server-boxes/bulk-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setBulkDeleting(null);
+    if (!res.ok || !json.success) {
+      toast.error('Bulk delete failed', { description: json.error });
+      return;
+    }
+    const deletedIds = (json.data?.deletedIds ?? []) as string[];
+    const skipped = (json.data?.skipped ?? []) as Array<{ id: string; reason: string }>;
+    setServerBoxes((boxes) => boxes.filter((x) => !deletedIds.includes(x.id)));
+    if (deletedIds.length > 0) toast.success(`Deleted ${deletedIds.length} group(s)`);
+    if (skipped.length > 0) {
+      toast.warning(`Skipped ${skipped.length} group(s)`, {
+        description: 'They still have linked services.',
+      });
+    }
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-1 rounded-full border border-line bg-paper-50 p-1 text-sm">
@@ -450,78 +499,15 @@ export function GroupServicesManager({
             </Button>
           </form>
 
-          <div className="overflow-hidden rounded-xl border border-line bg-paper-50">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line bg-paper-100 text-left font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
-                  <th className="px-4 py-3">Name</th>
-                  <th className="hidden px-4 py-3 md:table-cell">Description</th>
-                  <th className="px-4 py-3">Sort</th>
-                  <th className="px-4 py-3">Services</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {imeiPagination.pageRows.map((g) => (
-                  <tr key={g.id} className="border-b border-line last:border-0 hover:bg-paper-100">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <GroupThumb url={g.imageUrl} />
-                        <span className="flex items-center gap-1.5 font-medium text-ink">
-                          {g.title}
-                          {!g.marketplaceVisible && (
-                            <span className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-ink-soft">
-                              Hidden
-                            </span>
-                          )}
-                          {g.featured && (
-                            <Star size={12} weight="fill" className="text-amber-500" aria-label="Featured" />
-                          )}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="hidden max-w-xs truncate px-4 py-3 text-xs text-ink-muted md:table-cell">
-                      {g.description || '—'}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs">{g.sortOrder}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{g.servicesCount}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setEditingImei(g)}
-                          className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-ink hover:border-ink"
-                          disabled={busy === g.id}
-                        >
-                          <PencilSimple size={12} /> Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteImeiGroup(g.id)}
-                          className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700 hover:border-red-300"
-                          disabled={busy === g.id}
-                        >
-                          <Trash size={12} /> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {imeiGroups.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-ink-muted">
-                      No IMEI groups yet. Create one above or import from a provider.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <TablePagination
-            currentPage={imeiPagination.currentPage}
-            pageCount={imeiPagination.pageCount}
-            totalItems={imeiGroups.length}
-            onPageChange={imeiPagination.setPage}
+          <GroupCatalogTable
+            rows={imeiGroups}
+            emptyMessage="No IMEI groups yet. Create one above or import from a provider."
+            busy={busy}
+            bulkDeleting={bulkDeleting === 'imei'}
+            renderThumb={(g) => <GroupThumb url={g.imageUrl} />}
+            onEdit={(g) => setEditingImei(g as ImeiGroup)}
+            onDelete={deleteImeiGroup}
+            onBulkDelete={bulkDeleteImeiGroups}
           />
         </>
       ) : (
@@ -579,78 +565,15 @@ export function GroupServicesManager({
             </Button>
           </form>
 
-          <div className="overflow-hidden rounded-xl border border-line bg-paper-50">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line bg-paper-100 text-left font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
-                  <th className="px-4 py-3">Name</th>
-                  <th className="hidden px-4 py-3 md:table-cell">Description</th>
-                  <th className="px-4 py-3">Sort</th>
-                  <th className="px-4 py-3">Services</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {serverPagination.pageRows.map((b) => (
-                  <tr key={b.id} className="border-b border-line last:border-0 hover:bg-paper-100">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <GroupThumb url={b.imageUrl} />
-                        <span className="flex items-center gap-1.5 font-medium text-ink">
-                          {b.title}
-                          {!b.marketplaceVisible && (
-                            <span className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-ink-soft">
-                              Hidden
-                            </span>
-                          )}
-                          {b.featured && (
-                            <Star size={12} weight="fill" className="text-amber-500" aria-label="Featured" />
-                          )}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="hidden max-w-xs truncate px-4 py-3 text-xs text-ink-muted md:table-cell">
-                      {b.description || '—'}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs">{b.sortOrder}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{b.servicesCount}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setEditingServer(b)}
-                          className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-ink hover:border-ink"
-                          disabled={busy === b.id}
-                        >
-                          <PencilSimple size={12} /> Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteServerBox(b.id)}
-                          className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700 hover:border-red-300"
-                          disabled={busy === b.id}
-                        >
-                          <Trash size={12} /> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {serverBoxes.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-ink-muted">
-                      No server groups yet. Create one above or import from a provider.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <TablePagination
-            currentPage={serverPagination.currentPage}
-            pageCount={serverPagination.pageCount}
-            totalItems={serverBoxes.length}
-            onPageChange={serverPagination.setPage}
+          <GroupCatalogTable
+            rows={serverBoxes}
+            emptyMessage="No server groups yet. Create one above or import from a provider."
+            busy={busy}
+            bulkDeleting={bulkDeleting === 'server'}
+            renderThumb={(b) => <GroupThumb url={b.imageUrl} />}
+            onEdit={(b) => setEditingServer(b as ServerBox)}
+            onDelete={deleteServerBox}
+            onBulkDelete={bulkDeleteServerBoxes}
           />
         </>
       )}

@@ -39,6 +39,8 @@ export function ServicesTable({
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = React.useState(false);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
   const [editing, setEditing] = React.useState<Row | null>(null);
   const [search, setSearch] = React.useState('');
   const [groupFilter, setGroupFilter] = React.useState('');
@@ -52,6 +54,44 @@ export function ServicesTable({
     search,
     groupFilter,
   ]);
+
+  const pageIds = React.useMemo(() => pageRows.map((r) => r.id), [pageRows]);
+  const allPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+
+  React.useEffect(() => {
+    setSelectedIds(new Set());
+  }, [search, groupFilter]);
+
+  function toggleRow(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function togglePageSelection() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        for (const id of pageIds) next.delete(id);
+      } else {
+        for (const id of pageIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function selectAllFiltered() {
+    setSelectedIds(new Set(filtered.map((r) => r.id)));
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
 
   async function update(id: string, patch: Record<string, unknown>) {
     setBusy(id);
@@ -80,6 +120,52 @@ export function ServicesTable({
       return;
     }
     toast.success('Service deleted');
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    router.refresh();
+  }
+
+  async function removeSelected() {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `Delete ${ids.length} selected service(s)? Entries with existing orders will be skipped.`,
+      )
+    ) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    const res = await fetch('/api/admin/imei/services/bulk-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    const j = await res.json().catch(() => ({}));
+    setBulkDeleting(false);
+
+    if (!res.ok || !j.success) {
+      toast.error('Bulk delete failed', { description: j.error ?? 'Unknown error' });
+      return;
+    }
+
+    const deletedCount = j.data?.deletedCount ?? 0;
+    const skipped = (j.data?.skipped ?? []) as Array<{ id: string; reason: string }>;
+
+    if (deletedCount > 0) {
+      toast.success(`Deleted ${deletedCount} service(s)`);
+    }
+    if (skipped.length > 0) {
+      toast.warning(`Skipped ${skipped.length} service(s)`, {
+        description: 'They still have linked orders — disable instead.',
+      });
+    }
+
+    clearSelection();
     router.refresh();
   }
 
@@ -94,10 +180,57 @@ export function ServicesTable({
         resultCount={filtered.length}
       />
 
+      {selectedIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-paper-100 px-4 py-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+            {selectedIds.size} selected
+          </span>
+          {selectedIds.size < filtered.length && (
+            <button
+              type="button"
+              onClick={selectAllFiltered}
+              className="font-mono text-[10px] uppercase tracking-wider text-ink-muted hover:text-ink"
+              disabled={bulkDeleting}
+            >
+              Select all {filtered.length} filtered
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="font-mono text-[10px] uppercase tracking-wider text-ink-muted hover:text-ink"
+            disabled={bulkDeleting}
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={removeSelected}
+            disabled={bulkDeleting || busy !== null}
+            className="ml-auto rounded-full border border-red-200 bg-paper px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider text-red-700 hover:border-red-300 hover:bg-red-50 disabled:opacity-60"
+          >
+            {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.size})`}
+          </button>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-xl border border-line bg-paper-50">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line bg-paper-100 text-left font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Select all on this page"
+                  checked={allPageSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = somePageSelected && !allPageSelected;
+                  }}
+                  onChange={togglePageSelection}
+                  disabled={pageIds.length === 0 || bulkDeleting}
+                  className="h-4 w-4 rounded border-line"
+                />
+              </th>
               <th className="px-4 py-3">Ref</th>
               <th className="px-4 py-3">Title · Group</th>
               <th className="hidden px-4 py-3 lg:table-cell">Delivery</th>
@@ -109,14 +242,29 @@ export function ServicesTable({
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-ink-muted">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-ink-muted">
                   No services match your search or group filter.
                 </td>
               </tr>
             )}
             {pageRows.map((r) => {
               return (
-                <tr key={r.id} className="border-b border-line last:border-0 hover:bg-paper-100">
+                <tr
+                  key={r.id}
+                  className={`border-b border-line last:border-0 hover:bg-paper-100 ${
+                    selectedIds.has(r.id) ? 'bg-paper-100/80' : ''
+                  }`}
+                >
+                  <td className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${r.title}`}
+                      checked={selectedIds.has(r.id)}
+                      onChange={() => toggleRow(r.id)}
+                      disabled={bulkDeleting}
+                      className="h-4 w-4 rounded border-line"
+                    />
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs">A.{r.ref}</td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-ink">{r.title}</div>
@@ -140,21 +288,21 @@ export function ServicesTable({
                           })
                         }
                         className="font-mono text-[10px] uppercase tracking-wider text-ink-muted hover:text-ink"
-                        disabled={busy === r.id}
+                        disabled={busy === r.id || bulkDeleting}
                       >
                         {r.status === 'ACTIVE' ? 'Disable' : 'Enable'}
                       </button>
                       <button
                         onClick={() => setEditing(r)}
                         className="font-mono text-[10px] uppercase tracking-wider text-ink-muted hover:text-ink"
-                        disabled={busy === r.id}
+                        disabled={busy === r.id || bulkDeleting}
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => remove(r.id)}
                         className="font-mono text-[10px] uppercase tracking-wider text-red-700 hover:text-red-800"
-                        disabled={busy === r.id}
+                        disabled={busy === r.id || bulkDeleting}
                       >
                         Delete
                       </button>

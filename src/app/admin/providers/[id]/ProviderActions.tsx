@@ -95,21 +95,30 @@ export function ProviderActions({ providerId }: { providerId: string }) {
     setDialogOpen(kind);
   }
 
-  async function importSelected(kind: Kind, selectedIds: string[]) {
-    if (selectedIds.length === 0) {
+  async function importSelected(
+    kind: Kind,
+    selectedItems: Array<{ toolId: string; price: number }>,
+  ) {
+    if (selectedItems.length === 0) {
       toast.error('No services selected', { description: 'Select at least one service to import.' });
       return;
     }
 
     setLoading(kind);
 
-    const base =
-      kind === 'imei' ? imeiServices.filter((s) => selectedIds.includes(s.toolId)) : serverServices.filter((s) => selectedIds.includes(s.toolId));
+    const catalog = kind === 'imei' ? imeiServices : serverServices;
+    const byToolId = new Map(catalog.map((s) => [s.toolId, s]));
 
-    const services = base.map((s) => ({
-      ...s,
-      price: Math.max(0, Math.round(Number(s.price) * 100) / 100),
-    }));
+    const services = selectedItems
+      .map(({ toolId, price }) => {
+        const s = byToolId.get(toolId);
+        if (!s) return null;
+        return {
+          ...s,
+          price: roundPrice(price),
+        };
+      })
+      .filter((s): s is SyncedImei | SyncedServer => s !== null);
 
     const importPath =
       kind === 'imei'
@@ -168,7 +177,7 @@ export function ProviderActions({ providerId }: { providerId: string }) {
           loading={loading === 'imei'}
           services={imeiServices}
           onClose={() => setDialogOpen(null)}
-          onConfirm={(ids) => importSelected('imei', ids)}
+          onConfirm={(items) => importSelected('imei', items)}
         />
       )}
 
@@ -178,7 +187,7 @@ export function ProviderActions({ providerId }: { providerId: string }) {
           loading={loading === 'server'}
           services={serverServices}
           onClose={() => setDialogOpen(null)}
-          onConfirm={(ids) => importSelected('server', ids)}
+          onConfirm={(items) => importSelected('server', items)}
         />
       )}
     </>
@@ -219,6 +228,20 @@ function ActionCard({
   );
 }
 
+type MarkupMode = 'percent' | 'fixed';
+
+function roundPrice(value: number) {
+  return Math.max(0, Math.round(Number(value) * 100) / 100);
+}
+
+function applyMarkup(supplierPrice: number, mode: MarkupMode, amount: number) {
+  const base = Number(supplierPrice);
+  if (mode === 'percent') {
+    return roundPrice(base * (1 + amount / 100));
+  }
+  return roundPrice(base + amount);
+}
+
 function SyncServicesDialog({
   kind,
   services,
@@ -230,13 +253,60 @@ function SyncServicesDialog({
   services: SyncedImei[] | SyncedServer[];
   loading: boolean;
   onClose: () => void;
-  onConfirm: (ids: string[]) => void;
+  onConfirm: (items: Array<{ toolId: string; price: number }>) => void;
 }) {
   const [search, setSearch] = React.useState('');
-  const [selected, setSelected] = React.useState<Set<string>>(
-    () => new Set(services.map((s) => s.toolId)),
-  );
+  const [selected, setSelected] = React.useState<Set<string>>(() => new Set());
+  const [retailPrices, setRetailPrices] = React.useState<Map<string, number>>(() => new Map());
+  const [markupMode, setMarkupMode] = React.useState<MarkupMode>('percent');
+  const [markupValue, setMarkupValue] = React.useState('');
   const pageSize = 20;
+
+  const supplierById = React.useMemo(
+    () => new Map(services.map((s) => [s.toolId, Number(s.price)])),
+    [services],
+  );
+
+  function getRetailPrice(toolId: string) {
+    const override = retailPrices.get(toolId);
+    if (override !== undefined) return override;
+    return roundPrice(supplierById.get(toolId) ?? 0);
+  }
+
+  function setRetailPrice(toolId: string, price: number) {
+    setRetailPrices((prev) => {
+      const next = new Map(prev);
+      next.set(toolId, roundPrice(price));
+      return next;
+    });
+  }
+
+  function applyBulkMarkup(toolIds: string[]) {
+    const amount = Number(markupValue);
+    if (!Number.isFinite(amount)) {
+      toast.error('Invalid markup', { description: 'Enter a valid number for the markup.' });
+      return;
+    }
+    if (toolIds.length === 0) {
+      toast.error('No services targeted', { description: 'Select services or use apply to all.' });
+      return;
+    }
+
+    setRetailPrices((prev) => {
+      const next = new Map(prev);
+      for (const toolId of toolIds) {
+        const supplier = supplierById.get(toolId);
+        if (supplier === undefined) continue;
+        next.set(toolId, applyMarkup(supplier, markupMode, amount));
+      }
+      return next;
+    });
+
+    const modeLabel = markupMode === 'percent' ? `${amount}%` : `$${amount}`;
+    toast.success('Retail prices updated', {
+      description: `Applied ${modeLabel} markup to ${toolIds.length} service(s).`,
+    });
+  }
 
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -257,7 +327,8 @@ function SyncServicesDialog({
   );
 
   const allIds = filtered.map((s) => s.toolId);
-  const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
+  const allFilteredSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
+  const someFilteredSelected = allIds.some((id) => selected.has(id));
 
   function toggleOne(id: string) {
     setSelected((prev) => {
@@ -268,10 +339,10 @@ function SyncServicesDialog({
     });
   }
 
-  function toggleAllPage() {
+  function toggleAllFiltered() {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allSelected) {
+      if (allFilteredSelected) {
         allIds.forEach((id) => next.delete(id));
       } else {
         allIds.forEach((id) => next.add(id));
@@ -281,7 +352,22 @@ function SyncServicesDialog({
   }
 
   function handleConfirm() {
-    onConfirm(Array.from(selected));
+    const items = Array.from(selected).map((toolId) => ({
+      toolId,
+      price: getRetailPrice(toolId),
+    }));
+    if (items.length === 0) {
+      toast.error('No services selected', { description: 'Check at least one service to import.' });
+      return;
+    }
+
+    const kindLabel = kind === 'imei' ? 'IMEI' : 'server';
+    const ok = confirm(
+      `Import ${items.length} selected ${kindLabel} service(s) into your catalog?\n\nOnly checked items will be added with the retail prices shown in the table.`,
+    );
+    if (!ok) return;
+
+    onConfirm(items);
   }
 
   return (
@@ -305,7 +391,7 @@ function SyncServicesDialog({
           </button>
         </div>
 
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <input
             type="search"
             placeholder="Search by name, group, or ID…"
@@ -321,6 +407,68 @@ function SyncServicesDialog({
           </div>
         </div>
 
+        <div className="mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-paper-50 px-3 py-3">
+          <div>
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+              Bulk retail markup
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-lg border border-line bg-paper p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setMarkupMode('percent')}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
+                    markupMode === 'percent'
+                      ? 'bg-ink text-paper'
+                      : 'text-ink-soft hover:text-ink'
+                  }`}
+                >
+                  %
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMarkupMode('fixed')}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
+                    markupMode === 'fixed'
+                      ? 'bg-ink text-paper'
+                      : 'text-ink-soft hover:text-ink'
+                  }`}
+                >
+                  $
+                </button>
+              </div>
+              <input
+                type="number"
+                step={markupMode === 'percent' ? '1' : '0.01'}
+                placeholder={markupMode === 'percent' ? 'e.g. 20' : 'e.g. 1.50'}
+                className="w-28 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm focus:border-ink focus:outline-none"
+                value={markupValue}
+                onChange={(e) => setMarkupValue(e.target.value)}
+              />
+              <span className="text-xs text-ink-muted">
+                from supplier price
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={() => applyBulkMarkup(Array.from(selected))}
+              className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:border-ink disabled:opacity-50"
+            >
+              Apply to selected
+            </button>
+            <button
+              type="button"
+              onClick={() => applyBulkMarkup(services.map((s) => s.toolId))}
+              className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:border-ink"
+            >
+              Apply to all
+            </button>
+          </div>
+        </div>
+
         <div className="flex-1 overflow-hidden rounded-xl border border-line bg-paper-50">
           <div className="h-full overflow-auto">
             <table className="w-full text-sm">
@@ -330,14 +478,19 @@ function SyncServicesDialog({
                     <input
                       type="checkbox"
                       className="h-3 w-3 rounded border-line"
-                      checked={allSelected}
-                      onChange={toggleAllPage}
+                      aria-label="Select all filtered services"
+                      checked={allFilteredSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someFilteredSelected && !allFilteredSelected;
+                      }}
+                      onChange={toggleAllFiltered}
                     />
                   </th>
                   <th className="px-3 py-2">Service</th>
                   <th className="px-3 py-2">Group</th>
                   <th className="px-3 py-2">Tool ID</th>
                   <th className="px-3 py-2 text-right">Price (supplier)</th>
+                  <th className="px-3 py-2 text-right">Retail price</th>
                   {kind === 'server' && <th className="px-3 py-2">Required fields</th>}
                 </tr>
               </thead>
@@ -368,8 +521,21 @@ function SyncServicesDialog({
                     </td>
                     <td className="px-3 py-2 text-xs text-ink-muted">{s.groupName}</td>
                     <td className="px-3 py-2 font-mono text-[11px] text-ink-muted">{s.toolId}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">
+                    <td className="px-3 py-2 text-right font-mono text-xs text-ink-muted">
                       {Number(s.price).toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className="w-24 rounded-lg border border-line bg-paper px-2 py-1 text-right font-mono text-xs focus:border-ink focus:outline-none"
+                        value={getRetailPrice(s.toolId)}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          if (Number.isFinite(next)) setRetailPrice(s.toolId, next);
+                        }}
+                      />
                     </td>
                     {kind === 'server' && (
                       <td className="px-3 py-2 max-w-xs truncate text-xs text-ink-muted">
@@ -381,7 +547,7 @@ function SyncServicesDialog({
                 {pageRows.length === 0 && (
                   <tr>
                     <td
-                      colSpan={kind === 'server' ? 6 : 5}
+                      colSpan={kind === 'server' ? 7 : 6}
                       className="px-3 py-8 text-center text-xs text-ink-muted"
                     >
                       No services match the filter.
@@ -411,11 +577,11 @@ function SyncServicesDialog({
             </button>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || selected.size === 0}
               onClick={handleConfirm}
               className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-paper disabled:opacity-60"
             >
-              {loading ? 'Mengimport…' : 'Import selected'}
+              {loading ? 'Importing…' : `Import selected (${selected.size})`}
             </button>
           </div>
         </div>
