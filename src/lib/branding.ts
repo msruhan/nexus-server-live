@@ -14,6 +14,7 @@ export type Branding = {
   siteName: string;
   tagline: string;
   logoUrl: string | null;
+  logoIconUrl: string | null;
   faviconUrl: string | null;
   primaryColor: string;
   supportEmail: string | null;
@@ -29,6 +30,7 @@ const DEFAULTS: Branding = {
   siteName: 'Recovero',
   tagline: 'IMEI & Server Hub',
   logoUrl: null,
+  logoIconUrl: null,
   faviconUrl: null,
   primaryColor: '#2f63ff',
   supportEmail: null,
@@ -53,6 +55,7 @@ export async function getBranding(): Promise<Branding> {
       siteName: s?.siteName?.trim() || DEFAULTS.siteName,
       tagline: s?.siteTagline?.trim() || DEFAULTS.tagline,
       logoUrl: s?.logoUrl || null,
+      logoIconUrl: s?.faviconUrl || s?.logoUrl || null,
       faviconUrl: s?.faviconUrl || null,
       primaryColor: s?.primaryColor || DEFAULTS.primaryColor,
       supportEmail: s?.supportEmail || null,

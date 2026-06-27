@@ -223,7 +223,7 @@ export function Sidebar({
   /** Sub-admin permission map (perm key → boolean). Null/undefined = full admin. */
   permissions?: Record<string, boolean> | null;
   /** White-label brand identity for the sidebar header. */
-  brand?: { siteName: string; logoUrl: string | null };
+  brand?: { siteName: string; logoUrl: string | null; logoIconUrl?: string | null };
   /** When license runtime is locked, only show the system page in admin nav. */
   licenseLockdown?: boolean;
   children: React.ReactNode;
@@ -262,6 +262,13 @@ export function Sidebar({
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [isLg, setIsLg] = React.useState(false);
+  const [logoBroken, setLogoBroken] = React.useState(false);
+
+  React.useEffect(() => {
+    setLogoBroken(false);
+  }, [brand?.logoUrl, brand?.logoIconUrl]);
+
+  const sidebarLogoUrl = brand?.logoIconUrl || brand?.logoUrl;
 
   React.useEffect(() => {
     try {
@@ -341,12 +348,13 @@ export function Sidebar({
       {/* Brand */}
       <div className="flex items-center justify-between border-b border-line px-5 py-5">
         <Link href="/" className="flex min-w-0 flex-1 items-center gap-2" onClick={closeMobileNav}>
-          {brand?.logoUrl ? (
+          {sidebarLogoUrl && !logoBroken ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={brand.logoUrl}
+              src={sidebarLogoUrl}
               alt={brand.siteName}
-              className="h-8 w-auto max-w-[140px] object-contain"
+              className="h-8 w-8 shrink-0 object-contain"
+              onError={() => setLogoBroken(true)}
             />
           ) : (
             <span className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-paper">
