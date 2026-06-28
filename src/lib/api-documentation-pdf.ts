@@ -54,7 +54,7 @@ function drawRunningHeader(doc: PdfDoc) {
   doc.restore();
 }
 
-function drawPageFooters(doc: PdfDoc) {
+function drawPageFooters(doc: PdfDoc, siteName: string) {
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
@@ -62,7 +62,7 @@ function drawPageFooters(doc: PdfDoc) {
     doc.save();
     doc.strokeColor(C.line).lineWidth(0.5).moveTo(MARGIN, FOOTER_Y - 10).lineTo(PAGE_W - MARGIN, FOOTER_Y - 10).stroke();
     doc.fillColor(C.inkSoft).font('Helvetica').fontSize(8);
-    doc.text('Confidential · Recovero', MARGIN, FOOTER_Y, { lineBreak: false });
+    doc.text(`Confidential · ${siteName}`, MARGIN, FOOTER_Y, { lineBreak: false });
     doc.text(`Page ${i} of ${range.count - 1}`, PAGE_W - MARGIN - 50, FOOTER_Y, {
       width: 50,
       align: 'right',
@@ -129,7 +129,7 @@ function codeBlock(doc: PdfDoc, text: string) {
   doc.font('Helvetica').fontSize(10);
 }
 
-function drawCover(doc: PdfDoc, baseUrl: string) {
+function drawCover(doc: PdfDoc, baseUrl: string, siteName: string) {
   doc.save();
   doc.rect(0, 0, PAGE_W, 240).fill(C.ink);
   doc.fillColor(C.primary).rect(MARGIN, 200, 72, 4).fill();
@@ -178,14 +178,17 @@ function drawCover(doc: PdfDoc, baseUrl: string) {
   doc.moveDown(0.8);
   doc.fillColor(C.inkSoft).font('Helvetica').fontSize(9);
   doc.text(
-    'This document is for authenticated Recovero account holders. Keep API secrets confidential.',
+    `This document is for authenticated ${siteName} account holders. Keep API secrets confidential.`,
     MARGIN,
     doc.y,
     { width: CONTENT_W, align: 'center' },
   );
 }
 
-export async function buildApiDocumentationPdf(baseUrl: string): Promise<Buffer> {
+export async function buildApiDocumentationPdf(
+  baseUrl: string,
+  siteName: string,
+): Promise<Buffer> {
   const PDFDocument = loadPdfKit();
   const origin = baseUrl.replace(/\/$/, '');
 
@@ -196,7 +199,7 @@ export async function buildApiDocumentationPdf(baseUrl: string): Promise<Buffer>
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    drawCover(doc, origin);
+    drawCover(doc, origin, siteName);
     doc.addPage({ margin: 0 });
     drawRunningHeader(doc);
     doc.y = 88;
@@ -204,7 +207,7 @@ export async function buildApiDocumentationPdf(baseUrl: string): Promise<Buffer>
     section(doc, 1, 'Overview');
     paragraph(
       doc,
-      'Recovero provides reseller APIs for IMEI and Server catalog services. Wallet balance is debited when orders are placed. Pricing respects your user group tier when configured by an administrator.',
+      `${siteName} provides reseller APIs for IMEI and Server catalog services. Wallet balance is debited when orders are placed. Pricing respects your user group tier when configured by an administrator.`,
     );
 
     section(doc, 2, 'API keys & authentication');
@@ -296,7 +299,7 @@ export async function buildApiDocumentationPdf(baseUrl: string): Promise<Buffer>
     bullet(doc, 'POST order — store orderCode and referenceId');
     bullet(doc, 'Poll status via dashboard, REST, or Dhru getimeiorder');
 
-    drawPageFooters(doc);
+    drawPageFooters(doc, siteName);
     doc.end();
   });
 }

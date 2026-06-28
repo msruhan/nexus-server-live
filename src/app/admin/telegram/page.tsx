@@ -15,6 +15,9 @@ export default async function AdminTelegramPage() {
       telegramAdminChatId: true,
       telegramChannelId: true,
       telegramChannelEnabled: true,
+      telegramGroupId: true,
+      telegramGroupTopicId: true,
+      telegramGroupEnabled: true,
       telegramUserEvents: true,
       telegramAdminEvents: true,
     },
@@ -48,7 +51,7 @@ export default async function AdminTelegramPage() {
             Telegram <span className="font-serif italic font-normal">bot</span>.
           </>
         }
-        subtitle="Configure Telegram bot for notifications, user commands, and channel auto-posts."
+        subtitle="Configure Telegram bot for notifications, user commands, channel auto-posts, and group topic auto-posts."
       />
       <TelegramSettingsForm
         initial={{
@@ -58,6 +61,10 @@ export default async function AdminTelegramPage() {
           telegramAdminChatId: settings?.telegramAdminChatId ?? '',
           telegramChannelId: settings?.telegramChannelId ?? '',
           telegramChannelEnabled: settings?.telegramChannelEnabled ?? false,
+          telegramGroupId: settings?.telegramGroupId ?? '',
+          telegramGroupTopicId:
+            settings?.telegramGroupTopicId != null ? String(settings.telegramGroupTopicId) : '',
+          telegramGroupEnabled: settings?.telegramGroupEnabled ?? false,
           hasToken: !!settings?.telegramBotToken,
           userEvents: resolveChecked(settings?.telegramUserEvents, allUserKeys),
           adminEvents: resolveChecked(settings?.telegramAdminEvents, allAdminKeys),

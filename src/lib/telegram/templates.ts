@@ -5,6 +5,8 @@
  * <pre>, <a href="">, <tg-spoiler>.
  */
 
+import { resolveSiteName } from '@/lib/site-name';
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -203,9 +205,10 @@ export function channelPriceUpdateTemplate(p: {
 
 // ─── Bot command responses ──────────────────────────────────────
 
-export function welcomeTemplate(botUsername: string): string {
+export function welcomeTemplate(siteName: string): string {
+  const label = escapeHtml(resolveSiteName(siteName));
   return [
-    `👋 <b>Welcome to Recovero Bot!</b>`,
+    `👋 <b>Welcome to ${label} Bot!</b>`,
     ``,
     `I can help you with:`,
     `• /balance — Check your wallet balance`,
@@ -216,6 +219,11 @@ export function welcomeTemplate(botUsername: string): string {
     ``,
     `You'll receive notifications for order updates, payments, and ticket replies.`,
   ].join('\n');
+}
+
+export function testMessageTemplate(siteName: string, body: string): string {
+  const label = escapeHtml(resolveSiteName(siteName));
+  return `✅ <b>Test message from ${label}</b>\n\n${body}`;
 }
 
 export function linkSuccessTemplate(userName: string): string {

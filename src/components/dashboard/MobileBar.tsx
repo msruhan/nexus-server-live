@@ -7,7 +7,13 @@ import { formatAppVersion } from '@/lib/app-version';
 import { useSidebarMobileNav } from '@/components/dashboard/sidebar-mobile-context';
 import { NotificationBell } from '@/components/dashboard/NotificationBell';
 
-export function MobileBar({ user }: { user: { name: string; email: string; role: string } }) {
+export function MobileBar({
+  user,
+  siteName,
+}: {
+  user: { name: string; email: string; role: string };
+  siteName: string;
+}) {
   const { open, toggle } = useSidebarMobileNav();
 
   return (
@@ -30,7 +36,7 @@ export function MobileBar({ user }: { user: { name: string; email: string; role:
           </span>
           <div className="min-w-0 leading-tight">
             <span className="block truncate font-display text-sm font-extrabold tracking-tight text-ink">
-              Recovero
+              {siteName}
             </span>
             <span className="block font-mono text-[9px] tabular-nums text-ink-soft">{formatAppVersion()}</span>
           </div>

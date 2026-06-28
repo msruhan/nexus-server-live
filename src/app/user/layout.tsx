@@ -8,8 +8,9 @@ import { AccountThemeShell } from '@/components/appearance/AccountThemeShell';
 import { getBranding } from '@/lib/branding';
 import { getLicenseEnforcementState, shouldRedirectToLicenseSuspended } from '@/lib/license-state';
 import { guardAgainstBlockedIp } from '@/lib/ip-block-guard';
-import { getActiveAnnouncements } from '@/lib/announcements';
+import { getSiteAnnouncements } from '@/lib/announcements';
 import { GlobalAnnouncementBar } from '@/components/announcements/GlobalAnnouncementBar';
+import { DesktopTopBar } from '@/components/dashboard/DesktopTopBar';
 
 export default async function UserLayout({ children }: { children: React.ReactNode }) {
   await guardAgainstBlockedIp();
@@ -43,7 +44,7 @@ export default async function UserLayout({ children }: { children: React.ReactNo
   };
 
   const brand = await getBranding();
-  const announcements = await getActiveAnnouncements(false);
+  const announcements = await getSiteAnnouncements();
 
   return (
     <AccountThemeShell userId={session.user.id}>
@@ -57,7 +58,8 @@ export default async function UserLayout({ children }: { children: React.ReactNo
         }}
       >
         <GlobalAnnouncementBar items={announcements} />
-        <MobileBar user={userInfo} />
+        <DesktopTopBar />
+        <MobileBar user={userInfo} siteName={brand.siteName} />
         <main className="flex-1 px-4 py-8 sm:px-8 lg:px-12 lg:py-12">{children}</main>
       </Sidebar>
     </AccountThemeShell>

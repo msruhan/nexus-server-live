@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import type { Icon } from '@phosphor-icons/react';
 import { parseFooterContent, resolveFooterForRender } from '@/lib/footer-content';
+import { resolveSiteName, POWERED_BY_RECOVERO } from '@/lib/site-name';
 
 export async function Footer() {
   const [menus, settings] = await Promise.all([
@@ -21,7 +22,7 @@ export async function Footer() {
     prisma.siteSettings.findUnique({ where: { id: 'singleton' } }),
   ]);
 
-  const siteName = settings?.siteName ?? 'Recovero';
+  const siteName = resolveSiteName(settings?.siteName);
   const footerContent = parseFooterContent(settings?.footerContent);
   const resolved = resolveFooterForRender(footerContent, {
     siteName,
@@ -179,7 +180,7 @@ export async function Footer() {
         <div className="mx-auto flex max-w-[1400px] flex-col gap-1 px-6 py-6 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted sm:flex-row sm:items-center sm:justify-between lg:px-10">
           <span>{resolved.copyright}</span>
           {resolved.brandShowPoweredBy && (
-            <span className="text-ink-soft">Powered by Recovero</span>
+            <span className="text-ink-soft">{POWERED_BY_RECOVERO}</span>
           )}
         </div>
       </div>

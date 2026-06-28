@@ -8,6 +8,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { formatUSD } from '@/lib/format';
 import { buildInvoicePdf } from '@/lib/invoice/pdf';
+import { getBranding } from '@/lib/branding';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -25,6 +26,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   try {
+    const brand = await getBranding();
     const pdf = await buildInvoicePdf({
       number: invoice.number,
       kind: invoice.kind,
@@ -33,7 +35,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       currency: invoice.currency,
       description: invoice.description,
       orderCode: invoice.orderCode,
-      sellerName: invoice.sellerName ?? 'Recovero',
+      sellerName: invoice.sellerName ?? brand.siteName,
       sellerEmail: invoice.sellerEmail,
       buyerName: invoice.buyerName,
       buyerEmail: invoice.buyerEmail,

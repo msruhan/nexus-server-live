@@ -7,7 +7,7 @@ self.addEventListener('push', (event) => {
     payload = { body: event.data?.text() ?? '' };
   }
 
-  const title = payload.title || 'Recovero';
+  const title = payload.title || 'Notification';
   const options = {
     body: payload.body || '',
     icon: payload.icon || '/brand/icon-nexus.png',

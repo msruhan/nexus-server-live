@@ -1,5 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { getBranding } from '@/lib/branding';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { WEBHOOK_EVENTS } from '@/lib/webhook/types';
 import { WebhooksManager } from './WebhooksManager';
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function UserWebhooksPage() {
   const session = await auth();
   const userId = session!.user.id;
+  const brand = await getBranding();
 
   const endpoints = await prisma.webhookEndpoint.findMany({
     where: { userId },
@@ -30,7 +32,7 @@ export default async function UserWebhooksPage() {
             Outgoing <span className="font-serif italic font-normal">webhooks</span>.
           </>
         }
-        subtitle="Receive real-time POST callbacks when your orders complete or payments are credited — integrate Recovero into your own system."
+        subtitle={`Receive real-time POST callbacks when your orders complete or payments are credited — integrate ${brand.siteName} into your own system.`}
       />
       <WebhooksManager
         initialEndpoints={endpoints.map((e) => ({

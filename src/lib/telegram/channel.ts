@@ -1,8 +1,8 @@
 /**
- * Telegram channel auto-post helpers.
+ * Telegram channel & group auto-post helpers.
  *
- * Posts to the configured channel when services are published or
- * prices are updated. Fire-and-forget — never blocks the admin action.
+ * Posts when services are published or prices are updated. Fire-and-forget —
+ * never blocks the admin action.
  */
 import { loadSettings, sendMessage } from './client';
 import * as tpl from './templates';
@@ -26,8 +26,39 @@ function fmtUsd(n: number | string): string {
   }).format(v);
 }
 
+async function deliverAutoPost(text: string): Promise<void> {
+  const settings = await loadSettings();
+  if (!settings) return;
+
+  const sendOpts = {
+    text,
+    parseMode: 'HTML' as const,
+    disableWebPagePreview: true,
+  };
+
+  if (settings.channelEnabled && settings.channelId) {
+    await sendMessage({
+      chatId: settings.channelId,
+      ...sendOpts,
+    });
+  }
+
+  if (
+    settings.groupEnabled &&
+    settings.groupId &&
+    settings.groupTopicId != null &&
+    settings.groupTopicId > 0
+  ) {
+    await sendMessage({
+      chatId: settings.groupId,
+      messageThreadId: settings.groupTopicId,
+      ...sendOpts,
+    });
+  }
+}
+
 /**
- * Post to channel when a new service is published (status → ACTIVE).
+ * Post when a new service is published (status → ACTIVE).
  */
 export async function postNewService(input: {
   title: string;
@@ -36,9 +67,6 @@ export async function postNewService(input: {
   deliveryTime?: string | null;
 }) {
   try {
-    const settings = await loadSettings();
-    if (!settings?.channelEnabled || !settings.channelId) return;
-
     const text = tpl.channelNewServiceTemplate({
       title: input.title,
       category: input.category,
@@ -46,19 +74,14 @@ export async function postNewService(input: {
       deliveryTime: input.deliveryTime,
       siteUrl: resolveBaseUrl(),
     });
-    await sendMessage({
-      chatId: settings.channelId,
-      text,
-      parseMode: 'HTML',
-      disableWebPagePreview: true,
-    });
+    await deliverAutoPost(text);
   } catch (e) {
     console.error('[telegram.channel] postNewService', e);
   }
 }
 
 /**
- * Post to channel when a service price is updated.
+ * Post when a service price is updated.
  */
 export async function postPriceUpdate(input: {
   title: string;
@@ -66,21 +89,13 @@ export async function postPriceUpdate(input: {
   newPrice: number | string;
 }) {
   try {
-    const settings = await loadSettings();
-    if (!settings?.channelEnabled || !settings.channelId) return;
-
     const text = tpl.channelPriceUpdateTemplate({
       title: input.title,
       oldPrice: fmtUsd(input.oldPrice),
       newPrice: fmtUsd(input.newPrice),
       siteUrl: resolveBaseUrl(),
     });
-    await sendMessage({
-      chatId: settings.channelId,
-      text,
-      parseMode: 'HTML',
-      disableWebPagePreview: true,
-    });
+    await deliverAutoPost(text);
   } catch (e) {
     console.error('[telegram.channel] postPriceUpdate', e);
   }

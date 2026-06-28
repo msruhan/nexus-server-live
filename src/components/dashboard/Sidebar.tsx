@@ -51,7 +51,7 @@ import {
 import { cn } from '@/lib/cn';
 import { formatAppVersion } from '@/lib/app-version';
 import { SidebarMobileNavProvider } from '@/components/dashboard/sidebar-mobile-context';
-import { NotificationBell } from '@/components/dashboard/NotificationBell';
+import { DEFAULT_SITE_NAME } from '@/lib/site-name';
 import type { Icon } from '@phosphor-icons/react';
 
 type Item = {
@@ -370,7 +370,7 @@ export function Sidebar({
             </span>
           )}
           <div className="leading-tight">
-            <div className="font-display text-sm font-extrabold text-ink">{brand?.siteName ?? 'Recovero'}</div>
+            <div className="font-display text-sm font-extrabold text-ink">{brand?.siteName ?? DEFAULT_SITE_NAME}</div>
             <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-ink-muted">
               {variant === 'admin'
                 ? isSubAdmin
@@ -497,11 +497,6 @@ export function Sidebar({
 
       {/* User block */}
       <div className="border-t border-line px-3 py-4">
-        {variant === 'user' && (
-          <div className="mb-3 hidden justify-end lg:flex">
-            <NotificationBell />
-          </div>
-        )}
         <div className="rounded-lg bg-paper-100 p-3">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink font-display font-bold text-paper">

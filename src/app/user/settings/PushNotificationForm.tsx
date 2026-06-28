@@ -7,9 +7,11 @@ import {
   unsubscribeFromPush,
 } from '@/lib/push/client';
 import { iosPushRequiresInstall, isStandalonePwa } from '@/lib/push/platform';
+import { useSiteName } from '@/lib/site-name-client';
 import { IosInstallSteps } from '@/components/pwa/IosInstallSteps';
 
 export function PushNotificationForm() {
+  const siteName = useSiteName();
   const [status, setStatus] = React.useState<{
     configured: boolean;
     notifyEnabled: boolean;
@@ -120,10 +122,10 @@ export function PushNotificationForm() {
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
           <div className="text-sm font-bold text-amber-950">Install app first (iOS)</div>
           <p className="mt-1 text-xs text-amber-900">
-            Push notifications on iPhone/iPad only work when Recovero is opened from your Home
+            Push notifications on iPhone/iPad only work when {siteName} is opened from your Home
             Screen — not from a Safari tab.
           </p>
-          <IosInstallSteps />
+          <IosInstallSteps siteName={siteName} />
         </div>
       )}
 

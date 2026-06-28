@@ -10,6 +10,9 @@ export type TelegramSettings = {
   adminChatId: string | null;
   channelId: string | null;
   channelEnabled: boolean;
+  groupId: string | null;
+  groupTopicId: number | null;
+  groupEnabled: boolean;
   userEvents: string[]; // empty array = all enabled
   adminEvents: string[]; // empty array = all enabled
 };
@@ -102,4 +105,6 @@ export type SendMessageOptions = {
   parseMode?: 'HTML' | 'Markdown' | 'MarkdownV2';
   replyMarkup?: InlineKeyboardMarkup;
   disableWebPagePreview?: boolean;
+  /** Forum topic in a supergroup (Telegram `message_thread_id`). */
+  messageThreadId?: number;
 };

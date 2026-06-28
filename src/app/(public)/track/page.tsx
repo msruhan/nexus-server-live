@@ -1,14 +1,18 @@
 import type { Metadata } from 'next';
 import { lookupOrderByCode } from '@/lib/order-tracker';
+import { getBranding } from '@/lib/branding';
 import { TrackForm } from './TrackForm';
 import { TrackResult } from './TrackResult';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Track order — Recovero',
-  description: 'Look up your IMEI or server order status using its order code.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getBranding();
+  return {
+    title: `Track order — ${brand.siteName}`,
+    description: 'Look up your IMEI or server order status using its order code.',
+  };
+}
 
 type Props = {
   searchParams: Promise<{ code?: string }>;

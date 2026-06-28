@@ -41,7 +41,7 @@ export function formatSupplierRejectReason(raw: string, phase: 'submit' | 'poll'
 
   if (lower.includes('creditprocess') || lower.includes('credit process')) {
     return phase === 'submit'
-      ? '[Rejected on submit] Insufficient reseller API balance/credit at the supplier (CreditprocessError). Top up at the supplier panel — this is not the user wallet balance on Recovero.'
+      ? '[Rejected on submit] Insufficient reseller API balance/credit at the supplier (CreditprocessError). Top up at the supplier panel — this is not the user wallet balance on this platform.'
       : `[Rejected after supplier processing] ${clean}`
   }
 

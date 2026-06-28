@@ -11,11 +11,11 @@ export function GlobalAnnouncementBar({ items }: { items: ActiveAnnouncement[] }
   if (items.length === 0) return null;
 
   return (
-    <div className="space-y-0">
+    <div className="relative z-50 space-y-0" role="region" aria-label="Site announcements">
       {items.map((item) => (
         <div
           key={item.id}
-          className={`border-b px-4 py-2.5 text-center text-sm ${toneStyles[item.tone] ?? toneStyles.info}`}
+          className={`border-b px-4 py-3 text-center text-sm font-medium ${toneStyles[item.tone] ?? toneStyles.info}`}
         >
           {item.title && (
             <span className="mr-2 font-display font-bold tracking-tight">{item.title}</span>

@@ -18,7 +18,7 @@ export default async function AnnouncementsPage() {
             Site <span className="font-serif italic font-normal">announcements</span>.
           </>
         }
-        subtitle="Global banner above the site — schedule maintenance windows or broadcast notices. Separate from running ads ticker."
+        subtitle="Global banner at the top of the landing page and member dashboard. Optionally show the same banner inside the admin panel. Separate from running ads ticker."
       />
       <AnnouncementManager
         initial={items.map((i) => ({

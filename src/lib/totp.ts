@@ -1,7 +1,6 @@
 import { generateSecret, generateURI, verify } from 'otplib';
 import QRCode from 'qrcode';
-
-const APP_NAME = 'Recovero';
+import { DEFAULT_SITE_NAME } from '@/lib/site-name';
 
 /** Toleransi drift jam (detik). Period TOTP = 30s → ±1 langkah waktu. */
 const EPOCH_TOLERANCE_SECONDS = 30;
@@ -14,9 +13,9 @@ export function normalizeTotpSecret(secret: string): string {
   return secret.trim().replace(/\s/g, '').toUpperCase();
 }
 
-export function buildTotpUri(email: string, secret: string): string {
+export function buildTotpUri(email: string, secret: string, issuer?: string): string {
   return generateURI({
-    issuer: APP_NAME,
+    issuer: issuer?.trim() || DEFAULT_SITE_NAME,
     label: email,
     secret: normalizeTotpSecret(secret),
   });

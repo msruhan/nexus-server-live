@@ -37,6 +37,9 @@ export async function loadSettings(): Promise<TelegramSettings | null> {
       telegramAdminChatId: true,
       telegramChannelId: true,
       telegramChannelEnabled: true,
+      telegramGroupId: true,
+      telegramGroupTopicId: true,
+      telegramGroupEnabled: true,
       telegramUserEvents: true,
       telegramAdminEvents: true,
     },
@@ -54,6 +57,9 @@ export async function loadSettings(): Promise<TelegramSettings | null> {
     adminChatId: row.telegramAdminChatId ?? null,
     channelId: row.telegramChannelId ?? null,
     channelEnabled: row.telegramChannelEnabled,
+    groupId: row.telegramGroupId ?? null,
+    groupTopicId: row.telegramGroupTopicId ?? null,
+    groupEnabled: row.telegramGroupEnabled,
     // null = all enabled. Split CSV into trimmed list.
     userEvents:
       row.telegramUserEvents === null
@@ -139,6 +145,7 @@ export async function sendMessage(
   if (opts.parseMode) body.parse_mode = opts.parseMode;
   if (opts.replyMarkup) body.reply_markup = opts.replyMarkup;
   if (opts.disableWebPagePreview) body.disable_web_page_preview = true;
+  if (opts.messageThreadId != null) body.message_thread_id = opts.messageThreadId;
 
   const res = await apiCall<{ message_id: number }>(token, 'sendMessage', body);
   if (!res.ok) return { ok: false, error: res.description ?? 'send_failed' };

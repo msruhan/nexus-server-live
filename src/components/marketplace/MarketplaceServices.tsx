@@ -47,42 +47,33 @@ export function MarketplaceServices({
         {rows.map((row) => (
           <div
             key={row.modal.id}
-            className="flex flex-wrap items-center gap-4 py-6 lg:flex-nowrap"
+            className="flex items-center gap-2 py-3 sm:gap-4 sm:py-4"
           >
-            <div className="min-w-0 flex-1">
-              <h3 className="font-display text-lg font-extrabold tracking-tight text-ink">
-                {row.modal.title}
-              </h3>
-              {row.description && (
-                <p className="mt-1 line-clamp-2 font-serif italic text-ink-muted">{row.description}</p>
-              )}
-              {row.badges.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {row.badges.map((b) => (
-                    <span
-                      key={b}
-                      className="rounded-md bg-paper-200 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-ink-muted"
-                    >
-                      {b}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            {row.modal.deliveryTime && (
-              <div className="font-mono text-sm text-ink-muted lg:w-32">{row.modal.deliveryTime}</div>
-            )}
-            <div className="font-display text-xl font-black tracking-tight text-ink lg:w-32 lg:text-right">
-              {row.modal.priceLabel}
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelected(row.modal)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 text-xs font-bold text-paper transition-colors hover:bg-primary-600"
+            <h3
+              className="min-w-0 flex-1 line-clamp-2 break-words font-display text-sm font-extrabold leading-snug tracking-tight text-ink sm:text-base"
+              title={row.modal.title}
             >
-              Order
-              <ArrowUpRight weight="bold" size={12} />
-            </button>
+              {row.modal.title}
+            </h3>
+            <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+              <div
+                className="shrink-0 whitespace-nowrap font-mono text-[10px] text-ink-muted sm:text-xs"
+                title={row.modal.deliveryTime ?? undefined}
+              >
+                {row.modal.deliveryTime ?? '—'}
+              </div>
+              <div className="shrink-0 whitespace-nowrap font-display text-sm font-black tracking-tight text-ink sm:text-base">
+                {row.modal.priceLabel}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelected(row.modal)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-2 text-[11px] font-bold text-paper transition-colors hover:bg-primary-600 sm:gap-1.5 sm:px-5 sm:py-2.5 sm:text-xs"
+              >
+                Order
+                <ArrowUpRight weight="bold" size={12} />
+              </button>
+            </div>
           </div>
         ))}
       </div>

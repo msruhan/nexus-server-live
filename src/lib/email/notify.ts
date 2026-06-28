@@ -40,13 +40,14 @@ import {
   pushInAppTicketReply,
   pushInAppTopupApproved,
 } from '@/lib/notify-user-inapp';
+import { resolveSiteName } from '@/lib/site-name';
 
 async function loadSiteName(): Promise<string> {
   const row = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
     select: { siteName: true },
   });
-  return row?.siteName ?? 'Recovero';
+  return resolveSiteName(row?.siteName);
 }
 
 function resolveBaseUrl(): string {

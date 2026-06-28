@@ -5,6 +5,7 @@ import {
   readTotpSecretPlain,
 } from '@/lib/crypto/totp-secret';
 import { buildTotpUri, generateTotpSecret, totpQrDataUrl } from '@/lib/totp';
+import { getBranding } from '@/lib/branding';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,8 @@ export async function POST() {
       });
     }
 
-    const otpauthUri = buildTotpUri(user.email, secret);
+    const brand = await getBranding();
+    const otpauthUri = buildTotpUri(user.email, secret, brand.siteName);
     const qrDataUrl = await totpQrDataUrl(otpauthUri);
 
     return apiSuccess({

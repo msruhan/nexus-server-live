@@ -16,6 +16,9 @@ import {
   resetSettingsCache,
   getWebhookInfo,
 } from '@/lib/telegram/client';
+import { testMessageTemplate } from '@/lib/telegram/templates';
+import { parseGroupTopicConfig, telegramDeliveryHint } from '@/lib/telegram/group-config';
+import { getBranding } from '@/lib/branding';
 import crypto from 'crypto';
 
 async function requireAccess() {
@@ -44,6 +47,9 @@ export async function GET() {
       telegramAdminChatId: true,
       telegramChannelId: true,
       telegramChannelEnabled: true,
+      telegramGroupId: true,
+      telegramGroupTopicId: true,
+      telegramGroupEnabled: true,
       telegramUserEvents: true,
       telegramAdminEvents: true,
     },
@@ -63,6 +69,9 @@ export async function GET() {
     telegramAdminChatId: row?.telegramAdminChatId ?? '',
     telegramChannelId: row?.telegramChannelId ?? '',
     telegramChannelEnabled: row?.telegramChannelEnabled ?? false,
+    telegramGroupId: row?.telegramGroupId ?? '',
+    telegramGroupTopicId: row?.telegramGroupTopicId != null ? String(row.telegramGroupTopicId) : '',
+    telegramGroupEnabled: row?.telegramGroupEnabled ?? false,
     telegramUserEvents: parseEvents(row?.telegramUserEvents),
     telegramAdminEvents: parseEvents(row?.telegramAdminEvents),
     hasToken: !!row?.telegramBotToken,
@@ -98,9 +107,23 @@ export async function POST(req: NextRequest) {
       telegramAdminChatId,
       telegramChannelId,
       telegramChannelEnabled,
+      telegramGroupId,
+      telegramGroupTopicId,
+      telegramGroupEnabled,
       telegramUserEvents,
       telegramAdminEvents,
     } = body;
+
+    const parsedGroup = parseGroupTopicConfig(telegramGroupId, telegramGroupTopicId);
+    if (!parsedGroup.ok) {
+      return NextResponse.json({ error: parsedGroup.error }, { status: 400 });
+    }
+    if (telegramGroupEnabled && (!parsedGroup.value.groupId || parsedGroup.value.groupTopicId == null)) {
+      return NextResponse.json(
+        { error: 'Group chat ID and topic ID are required when group auto-post is enabled.' },
+        { status: 400 },
+      );
+    }
 
     // If token is provided (not masked), verify it first
     let botUsername: string | undefined;
@@ -137,6 +160,9 @@ export async function POST(req: NextRequest) {
       telegramAdminChatId: telegramAdminChatId || null,
       telegramChannelId: telegramChannelId || null,
       telegramChannelEnabled: !!telegramChannelEnabled,
+      telegramGroupId: parsedGroup.value.groupId,
+      telegramGroupTopicId: parsedGroup.value.groupTopicId,
+      telegramGroupEnabled: !!telegramGroupEnabled,
     };
 
     // Persist notification event allow-lists.
@@ -191,10 +217,11 @@ export async function POST(req: NextRequest) {
     if (!settings?.telegramBotToken || !settings.telegramAdminChatId) {
       return NextResponse.json({ error: 'Bot token and admin chat ID required' }, { status: 400 });
     }
+    const brand = await getBranding();
     const result = await sendMessage(
       {
         chatId: settings.telegramAdminChatId,
-        text: '✅ <b>Test message from Recovero</b>\n\nTelegram bot is configured correctly!',
+        text: testMessageTemplate(brand.siteName, 'Telegram bot is configured correctly!'),
         parseMode: 'HTML',
       },
       settings.telegramBotToken,
@@ -214,16 +241,53 @@ export async function POST(req: NextRequest) {
     if (!settings?.telegramBotToken || !settings.telegramChannelId) {
       return NextResponse.json({ error: 'Bot token and channel ID required' }, { status: 400 });
     }
+    const brand = await getBranding();
     const result = await sendMessage(
       {
         chatId: settings.telegramChannelId,
-        text: '✅ <b>Test message from Recovero</b>\n\nChannel integration is working!',
+        text: testMessageTemplate(brand.siteName, 'Channel integration is working!'),
         parseMode: 'HTML',
       },
       settings.telegramBotToken,
     );
     if (!result.ok) {
       return NextResponse.json({ error: result.error ?? 'Send failed' }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // ─── Action: test message to group topic ────────────────────────
+  if (action === 'testGroup') {
+    const settings = await prisma.siteSettings.findUnique({
+      where: { id: 'singleton' },
+      select: {
+        telegramBotToken: true,
+        telegramGroupId: true,
+        telegramGroupTopicId: true,
+      },
+    });
+    if (!settings?.telegramBotToken || !settings.telegramGroupId || settings.telegramGroupTopicId == null) {
+      return NextResponse.json(
+        { error: 'Bot token, group chat ID, and topic ID required' },
+        { status: 400 },
+      );
+    }
+    const brand = await getBranding();
+    const result = await sendMessage(
+      {
+        chatId: settings.telegramGroupId,
+        messageThreadId: settings.telegramGroupTopicId,
+        text: testMessageTemplate(
+          brand.siteName,
+          'Group topic integration is working! Service auto-posts will land in this topic.',
+        ),
+        parseMode: 'HTML',
+      },
+      settings.telegramBotToken,
+    );
+    if (!result.ok) {
+      const err = result.error ?? 'Send failed';
+      return NextResponse.json({ error: err + telegramDeliveryHint(err) }, { status: 400 });
     }
     return NextResponse.json({ ok: true });
   }

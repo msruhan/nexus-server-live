@@ -1,4 +1,10 @@
-export function IosInstallSteps({ compact = false }: { compact?: boolean }) {
+export function IosInstallSteps({
+  siteName,
+  compact = false,
+}: {
+  siteName: string;
+  compact?: boolean;
+}) {
   return (
     <ol
       className={`list-decimal space-y-1.5 pl-4 text-xs text-ink-muted ${compact ? '' : 'mt-2'}`}
@@ -10,7 +16,7 @@ export function IosInstallSteps({ compact = false }: { compact?: boolean }) {
         Scroll and tap <strong className="text-ink">Add to Home Screen</strong>.
       </li>
       <li>
-        Open Recovero from your home screen, then enable push in Settings.
+        Open {siteName} from your home screen, then enable push in Settings.
       </li>
     </ol>
   );

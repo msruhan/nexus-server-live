@@ -122,8 +122,11 @@ export function AnnouncementManager({ initial }: { initial: Announcement[] }) {
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={editing.showOnAdmin} onChange={(e) => setEditing({ ...editing, showOnAdmin: e.target.checked })} />
-            Show in admin panel too
+            Also show in admin panel
           </label>
+          <p className="text-xs text-ink-muted">
+            Active announcements always appear on the public site and member dashboard. Enable the option above to duplicate the banner inside admin.
+          </p>
           <div className="flex gap-2">
             <Button type="button" onClick={() => void save(editing)}>Save</Button>
             <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
@@ -142,6 +145,8 @@ export function AnnouncementManager({ initial }: { initial: Announcement[] }) {
                 <p className="mt-1 font-serif text-sm italic text-ink-muted">{item.message}</p>
                 <p className="mt-2 font-mono text-[10px] uppercase text-ink-soft">
                   {item.tone} · {item.isActive ? 'active' : 'off'}
+                  {item.isActive ? ' · site + member' : ''}
+                  {item.showOnAdmin ? ' · admin' : ''}
                   {item.startAt ? ` · from ${new Date(item.startAt).toLocaleString()}` : ''}
                   {item.endAt ? ` · until ${new Date(item.endAt).toLocaleString()}` : ''}
                 </p>

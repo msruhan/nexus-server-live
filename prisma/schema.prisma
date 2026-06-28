@@ -650,6 +650,9 @@ model SiteSettings {
   telegramAdminChatId    String?
   telegramChannelId      String?
   telegramChannelEnabled Boolean @default(false)
+  telegramGroupId        String?
+  telegramGroupTopicId   Int?
+  telegramGroupEnabled   Boolean @default(false)
   // Comma-separated allow-list of enabled notification events.
   // null = all enabled (default, non-breaking). "" = none enabled.
   // e.g. "order.created,order.success,payment.credited"

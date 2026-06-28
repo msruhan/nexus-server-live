@@ -20,6 +20,7 @@
  */
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { getBranding } from '@/lib/branding';
 import type { CreateIntentInput, CreateIntentResult, RedirectPayload } from './types';
 
 type Settings = {
@@ -130,6 +131,7 @@ export async function createPaypalIntent(
   });
 
   const base = appBaseUrl();
+  const brand = await getBranding();
   const orderBody = {
     intent: 'CAPTURE',
     purchase_units: [
@@ -145,7 +147,7 @@ export async function createPaypalIntent(
       },
     ],
     application_context: {
-      brand_name: 'Recovero',
+      brand_name: brand.siteName,
       shipping_preference: 'NO_SHIPPING',
       user_action: 'PAY_NOW',
       return_url: `${base}/api/payment/paypal/return?intent=${intent.id}`,

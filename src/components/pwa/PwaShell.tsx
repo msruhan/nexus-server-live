@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { X, DeviceMobile, DownloadSimple, ShareNetwork } from '@phosphor-icons/react';
+import { useSiteName } from '@/lib/site-name-client';
 import { registerServiceWorker } from '@/lib/push/client';
 import { isIosDevice, isStandalonePwa } from '@/lib/push/platform';
 import { IosInstallSteps } from '@/components/pwa/IosInstallSteps';
@@ -16,6 +17,7 @@ type BeforeInstallPromptEvent = Event & {
 type BannerMode = 'none' | 'ios' | 'android';
 
 export function PwaShell() {
+  const siteName = useSiteName();
   const [mode, setMode] = React.useState<BannerMode>('none');
   const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(
     null,
@@ -79,7 +81,7 @@ export function PwaShell() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="font-display text-sm font-extrabold tracking-tight text-ink">
-              {isIos ? 'Add Recovero to Home Screen' : 'Install Recovero'}
+              {isIos ? `Add ${siteName} to Home Screen` : `Install ${siteName}`}
             </p>
             <p className="mt-1 text-xs text-ink-muted">
               {isIos
@@ -87,7 +89,7 @@ export function PwaShell() {
                 : 'Add to your home screen for quick access and order notifications.'}
             </p>
             {isIos ? (
-              <IosInstallSteps />
+              <IosInstallSteps siteName={siteName} />
             ) : (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button

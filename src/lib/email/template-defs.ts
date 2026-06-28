@@ -1,4 +1,5 @@
 import type { EmailEvent } from './types';
+import { resolveSiteName } from '@/lib/site-name';
 
 export type EditableEmailTemplateDef = {
   event: EmailEvent;
@@ -137,6 +138,6 @@ export function renderCustomEmail(
   const cta = url
     ? `<p><a href="${url}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;font-size:13px">Open</a></p>`
     : '';
-  const html = shellHtml(vars.siteName ?? 'Recovero', bodyHtml + cta);
+  const html = shellHtml(resolveSiteName(vars.siteName), bodyHtml + cta);
   return { subject, text, html };
 }

@@ -13,6 +13,9 @@ type Props = {
     telegramAdminChatId: string;
     telegramChannelId: string;
     telegramChannelEnabled: boolean;
+    telegramGroupId: string;
+    telegramGroupTopicId: string;
+    telegramGroupEnabled: boolean;
     hasToken: boolean;
     userEvents: string[];
     adminEvents: string[];
@@ -29,6 +32,9 @@ export function TelegramSettingsForm({ initial, userEventCatalog, adminEventCata
   const [adminChatId, setAdminChatId] = React.useState(initial.telegramAdminChatId);
   const [channelId, setChannelId] = React.useState(initial.telegramChannelId);
   const [channelEnabled, setChannelEnabled] = React.useState(initial.telegramChannelEnabled);
+  const [groupId, setGroupId] = React.useState(initial.telegramGroupId);
+  const [groupTopicId, setGroupTopicId] = React.useState(initial.telegramGroupTopicId);
+  const [groupEnabled, setGroupEnabled] = React.useState(initial.telegramGroupEnabled);
   const [userEvents, setUserEvents] = React.useState<string[]>(initial.userEvents);
   const [adminEvents, setAdminEvents] = React.useState<string[]>(initial.adminEvents);
 
@@ -36,6 +42,7 @@ export function TelegramSettingsForm({ initial, userEventCatalog, adminEventCata
   const [verifying, setVerifying] = React.useState(false);
   const [testingAdmin, setTestingAdmin] = React.useState(false);
   const [testingChannel, setTestingChannel] = React.useState(false);
+  const [testingGroup, setTestingGroup] = React.useState(false);
   const [message, setMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -89,6 +96,9 @@ export function TelegramSettingsForm({ initial, userEventCatalog, adminEventCata
           telegramAdminChatId: adminChatId,
           telegramChannelId: channelId,
           telegramChannelEnabled: channelEnabled,
+          telegramGroupId: groupId,
+          telegramGroupTopicId: groupTopicId,
+          telegramGroupEnabled: groupEnabled,
           telegramUserEvents: userEvents,
           telegramAdminEvents: adminEvents,
         }),
@@ -146,6 +156,27 @@ export function TelegramSettingsForm({ initial, userEventCatalog, adminEventCata
       showMessage('error', 'Network error');
     } finally {
       setTestingChannel(false);
+    }
+  };
+
+  const handleTestGroup = async () => {
+    setTestingGroup(true);
+    try {
+      const res = await fetch('/api/admin/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'testGroup' }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showMessage('success', 'Test message sent to group topic!');
+      } else {
+        showMessage('error', data.error ?? 'Send failed');
+      }
+    } catch {
+      showMessage('error', 'Network error');
+    } finally {
+      setTestingGroup(false);
     }
   };
 
@@ -448,6 +479,85 @@ export function TelegramSettingsForm({ initial, userEventCatalog, adminEventCata
             className="rounded-lg border border-line bg-paper px-4 py-2 text-xs font-bold text-ink transition-colors hover:bg-paper-200 disabled:opacity-50"
           >
             {testingChannel ? 'Sending…' : 'Send Test Message'}
+          </button>
+        </div>
+      </section>
+
+      {/* Group topic auto-post */}
+      <section className="rounded-2xl border border-line bg-paper-50 p-6">
+        <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">
+          Group Auto-Post (Topic)
+        </h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Mirror service publish / price-update posts into a specific forum topic inside a Telegram
+          supergroup. Add the bot as a group admin with permission to post in that topic.
+        </p>
+
+        <div className="mt-4 rounded-xl border border-line bg-paper p-4 text-xs leading-relaxed text-ink-muted">
+          <p className="font-semibold text-ink">How to find IDs from a topic link</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-4">
+            <li>Open the topic in Telegram and copy the link (e.g. t.me/c/3934891588/2).</li>
+            <li>
+              Group chat ID = <code className="rounded bg-paper-100 px-1">-1003934891588</code> (prepend
+              -100 to the middle segment).
+            </li>
+            <li>
+              Topic ID = <code className="rounded bg-paper-100 px-1">2</code> (the number after the last
+              slash).
+            </li>
+          </ol>
+        </div>
+
+        <div className="mt-6 space-y-5">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={groupEnabled}
+              onChange={(e) => setGroupEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-line text-primary-600 focus:ring-primary-500"
+            />
+            <span className="text-sm font-medium text-ink">Enable group topic auto-post</span>
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                Group chat ID
+              </label>
+              <input
+                type="text"
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
+                placeholder="e.g. -1003934891588"
+                className="mt-1.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                Topic ID
+              </label>
+              <input
+                type="text"
+                value={groupTopicId}
+                onChange={(e) => setGroupTopicId(e.target.value)}
+                placeholder="e.g. 2"
+                inputMode="numeric"
+                className="mt-1.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-ink-muted">
+            Group chat ID and topic ID must be filled together. Works independently from channel
+            auto-post — you can enable either or both.
+          </p>
+
+          <button
+            type="button"
+            onClick={handleTestGroup}
+            disabled={testingGroup || !groupId || !groupTopicId}
+            className="rounded-lg border border-line bg-paper px-4 py-2 text-xs font-bold text-ink transition-colors hover:bg-paper-200 disabled:opacity-50"
+          >
+            {testingGroup ? 'Sending…' : 'Send Test to Topic'}
           </button>
         </div>
       </section>

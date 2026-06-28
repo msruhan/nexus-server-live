@@ -5,6 +5,7 @@ import { ClientProviders } from '@/components/ClientProviders';
 import { Toaster } from '@/components/ui/Toaster';
 import { getSitePaletteCss } from '@/lib/active-palette';
 import { getBranding } from '@/lib/branding';
+import { SiteNameProvider } from '@/lib/site-name-client';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -69,19 +70,22 @@ export const viewport = {
 export const dynamic = 'force-dynamic';
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const paletteCss = await getSitePaletteCss();
+  const [paletteCss, brand] = await Promise.all([getSitePaletteCss(), getBranding()]);
 
   return (
     <html
       lang="id"
       className={`${inter.variable} ${display.variable} ${serif.variable} ${mono.variable}`}
+      data-site-name={brand.siteName}
     >
       <head>
         {/* Public site palette — account dashboards override via AccountThemeShell */}
         <style id="palette-vars" dangerouslySetInnerHTML={{ __html: `:root{${paletteCss}}` }} />
       </head>
       <body className="bg-paper text-ink font-sans">
-        <ClientProviders>{children}</ClientProviders>
+        <SiteNameProvider siteName={brand.siteName}>
+          <ClientProviders>{children}</ClientProviders>
+        </SiteNameProvider>
         <Toaster />
       </body>
     </html>

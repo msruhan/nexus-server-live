@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { guardAgainstBlockedIp } from '@/lib/ip-block-guard';
+import { getBranding } from '@/lib/branding';
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   await guardAgainstBlockedIp();
+  const brand = await getBranding();
   return (
     <main className="relative grid min-h-screen grid-cols-1 lg:grid-cols-2">
       {/* Left side — form */}
@@ -15,7 +17,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
             ← Back to site
           </Link>
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
-            Recovero
+            {brand.siteName}
           </span>
         </div>
         <div className="flex flex-1 items-center justify-center px-6 pb-12 pt-4 lg:px-12">

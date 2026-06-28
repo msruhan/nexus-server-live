@@ -9,6 +9,7 @@
  * not touch any order / API-management flow.
  */
 import { prisma } from '@/lib/db';
+import { DEFAULT_SITE_NAME } from '@/lib/site-name';
 
 export type Branding = {
   siteName: string;
@@ -27,7 +28,7 @@ export type Branding = {
 };
 
 const DEFAULTS: Branding = {
-  siteName: 'Recovero',
+  siteName: DEFAULT_SITE_NAME,
   tagline: 'IMEI & Server Hub',
   logoUrl: null,
   logoIconUrl: null,

@@ -16,10 +16,11 @@ import {
   PhoneUnlock,
   type HeroVisualVariant,
 } from './visuals';
+import { DEFAULT_SITE_NAME } from '@/lib/site-name';
 
 export function Hero({
   variant = 'ticket',
-  siteName = 'Recovero',
+  siteName = DEFAULT_SITE_NAME,
   host = 'localhost',
 }: {
   variant?: HeroVisualVariant;
@@ -107,7 +108,7 @@ export function Hero({
               transition={{ delay: 1.0, duration: 0.8 }}
               className="mt-10 max-w-xl text-[17px] leading-relaxed text-ink/75"
             >
-              Recovero is a self-service unlock portal for resellers, technicians, and busy counters.
+              {siteName} is a self-service unlock portal for resellers, technicians, and busy counters.
               You order an unlock, an iCloud removal, an FRP bypass — we hand it off to{' '}
               <span className="rounded bg-ink px-1.5 py-0.5 font-mono text-[12px] font-medium text-paper">
                 DhruFusion

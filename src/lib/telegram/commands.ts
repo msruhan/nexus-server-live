@@ -5,7 +5,8 @@
  * Each handler is self-contained and never throws.
  */
 import { prisma } from '@/lib/db';
-import { sendMessage, loadSettings } from './client';
+import { getBranding } from '@/lib/branding';
+import { sendMessage } from './client';
 import * as tpl from './templates';
 import type { TelegramMessage } from './types';
 
@@ -100,8 +101,7 @@ async function handleStart(chatId: number, message: TelegramMessage) {
     select: { name: true },
   });
 
-  const settings = await loadSettings();
-  const botUsername = settings?.botUsername ?? 'RecoveroBot';
+  const brand = await getBranding();
 
   if (user) {
     await sendMessage({
@@ -112,7 +112,8 @@ async function handleStart(chatId: number, message: TelegramMessage) {
   } else {
     await sendMessage({
       chatId,
-      text: tpl.welcomeTemplate(botUsername) +
+      text:
+        tpl.welcomeTemplate(brand.siteName) +
         `\n\n⚠️ Your Telegram is not linked yet. Please link it from your account settings on the website.`,
       parseMode: 'HTML',
     });

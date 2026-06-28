@@ -8,7 +8,7 @@ import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { ScrollProgress } from '@/components/landing/ScrollProgress';
 import { guardAgainstBlockedIp } from '@/lib/ip-block-guard';
-import { getActiveAnnouncements } from '@/lib/announcements';
+import { getSiteAnnouncements } from '@/lib/announcements';
 import { GlobalAnnouncementBar } from '@/components/announcements/GlobalAnnouncementBar';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -38,7 +38,7 @@ export default async function PublicLayout({ children }: { children: React.React
     }
   }
 
-  const announcements = await getActiveAnnouncements(false);
+  const announcements = await getSiteAnnouncements();
 
   return (
     <main className="relative">

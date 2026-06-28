@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/db';
 import { renderMarkdown } from '@/lib/markdown';
+import { getBranding } from '@/lib/branding';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,8 +33,9 @@ export async function generateMetadata({
   const { slug } = await params;
   const page = await getPage(slug);
   if (!page) return {};
+  const brand = await getBranding();
   return {
-    title: page.metaTitle ?? `${page.title} · Recovero`,
+    title: page.metaTitle ?? `${page.title} · ${brand.siteName}`,
     description: page.metaDescription ?? undefined,
   };
 }

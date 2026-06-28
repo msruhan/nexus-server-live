@@ -19,6 +19,8 @@ export function isAndroidDevice(): boolean {
   return /Android/i.test(navigator.userAgent);
 }
 
+import { resolveSiteName } from '@/lib/site-name';
+
 /** iOS Web Push only works in a Home Screen PWA (Safari 16.4+). */
 export function iosPushRequiresInstall(): boolean {
   return isIosDevice() && !isStandalonePwa();
@@ -31,13 +33,19 @@ export function canSubscribeToPush(): boolean {
   return true;
 }
 
+function readClientSiteName(): string {
+  if (typeof document === 'undefined') return resolveSiteName(null);
+  return resolveSiteName(document.documentElement.dataset.siteName);
+}
+
 export function pushUnsupportedReason(): string | null {
   if (typeof window === 'undefined') return null;
   if (!('Notification' in window) || !('PushManager' in window)) {
     return 'Push is not supported in this browser.';
   }
   if (iosPushRequiresInstall()) {
-    return 'On iPhone/iPad, add Recovero to your Home Screen first, then open the app from that icon to enable push.';
+    const siteName = readClientSiteName();
+    return `On iPhone/iPad, add ${siteName} to your Home Screen first, then open the app from that icon to enable push.`;
   }
   return null;
 }

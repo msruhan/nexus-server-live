@@ -4,6 +4,7 @@ import { apiError, apiSuccess, requireApiRole } from '@/lib/api-auth';
 import { resetTransporter, verifySmtp, sendEmail } from '@/lib/email/mailer';
 import { ALL_EMAIL_EVENTS, EMAIL_EVENT_GROUPS } from '@/lib/email/types';
 import { logActivity } from '@/lib/activity';
+import { getBranding } from '@/lib/branding';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,12 +102,13 @@ export async function PATCH(req: Request) {
   if (body?.action === 'test_send') {
     const to = String(body.to ?? '').trim();
     if (!to) return apiError('Recipient required');
+    const brand = await getBranding();
     const result = await sendEmail({
       to,
-      subject: 'Recovero — SMTP test',
+      subject: `${brand.siteName} — SMTP test`,
       text: 'This is a test email. If you can read this, your SMTP settings work.',
       html:
-        '<p>This is a test email. If you can read this, your SMTP settings work. — <em>Recovero</em></p>',
+        `<p>This is a test email. If you can read this, your SMTP settings work. — <em>${brand.siteName}</em></p>`,
       event: 'auth.password_changed', // any event OK; we whitelist 'auth.password_changed' by default
     });
     return result.ok ? apiSuccess({ ok: true, logId: result.logId }) : apiError(result.reason ?? 'send_failed');

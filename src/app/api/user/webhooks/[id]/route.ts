@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { logActivity } from '@/lib/activity';
+import { getBranding } from '@/lib/branding';
 import {
   generateWebhookSecret,
   validateWebhookUrl,
@@ -49,11 +50,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const urlCheck = validateWebhookUrl(ep.url);
     if (!urlCheck.ok) return NextResponse.json({ error: urlCheck.reason }, { status: 400 });
 
+    const brand = await getBranding();
     const payload: WebhookPayload = {
       id: `test_${Date.now()}`,
       event: 'order.success',
       createdAt: new Date().toISOString(),
-      data: { test: true, message: 'This is a test event from Recovero', orderCode: 'TEST-0000' },
+      data: {
+        test: true,
+        message: `This is a test event from ${brand.siteName}`,
+        orderCode: 'TEST-0000',
+      },
     };
     const body = JSON.stringify(payload);
     const signature = signPayload(body, ep.secret);

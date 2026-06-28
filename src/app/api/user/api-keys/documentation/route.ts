@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireApiAuth } from '@/lib/api-auth';
+import { getBranding } from '@/lib/branding';
 import { buildApiDocumentationPdf } from '@/lib/api-documentation-pdf';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,8 @@ export async function GET(req: Request) {
 
   try {
     const baseUrl = resolveBaseUrl(req);
-    const pdf = await buildApiDocumentationPdf(baseUrl);
+    const brand = await getBranding();
+    const pdf = await buildApiDocumentationPdf(baseUrl, brand.siteName);
     const filename = `nexus-server-api-documentation-${new Date().toISOString().slice(0, 10)}.pdf`;
 
     return new NextResponse(new Uint8Array(pdf), {
