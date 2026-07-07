@@ -70,7 +70,8 @@ jobs:
             --arg version "$VERSION" \
             --arg image "$IMAGE" \
             --arg changelog "$CHANGELOG" \
-            '{version:$version,dockerImage:$image,changelog:$changelog}')
+            --arg productSlug "recovero-classic" \
+            '{version:$version,dockerImage:$image,changelog:$changelog,productSlug:$productSlug}')
           curl -fsS -X POST "$PORTAL_RELEASE_SYNC_URL" \
             -H "Authorization: Bearer $RELEASE_SYNC_SECRET" \
             -H "Content-Type: application/json" \
