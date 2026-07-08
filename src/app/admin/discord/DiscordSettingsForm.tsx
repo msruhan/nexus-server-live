@@ -7,19 +7,52 @@ type Props = {
   initial: {
     discordWebhookEnabled: boolean;
     discordWebhookUrl: string;
+    discordBotUsername: string;
+    discordBotAvatarUrl: string;
   };
 };
 
 export function DiscordSettingsForm({ initial }: Props) {
   const [enabled, setEnabled] = React.useState(initial.discordWebhookEnabled);
   const [webhookUrl, setWebhookUrl] = React.useState(initial.discordWebhookUrl);
+  const [botUsername, setBotUsername] = React.useState(initial.discordBotUsername);
+  const [avatarUrl, setAvatarUrl] = React.useState(initial.discordBotAvatarUrl);
+  const [clearAvatar, setClearAvatar] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [testing, setTesting] = React.useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
   const [message, setMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
+  };
+
+  const uploadAvatar = async (file: File) => {
+    setUploadingAvatar(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('kind', 'discord-avatar');
+      const res = await fetch('/api/admin/branding/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        showMessage('error', data.error ?? 'Avatar upload failed');
+        return;
+      }
+      setAvatarUrl(data.url);
+      setClearAvatar(false);
+      showMessage('success', 'Bot avatar uploaded');
+    } catch {
+      showMessage('error', 'Avatar upload failed');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const removeAvatar = () => {
+    setAvatarUrl('');
+    setClearAvatar(true);
   };
 
   const save = async () => {
@@ -32,10 +65,13 @@ export function DiscordSettingsForm({ initial }: Props) {
           action: 'save',
           discordWebhookEnabled: enabled,
           discordWebhookUrl: webhookUrl,
+          discordBotUsername: botUsername,
+          clearDiscordBotAvatar: clearAvatar,
         }),
       });
       const data = await res.json();
       if (data.ok) {
+        setClearAvatar(false);
         showMessage('success', 'Discord webhook settings saved');
       } else {
         showMessage('error', data.error ?? 'Save failed');
@@ -108,7 +144,65 @@ export function DiscordSettingsForm({ initial }: Props) {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide text-ink-muted">
-              Webhook URL
+              Bot username {enabled ? <span className="text-red-500">*</span> : null}
+            </label>
+            <input
+              type="text"
+              value={botUsername}
+              onChange={(e) => setBotUsername(e.target.value)}
+              maxLength={80}
+              placeholder="e.g. Nexus Unlock Bot"
+              required={enabled}
+              className="mt-1.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
+            />
+            <p className="mt-1 text-xs text-ink-muted">
+              Display name shown on Discord messages. Required when webhook is enabled.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-5">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-paper">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="Bot avatar" className="h-full w-full object-cover" />
+              ) : (
+                <span className="font-mono text-[9px] uppercase text-ink-soft">No avatar</span>
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-medium text-ink">Bot profile photo</div>
+              <div className="text-xs text-ink-muted">
+                PNG / JPG / WebP. Square image recommended. Optional.
+              </div>
+              <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:border-ink">
+                {uploadingAvatar ? 'Uploading…' : 'Upload avatar'}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  disabled={uploadingAvatar}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadAvatar(f);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={removeAvatar}
+                  className="ml-2 text-xs font-medium text-red-600 hover:underline"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-ink-muted">
+              Webhook URL {enabled ? <span className="text-red-500">*</span> : null}
             </label>
             <input
               type="text"

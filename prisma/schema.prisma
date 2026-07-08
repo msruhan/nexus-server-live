@@ -664,6 +664,8 @@ model SiteSettings {
   telegramGroupEnabled   Boolean @default(false)
   discordWebhookEnabled  Boolean @default(false)
   discordWebhookUrl      String?
+  discordBotUsername     String?
+  discordBotAvatarUrl    String?
   // Comma-separated allow-list of enabled notification events.
   // null = all enabled (default, non-breaking). "" = none enabled.
   // e.g. "order.created,order.success,payment.credited"

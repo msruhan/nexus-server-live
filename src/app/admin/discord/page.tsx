@@ -10,6 +10,8 @@ export default async function AdminDiscordPage() {
     select: {
       discordWebhookEnabled: true,
       discordWebhookUrl: true,
+      discordBotUsername: true,
+      discordBotAvatarUrl: true,
     },
   });
 
@@ -29,6 +31,8 @@ export default async function AdminDiscordPage() {
         initial={{
           discordWebhookEnabled: settings?.discordWebhookEnabled ?? false,
           discordWebhookUrl: settings?.discordWebhookUrl ?? '',
+          discordBotUsername: settings?.discordBotUsername ?? '',
+          discordBotAvatarUrl: settings?.discordBotAvatarUrl ?? '',
         }}
       />
     </div>

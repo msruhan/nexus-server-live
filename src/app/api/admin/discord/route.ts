@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { hasPermission } from '@/lib/sub-admin';
 import { getBranding } from '@/lib/branding';
 import {
+  normalizeDiscordBotUsername,
   postDiscordTestMessage,
   resetDiscordWebhookConfigCache,
 } from '@/lib/discord/webhook';
@@ -31,12 +32,19 @@ export async function GET() {
 
   const row = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
-    select: { discordWebhookEnabled: true, discordWebhookUrl: true },
+    select: {
+      discordWebhookEnabled: true,
+      discordWebhookUrl: true,
+      discordBotUsername: true,
+      discordBotAvatarUrl: true,
+    },
   });
 
   return NextResponse.json({
     discordWebhookEnabled: row?.discordWebhookEnabled ?? false,
     discordWebhookUrl: row?.discordWebhookUrl ?? '',
+    discordBotUsername: row?.discordBotUsername ?? '',
+    discordBotAvatarUrl: row?.discordBotAvatarUrl ?? '',
   });
 }
 
@@ -50,6 +58,10 @@ export async function POST(req: NextRequest) {
   if (action === 'save') {
     const enabled = body?.discordWebhookEnabled === true;
     const url = typeof body?.discordWebhookUrl === 'string' ? body.discordWebhookUrl.trim() : '';
+    const username = normalizeDiscordBotUsername(
+      typeof body?.discordBotUsername === 'string' ? body.discordBotUsername : '',
+    );
+    const clearAvatar = body?.clearDiscordBotAvatar === true;
 
     if (enabled && !isValidDiscordWebhookUrl(url)) {
       return NextResponse.json({ error: 'Valid Discord webhook URL is required when enabled' }, { status: 400 });
@@ -57,17 +69,24 @@ export async function POST(req: NextRequest) {
     if (url && !isValidDiscordWebhookUrl(url)) {
       return NextResponse.json({ error: 'Discord webhook URL is invalid' }, { status: 400 });
     }
+    if (enabled && !username) {
+      return NextResponse.json({ error: 'Discord bot username is required when enabled' }, { status: 400 });
+    }
 
     await prisma.siteSettings.upsert({
       where: { id: 'singleton' },
       update: {
         discordWebhookEnabled: enabled,
         discordWebhookUrl: url || null,
+        discordBotUsername: username,
+        ...(clearAvatar ? { discordBotAvatarUrl: null } : {}),
       },
       create: {
         id: 'singleton',
         discordWebhookEnabled: enabled,
         discordWebhookUrl: url || null,
+        discordBotUsername: username,
+        discordBotAvatarUrl: null,
       },
     });
     resetDiscordWebhookConfigCache();

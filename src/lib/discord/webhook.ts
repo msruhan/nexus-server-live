@@ -2,8 +2,9 @@
  * Minimal Discord webhook notifier for catalog announcements.
  *
  * Config source priority:
- * 1) SiteSettings.discordWebhookEnabled + SiteSettings.discordWebhookUrl (admin UI)
- * 2) ENV fallback (`DISCORD_WEBHOOK_ENABLED`, `DISCORD_WEBHOOK_URL`)
+ * 1) SiteSettings (admin UI): enabled + URL + required bot username + optional avatar
+ * 2) ENV fallback (`DISCORD_WEBHOOK_ENABLED`, `DISCORD_WEBHOOK_URL`, `DISCORD_BOT_USERNAME`)
+ *    only when DB settings are untouched (disabled + empty URL + empty username)
  */
 import { prisma } from '@/lib/db';
 
@@ -15,15 +16,44 @@ type DiscordEmbed = {
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
 };
 
+const DISCORD_USERNAME_MAX = 80;
+
+export function normalizeDiscordBotUsername(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const val = raw.trim().slice(0, DISCORD_USERNAME_MAX);
+  return val || null;
+}
+
 function normalizeWebhookUrl(raw: string | null | undefined): string | null {
   if (!raw?.trim()) return null;
   const val = raw.trim();
   return /^https:\/\/discord\.com\/api\/webhooks\//i.test(val) ? val : null;
 }
 
+function resolveBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ??
+    process.env.AUTH_URL?.trim() ??
+    'http://localhost:3000'
+  ).replace(/\/$/, '');
+}
+
+/** Discord requires an absolute HTTPS avatar URL. */
+export function resolveDiscordAvatarUrl(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const val = raw.trim();
+  if (/^https:\/\//i.test(val)) return val;
+  if (val.startsWith('/')) {
+    return `${resolveBaseUrl()}${val}`;
+  }
+  return null;
+}
+
 type DiscordWebhookConfig = {
   enabled: boolean;
   url: string | null;
+  username: string | null;
+  avatarUrl: string | null;
 };
 
 let cachedConfig: { value: DiscordWebhookConfig; expiresAt: number } | null = null;
@@ -34,15 +64,24 @@ async function getDiscordWebhookConfig(): Promise<DiscordWebhookConfig> {
 
   const row = await prisma.siteSettings.findUnique({
     where: { id: 'singleton' },
-    select: { discordWebhookEnabled: true, discordWebhookUrl: true },
+    select: {
+      discordWebhookEnabled: true,
+      discordWebhookUrl: true,
+      discordBotUsername: true,
+      discordBotAvatarUrl: true,
+    },
   });
   const dbUrl = normalizeWebhookUrl(row?.discordWebhookUrl);
+  const dbUsername = normalizeDiscordBotUsername(row?.discordBotUsername);
+  const dbAvatar = resolveDiscordAvatarUrl(row?.discordBotAvatarUrl);
 
-  // If DB config is untouched (disabled + empty URL), allow ENV fallback.
-  if (row && row.discordWebhookEnabled === false && !dbUrl) {
+  // If DB config is untouched (disabled + empty URL + empty username), allow ENV fallback.
+  if (row && row.discordWebhookEnabled === false && !dbUrl && !dbUsername) {
     const envCfg = {
       enabled: process.env.DISCORD_WEBHOOK_ENABLED === 'true',
       url: normalizeWebhookUrl(process.env.DISCORD_WEBHOOK_URL),
+      username: normalizeDiscordBotUsername(process.env.DISCORD_BOT_USERNAME),
+      avatarUrl: resolveDiscordAvatarUrl(process.env.DISCORD_BOT_AVATAR_URL),
     };
     cachedConfig = { value: envCfg, expiresAt: now + 30_000 };
     return envCfg;
@@ -51,6 +90,8 @@ async function getDiscordWebhookConfig(): Promise<DiscordWebhookConfig> {
   const value = {
     enabled: row?.discordWebhookEnabled === true,
     url: dbUrl,
+    username: dbUsername,
+    avatarUrl: dbAvatar,
   };
   cachedConfig = { value, expiresAt: now + 30_000 };
   return value;
@@ -61,16 +102,7 @@ export function resetDiscordWebhookConfigCache(): void {
 }
 
 function envWebhookUrl(): string | null {
-  const raw = process.env.DISCORD_WEBHOOK_URL?.trim();
-  return raw && /^https:\/\/discord\.com\/api\/webhooks\//i.test(raw) ? raw : null;
-}
-
-function resolveBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ??
-    process.env.AUTH_URL?.trim() ??
-    'http://localhost:3000'
-  ).replace(/\/$/, '');
+  return normalizeWebhookUrl(process.env.DISCORD_WEBHOOK_URL);
 }
 
 function fmtUsd(n: number | string): string {
@@ -84,26 +116,35 @@ function fmtUsd(n: number | string): string {
   }).format(v);
 }
 
-async function sendEmbed(embed: DiscordEmbed): Promise<void> {
+async function sendEmbed(embed: DiscordEmbed): Promise<{ ok: boolean; error?: string }> {
   const cfg = await getDiscordWebhookConfig();
-  if (!cfg.enabled) return;
-  const url = cfg.url;
-  if (!url) return;
+  if (!cfg.enabled) return { ok: false, error: 'Discord webhook is disabled' };
+  if (!cfg.url) return { ok: false, error: 'Discord webhook URL is missing or invalid' };
+  if (!cfg.username) return { ok: false, error: 'Discord bot username is required' };
+
+  const body: Record<string, unknown> = {
+    username: cfg.username,
+    embeds: [embed],
+  };
+  if (cfg.avatarUrl) {
+    body.avatar_url = cfg.avatarUrl;
+  }
 
   try {
-    const res = await fetch(url, {
+    const res = await fetch(cfg.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: 'Recovero Catalog Bot',
-        embeds: [embed],
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
-      console.error('[discord.webhook] send failed', res.status, await res.text());
+      const text = await res.text();
+      console.error('[discord.webhook] send failed', res.status, text);
+      return { ok: false, error: `Discord API ${res.status}` };
     }
+    return { ok: true };
   } catch (e) {
     console.error('[discord.webhook] network error', e);
+    return { ok: false, error: e instanceof Error ? e.message : 'network_error' };
   }
 }
 
@@ -114,18 +155,16 @@ export async function postDiscordTestMessage(siteName = 'NexusServer'): Promise<
     const envUrl = envWebhookUrl();
     if (!envUrl) return { ok: false, error: 'Discord webhook URL is missing or invalid' };
   }
-  try {
-    await sendEmbed({
-      title: 'Discord Webhook Connected',
-      description: `Test message from **${siteName}**`,
-      color: 0x5865f2,
-      url: resolveBaseUrl(),
-      fields: [{ name: 'Status', value: 'Webhook is working', inline: true }],
-    });
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'send_failed' };
+  if (!cfg.username) {
+    return { ok: false, error: 'Discord bot username is required' };
   }
+  return sendEmbed({
+    title: 'Discord Webhook Connected',
+    description: `Test message from **${siteName}**`,
+    color: 0x5865f2,
+    url: resolveBaseUrl(),
+    fields: [{ name: 'Status', value: 'Webhook is working', inline: true }],
+  });
 }
 
 export async function postDiscordNewService(input: {

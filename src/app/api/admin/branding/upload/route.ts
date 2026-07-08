@@ -24,26 +24,38 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
-    if (kind !== 'logo' && kind !== 'favicon') {
+    if (kind !== 'logo' && kind !== 'favicon' && kind !== 'discord-avatar') {
       return NextResponse.json({ error: 'Invalid kind' }, { status: 400 });
     }
 
-    const result = await saveUpload(file, 'branding');
+    const result = await saveUpload(file, kind === 'discord-avatar' ? 'discord' : 'branding');
+
+    const settingsPatch =
+      kind === 'logo'
+        ? { logoUrl: result.url }
+        : kind === 'favicon'
+          ? { faviconUrl: result.url }
+          : { discordBotAvatarUrl: result.url };
 
     await prisma.siteSettings.upsert({
       where: { id: 'singleton' },
-      update: kind === 'logo' ? { logoUrl: result.url } : { faviconUrl: result.url },
+      update: settingsPatch,
       create: {
         id: 'singleton',
-        ...(kind === 'logo' ? { logoUrl: result.url } : { faviconUrl: result.url }),
+        ...settingsPatch,
       },
     });
 
-    resetBrandingCache();
+    if (kind !== 'discord-avatar') {
+      resetBrandingCache();
+    } else {
+      const { resetDiscordWebhookConfigCache } = await import('@/lib/discord/webhook');
+      resetDiscordWebhookConfigCache();
+    }
 
     await logActivity({
       userId: session?.user.id,
-      action: 'site.branding_uploaded',
+      action: kind === 'discord-avatar' ? 'site.discord_avatar_uploaded' : 'site.branding_uploaded',
       entity: 'SiteSettings',
       metadata: { kind, url: result.url },
     });
