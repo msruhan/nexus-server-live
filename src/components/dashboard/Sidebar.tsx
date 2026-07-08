@@ -40,6 +40,7 @@ import {
   UsersThree,
   Warning,
   TelegramLogo,
+  DiscordLogo,
   ArrowsClockwise,
   ChartBar,
   Broadcast,
@@ -150,6 +151,7 @@ const adminSections: Section[] = [
       { href: '/admin/email', label: 'Email / SMTP', icon: Envelope, perm: 'manageEmailSettings' },
       { href: '/admin/cms/email-templates', label: 'Email templates', icon: Envelope, perm: 'editCms' },
       { href: '/admin/telegram', label: 'Telegram bot', icon: TelegramLogo, perm: 'manageTelegram' },
+      { href: '/admin/discord', label: 'Discord webhook', icon: DiscordLogo, perm: 'manageTelegram' },
     ],
   },
   {

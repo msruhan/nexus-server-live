@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/admin-guard';
 import { logActivity } from '@/lib/activity';
 import { postNewService, postPriceUpdate } from '@/lib/telegram/channel';
+import { postDiscordNewService, postDiscordPriceUpdate } from '@/lib/discord/webhook';
 
 const schema = z
   .object({
@@ -28,7 +29,12 @@ export async function PUT(
   // Fetch before state for channel auto-post detection
   const before = await prisma.serverService.findUnique({
     where: { id },
-    select: { title: true, price: true, status: true, box: { select: { title: true } } },
+    select: {
+      title: true,
+      price: true,
+      status: true,
+      box: { select: { title: true, marketplaceVisible: true } },
+    },
   });
 
   await prisma.serverService.update({ where: { id }, data: parsed.data });
@@ -52,11 +58,20 @@ export async function PUT(
     const newPrice = parsed.data.price ?? Number(before.price);
     const title = parsed.data.title ?? before.title;
 
-    if (parsed.data.status === 'ACTIVE' && before.status !== 'ACTIVE') {
+    const isPublicVisible = before.box?.marketplaceVisible === true;
+
+    if (parsed.data.status === 'ACTIVE' && before.status !== 'ACTIVE' && isPublicVisible) {
       void postNewService({ title, category: before.box?.title ?? 'Server', price: newPrice });
+      void postDiscordNewService({ title, category: before.box?.title ?? 'Server', price: newPrice });
     }
-    if (parsed.data.price !== undefined && Number(before.price) !== parsed.data.price && newStatus === 'ACTIVE') {
+    if (
+      parsed.data.price !== undefined &&
+      Number(before.price) !== parsed.data.price &&
+      newStatus === 'ACTIVE' &&
+      isPublicVisible
+    ) {
       void postPriceUpdate({ title, oldPrice: Number(before.price), newPrice: parsed.data.price });
+      void postDiscordPriceUpdate({ title, oldPrice: Number(before.price), newPrice: parsed.data.price });
     }
   }
 

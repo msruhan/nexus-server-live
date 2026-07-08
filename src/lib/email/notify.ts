@@ -354,6 +354,13 @@ export async function notifyTopupApproved(input: {
       },
     });
 
+    void notifyTelegramPaymentCredited({
+      userId: input.userId,
+      amount: typeof input.amount === 'bigint' ? Number(input.amount) : input.amount,
+      gateway: 'Manual top-up',
+      newBalance: typeof input.newBalance === 'bigint' ? Number(input.newBalance) : input.newBalance,
+    });
+
     pushInAppTopupApproved({ userId: input.userId, amount: amountLabel });
   } catch (e) {
     console.error('[notify] topup.approved', e);

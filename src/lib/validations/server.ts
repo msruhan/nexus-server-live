@@ -1,12 +1,44 @@
 import { z } from 'zod'
 import { serializeServerFieldDefs } from '@/lib/server-fields'
 
-const serverFieldDefSchema = z.object({
+export const serverFieldDefSchema = z.object({
   key: z.string().min(1).max(64),
   label: z.string().min(1).max(120),
   required: z.boolean(),
   type: z.enum(['text', 'email', 'number', 'password', 'textarea']).default('text'),
 })
+
+export const createServerServiceSchema = z.object({
+  sourceType: z.enum(['PROVIDER_SYNCED', 'MANUAL']).default('PROVIDER_SYNCED'),
+  apiId: z.string().min(1, 'API provider is required').optional().nullable(),
+  boxId: z.string().min(1, 'Server group is required'),
+  toolId: z.string().max(255).optional().nullable(),
+  title: z.string().min(2).max(500),
+  description: z.string().max(50000).optional().nullable(),
+  price: z.number().nonnegative(),
+  deliveryTime: z.string().max(100).optional().nullable(),
+  quantity: z.number().int().positive().default(1),
+  status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
+  fieldDefs: z.array(serverFieldDefSchema).optional(),
+  requiredFields: z.string().optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.sourceType === 'PROVIDER_SYNCED') {
+    if (!data.apiId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['apiId'], message: 'API provider is required' })
+    }
+    if (!data.toolId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['toolId'], message: 'Provider service ID is required' })
+    }
+  }
+  if (data.sourceType === 'MANUAL') {
+    if (data.apiId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['apiId'], message: 'Manual service must not be linked to an API provider' })
+    }
+    if (data.toolId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['toolId'], message: 'Manual service must not have a provider service ID' })
+    }
+  }
+});
 
 export const updateServerServiceSchema = z.object({
   title: z.string().min(2).max(500).optional(),

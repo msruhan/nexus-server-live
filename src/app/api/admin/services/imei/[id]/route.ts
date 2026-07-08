@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/admin-guard';
 import { logActivity } from '@/lib/activity';
 import { postNewService, postPriceUpdate } from '@/lib/telegram/channel';
+import { postDiscordNewService, postDiscordPriceUpdate } from '@/lib/discord/webhook';
 
 const schema = z
   .object({
@@ -29,7 +30,12 @@ export async function PUT(
   // Fetch current state before update (for price change detection)
   const before = await prisma.imeiService.findUnique({
     where: { id },
-    select: { title: true, price: true, status: true, group: { select: { title: true } } },
+    select: {
+      title: true,
+      price: true,
+      status: true,
+      group: { select: { title: true, marketplaceVisible: true } },
+    },
   });
 
   await prisma.imeiService.update({ where: { id }, data: parsed.data });
@@ -54,8 +60,16 @@ export async function PUT(
     const title = parsed.data.title ?? before.title;
 
     // Post to channel if status changed to ACTIVE (new publish)
-    if (parsed.data.status === 'ACTIVE' && before.status !== 'ACTIVE') {
+    const isPublicVisible = before.group?.marketplaceVisible === true;
+
+    if (parsed.data.status === 'ACTIVE' && before.status !== 'ACTIVE' && isPublicVisible) {
       void postNewService({
+        title,
+        category: before.group?.title ?? 'IMEI',
+        price: newPrice,
+        deliveryTime: parsed.data.deliveryTime,
+      });
+      void postDiscordNewService({
         title,
         category: before.group?.title ?? 'IMEI',
         price: newPrice,
@@ -63,8 +77,18 @@ export async function PUT(
       });
     }
     // Post to channel if price changed on an active service
-    if (parsed.data.price !== undefined && Number(before.price) !== parsed.data.price && newStatus === 'ACTIVE') {
+    if (
+      parsed.data.price !== undefined &&
+      Number(before.price) !== parsed.data.price &&
+      newStatus === 'ACTIVE' &&
+      isPublicVisible
+    ) {
       void postPriceUpdate({
+        title,
+        oldPrice: Number(before.price),
+        newPrice: parsed.data.price,
+      });
+      void postDiscordPriceUpdate({
         title,
         oldPrice: Number(before.price),
         newPrice: parsed.data.price,

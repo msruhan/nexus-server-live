@@ -1,22 +1,13 @@
 import { prisma } from '@/lib/db'
 import { apiError, apiSuccess, requireApiRole } from '@/lib/api-auth'
-import { z } from 'zod'
+import {
+  createServerServiceSchema,
+  resolveRequiredFieldsFromUpdate,
+} from '@/lib/validations/server'
+import { buildManualInternalRef } from '@/lib/service-source'
 import type { Prisma } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
-
-const createSchema = z.object({
-  apiId: z.string().min(1),
-  boxId: z.string().min(1),
-  toolId: z.string().optional().nullable(),
-  title: z.string().min(2).max(500),
-  description: z.string().optional().nullable(),
-  price: z.number().nonnegative(),
-  deliveryTime: z.string().optional().nullable(),
-  quantity: z.number().int().positive().default(1),
-  requiredFields: z.string().optional().nullable(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
-})
 
 /** GET /api/admin/imei/server-services */
 export async function GET(req: Request) {
@@ -61,11 +52,43 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const parsed = createSchema.safeParse(body)
+    const parsed = createServerServiceSchema.safeParse(body)
     if (!parsed.success) return apiError(parsed.error.issues[0].message)
 
+    const [api, box] = await Promise.all([
+      parsed.data.apiId ? prisma.imeiApi.findUnique({ where: { id: parsed.data.apiId } }) : Promise.resolve(null),
+      prisma.serverServiceBox.findUnique({ where: { id: parsed.data.boxId } }),
+    ])
+    if (parsed.data.sourceType === 'PROVIDER_SYNCED' && !api) return apiError('API provider not found', 404)
+    if (!box) return apiError('Server group not found', 404)
+
+    if (parsed.data.sourceType === 'PROVIDER_SYNCED' && parsed.data.apiId && parsed.data.toolId) {
+      const existingLink = await prisma.serverService.findFirst({
+        where: { apiId: parsed.data.apiId, toolId: parsed.data.toolId },
+        select: { id: true, title: true },
+      })
+      if (existingLink) {
+        return apiError(`Provider service already linked to "${existingLink.title}"`, 409)
+      }
+    }
+
+    let internalRef: string | null = null
+    if (parsed.data.sourceType === 'MANUAL') {
+      const count = await prisma.serverService.count({ where: { sourceType: 'MANUAL' } })
+      internalRef = buildManualInternalRef('server', count + 1)
+    }
+
+    const { fieldDefs: _fd, requiredFields: _rf, ...rest } = parsed.data
+    const fieldUpdate = resolveRequiredFieldsFromUpdate(parsed.data)
+
     const created = await prisma.serverService.create({
-      data: parsed.data,
+      data: {
+        ...rest,
+        ...fieldUpdate,
+        apiId: parsed.data.sourceType === 'MANUAL' ? null : parsed.data.apiId ?? null,
+        toolId: parsed.data.sourceType === 'MANUAL' ? null : parsed.data.toolId ?? null,
+        internalRef,
+      },
       include: { box: { select: { id: true, title: true } }, api: { select: { id: true, title: true } } },
     })
     return apiSuccess(created, 201)

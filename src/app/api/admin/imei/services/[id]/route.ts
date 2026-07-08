@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { apiError, apiSuccess, requireApiRole } from '@/lib/api-auth'
 import { updateImeiServiceSchema } from '@/lib/validations/imei'
 import { postNewService, postPriceUpdate } from '@/lib/telegram/channel'
+import { postDiscordNewService, postDiscordPriceUpdate } from '@/lib/discord/webhook'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,7 +48,12 @@ export async function PATCH(
     // Fetch before state for channel auto-post detection
     const before = await prisma.imeiService.findUnique({
       where: { id },
-      select: { title: true, price: true, status: true, group: { select: { title: true } } },
+      select: {
+        title: true,
+        price: true,
+        status: true,
+        group: { select: { title: true, marketplaceVisible: true } },
+      },
     })
 
     const updated = await prisma.imeiService.update({
@@ -65,11 +71,24 @@ export async function PATCH(
       const newPrice = (parsed.data as Record<string, unknown>).price as number | undefined ?? Number(before.price)
       const title = (parsed.data as Record<string, unknown>).title as string | undefined ?? before.title
 
-      if ((parsed.data as Record<string, unknown>).status === 'ACTIVE' && before.status !== 'ACTIVE') {
+      const isPublicVisible = before.group?.marketplaceVisible === true
+
+      if (
+        (parsed.data as Record<string, unknown>).status === 'ACTIVE' &&
+        before.status !== 'ACTIVE' &&
+        isPublicVisible
+      ) {
         void postNewService({ title, category: before.group?.title ?? 'IMEI', price: newPrice })
+        void postDiscordNewService({ title, category: before.group?.title ?? 'IMEI', price: newPrice })
       }
-      if ((parsed.data as Record<string, unknown>).price !== undefined && Number(before.price) !== newPrice && newStatus === 'ACTIVE') {
+      if (
+        (parsed.data as Record<string, unknown>).price !== undefined &&
+        Number(before.price) !== newPrice &&
+        newStatus === 'ACTIVE' &&
+        isPublicVisible
+      ) {
         void postPriceUpdate({ title, oldPrice: Number(before.price), newPrice })
+        void postDiscordPriceUpdate({ title, oldPrice: Number(before.price), newPrice })
       }
     }
 

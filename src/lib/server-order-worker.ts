@@ -24,6 +24,7 @@ import {
   STALE_SUBMIT_REJECT_MESSAGE,
 } from '@/lib/order-submit-policy'
 import { assertOrderPaidBeforeSupplierSubmit } from '@/lib/marketplace-order-guard'
+import { isManualSource, MANUAL_REVIEW_COMMENT } from '@/lib/service-source'
 import {
   extractServerStressEmail,
   isServerStressCredit,
@@ -271,6 +272,7 @@ async function rejectStalePendingServerOrders(limit = 50): Promise<number> {
     where: {
       status: 'PENDING',
       referenceId: null,
+      processedAt: null,
       createdAt: { lt: cutoff },
     },
     orderBy: { createdAt: 'asc' },
@@ -377,6 +379,17 @@ export async function submitServerOrderToSupplier(orderId: string): Promise<{
     })
     if (again?.referenceId) return { ok: true, referenceId: again.referenceId }
     return { ok: false, error: 'Submit already in progress or completed' }
+  }
+
+  if (isManualSource(order.service.sourceType)) {
+    await prisma.serverOrder.update({
+      where: { id: orderId },
+      data: {
+        comments: MANUAL_REVIEW_COMMENT,
+        processedAt: order.processedAt ?? new Date(),
+      },
+    })
+    return { ok: false, error: 'manual_review_required' }
   }
 
   const toolId = order.service.toolId

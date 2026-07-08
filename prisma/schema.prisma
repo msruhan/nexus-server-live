@@ -285,6 +285,11 @@ enum ImeiServiceStatus {
   INACTIVE
 }
 
+enum ServiceSourceType {
+  PROVIDER_SYNCED
+  MANUAL
+}
+
 enum ImeiOrderStatus {
   PENDING
   IN_PROCESS
@@ -359,9 +364,11 @@ model ImeiServiceGroup {
 
 model ImeiService {
   id           String            @id @default(cuid())
-  apiId        String
+  apiId        String?
   groupId      String
   toolId       String?
+  internalRef  String?           @unique
+  sourceType   ServiceSourceType @default(PROVIDER_SYNCED)
   title        String
   description  String?           @db.Text
   price        Decimal           @db.Decimal(12, 2)
@@ -385,7 +392,7 @@ model ImeiService {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  api    ImeiApi          @relation(fields: [apiId], references: [id], onDelete: Cascade)
+  api    ImeiApi?         @relation(fields: [apiId], references: [id], onDelete: SetNull)
   group  ImeiServiceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   orders ImeiOrder[]
 
@@ -476,9 +483,11 @@ model ServerServiceBox {
 
 model ServerService {
   id             String            @id @default(cuid())
-  apiId          String
+  apiId          String?
   boxId          String
   toolId         String?
+  internalRef    String?           @unique
+  sourceType     ServiceSourceType @default(PROVIDER_SYNCED)
   title          String
   description    String?           @db.Text
   price          Decimal           @db.Decimal(12, 2)
@@ -492,7 +501,7 @@ model ServerService {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  api    ImeiApi          @relation(fields: [apiId], references: [id], onDelete: Cascade)
+  api    ImeiApi?         @relation(fields: [apiId], references: [id], onDelete: SetNull)
   box    ServerServiceBox @relation(fields: [boxId], references: [id], onDelete: Cascade)
   orders ServerOrder[]
 
@@ -653,6 +662,8 @@ model SiteSettings {
   telegramGroupId        String?
   telegramGroupTopicId   Int?
   telegramGroupEnabled   Boolean @default(false)
+  discordWebhookEnabled  Boolean @default(false)
+  discordWebhookUrl      String?
   // Comma-separated allow-list of enabled notification events.
   // null = all enabled (default, non-breaking). "" = none enabled.
   // e.g. "order.created,order.success,payment.credited"

@@ -17,25 +17,34 @@ export type ActiveDeviceDuplicate = {
  * - SUCCESS: exact same service (serviceId) — prevents repeat one-time orders
  */
 export async function findActiveDeviceDuplicate(params: {
-  apiId: string
+  apiId?: string | null
   serviceId: string
   deviceKey: string
   excludeOrderId?: string
 }): Promise<ActiveDeviceDuplicate | null> {
+  const duplicateMatchers: Array<Record<string, unknown>> = [
+    {
+      status: 'SUCCESS',
+      serviceId: params.serviceId,
+    },
+  ]
+  if (params.apiId) {
+    duplicateMatchers.unshift({
+      status: { in: ['PENDING', 'IN_PROCESS'] },
+      service: { apiId: params.apiId },
+    })
+  } else {
+    duplicateMatchers.unshift({
+      status: { in: ['PENDING', 'IN_PROCESS'] },
+      serviceId: params.serviceId,
+    })
+  }
+
   const row = await prisma.imeiOrder.findFirst({
     where: {
       imei: params.deviceKey,
       ...(params.excludeOrderId ? { id: { not: params.excludeOrderId } } : {}),
-      OR: [
-        {
-          status: { in: ['PENDING', 'IN_PROCESS'] },
-          service: { apiId: params.apiId },
-        },
-        {
-          status: 'SUCCESS',
-          serviceId: params.serviceId,
-        },
-      ],
+      OR: duplicateMatchers,
     },
     orderBy: { createdAt: 'desc' },
     select: {

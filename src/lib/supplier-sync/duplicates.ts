@@ -8,7 +8,7 @@ export type DuplicateGroup = {
     id: string;
     title: string;
     toolId: string | null;
-    apiId: string;
+    apiId: string | null;
     apiTitle: string;
     status: string;
     price: string;
@@ -26,10 +26,10 @@ function pushToolIdGroups(
     id: string;
     title: string;
     toolId: string | null;
-    apiId: string;
+    apiId: string | null;
     status: string;
     price: { toString(): string };
-    api: { title: string };
+    api: { title: string } | null;
   }>,
   kind: 'imei' | 'server',
   groups: DuplicateGroup[],
@@ -43,7 +43,7 @@ function pushToolIdGroups(
       title: s.title,
       toolId: s.toolId,
       apiId: s.apiId,
-      apiTitle: s.api.title,
+      apiTitle: s.api?.title ?? 'Manual',
       status: s.status,
       price: s.price.toString(),
     };
@@ -62,10 +62,10 @@ function pushTitleGroups(
     id: string;
     title: string;
     toolId: string | null;
-    apiId: string;
+    apiId: string | null;
     status: string;
     price: { toString(): string };
-    api: { title: string };
+    api: { title: string } | null;
   }>,
   kind: 'imei' | 'server',
   groups: DuplicateGroup[],
@@ -79,7 +79,7 @@ function pushTitleGroups(
       title: s.title,
       toolId: s.toolId,
       apiId: s.apiId,
-      apiTitle: s.api.title,
+      apiTitle: s.api?.title ?? 'Manual',
       status: s.status,
       price: s.price.toString(),
     };

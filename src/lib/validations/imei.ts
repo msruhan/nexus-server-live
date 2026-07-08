@@ -43,7 +43,8 @@ export type UpdateImeiServiceGroupInput = z.infer<typeof updateImeiServiceGroupS
 // ============================================================
 
 export const createImeiServiceSchema = z.object({
-  apiId: z.string().min(1, 'API provider is required'),
+  sourceType: z.enum(['PROVIDER_SYNCED', 'MANUAL']).default('PROVIDER_SYNCED'),
+  apiId: z.string().min(1, 'API provider is required').optional().nullable(),
   groupId: z.string().min(1, 'Service group is required'),
   toolId: z.string().max(255).optional().nullable(),
   title: z.string().min(2, 'Name must be at least 2 characters').max(500),
@@ -62,9 +63,43 @@ export const createImeiServiceSchema = z.object({
   requiresPrd: z.boolean().default(false),
   requiresSn: z.boolean().default(false),
   requiresEcid: z.boolean().default(false),
+}).superRefine((data, ctx) => {
+  if (data.sourceType === 'PROVIDER_SYNCED') {
+    if (!data.apiId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['apiId'], message: 'API provider is required' })
+    }
+    if (!data.toolId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['toolId'], message: 'Provider service ID is required' })
+    }
+  }
+  if (data.sourceType === 'MANUAL') {
+    if (data.apiId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['apiId'], message: 'Manual service must not be linked to an API provider' })
+    }
+    if (data.toolId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['toolId'], message: 'Manual service must not have a provider service ID' })
+    }
+  }
 })
 
-export const updateImeiServiceSchema = createImeiServiceSchema.partial()
+export const updateImeiServiceSchema = z.object({
+  title: z.string().min(2, 'Name must be at least 2 characters').max(500).optional(),
+  description: z.string().max(50000).optional().nullable(),
+  price: z.number().nonnegative('Price cannot be negative').or(z.string().transform((v) => Number(v))).optional(),
+  deliveryTime: z.string().max(100).optional().nullable(),
+  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  groupId: z.string().min(1).optional(),
+  requiresImei: z.boolean().optional(),
+  requiresNetwork: z.boolean().optional(),
+  requiresModel: z.boolean().optional(),
+  requiresProvider: z.boolean().optional(),
+  requiresPin: z.boolean().optional(),
+  requiresKbh: z.boolean().optional(),
+  requiresMep: z.boolean().optional(),
+  requiresPrd: z.boolean().optional(),
+  requiresSn: z.boolean().optional(),
+  requiresEcid: z.boolean().optional(),
+})
 
 export type CreateImeiServiceInput = z.infer<typeof createImeiServiceSchema>
 export type UpdateImeiServiceInput = z.infer<typeof updateImeiServiceSchema>

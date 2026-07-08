@@ -12,8 +12,9 @@ import { isMarketplacePaymentReference } from '@/lib/marketplace-order-guard';
 import { toNum } from '@/lib/supplier-sync/money';
 import { logActivity } from '@/lib/activity';
 import { isMarketplaceSystemGuestUser, displayNameFromEmail } from '@/lib/marketplace-guest-user';
-import { notifyOrderCreated } from '@/lib/email/notify';
+import { notifyOrderCreated, notifyAdminNewOrder } from '@/lib/email/notify';
 import { createInvoice } from '@/lib/invoice/service';
+import { notifyTelegramOrderCreated, notifyTelegramAdminNewOrder } from '@/lib/telegram/notify';
 
 function safeJsonParse(input: string): Record<string, string> {
   try {
@@ -29,6 +30,52 @@ function safeJsonParse(input: string): Record<string, string> {
 
 function amountsMatch(a: Prisma.Decimal | number, b: Prisma.Decimal | number): boolean {
   return Math.abs(toNum(a) - toNum(b)) < 0.01;
+}
+
+async function resolveMarketplaceOrderUserName(
+  userId: string,
+  email: string,
+  isGuest: boolean,
+): Promise<string> {
+  if (isGuest) return displayNameFromEmail(email) || email;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true },
+  });
+  return user?.name ?? user?.email ?? email ?? 'Unknown';
+}
+
+function notifyMarketplaceOrderCreated(input: {
+  kind: 'imei' | 'server';
+  userId: string;
+  userName: string;
+  orderCode: string;
+  serviceName: string;
+  price: string;
+  orderId: string;
+  imei?: string;
+}) {
+  void notifyOrderCreated({ kind: input.kind, orderId: input.orderId });
+  void notifyTelegramOrderCreated({
+    userId: input.userId,
+    orderCode: input.orderCode,
+    serviceName: input.serviceName,
+    imei: input.imei,
+    price: input.price,
+  });
+  void notifyTelegramAdminNewOrder({
+    orderCode: input.orderCode,
+    userName: input.userName,
+    serviceName: input.serviceName,
+    price: input.price,
+  });
+  void notifyAdminNewOrder({
+    orderCode: input.orderCode,
+    userName: input.userName,
+    serviceName: input.serviceName,
+    price: input.price,
+    kind: input.kind,
+  });
 }
 
 /**
@@ -234,7 +281,17 @@ async function fulfillImeiCheckout(
     scheduleImeiOrderFollowUp(order.id);
   }
 
-  void notifyOrderCreated({ kind: 'imei', orderId: order.id });
+  const userName = await resolveMarketplaceOrderUserName(checkout.userId, checkout.email, isGuest);
+  notifyMarketplaceOrderCreated({
+    kind: 'imei',
+    userId: checkout.userId,
+    userName,
+    orderCode: order.orderCode,
+    serviceName: service.title,
+    price: order.price.toString(),
+    orderId: order.id,
+    imei: deviceInput.imei,
+  });
   void createInvoice({
     userId: checkout.userId,
     kind: 'ORDER',
@@ -309,7 +366,16 @@ async function fulfillServerCheckout(
     scheduleServerOrderFollowUp(order.id);
   }
 
-  void notifyOrderCreated({ kind: 'server', orderId: order.id });
+  const userName = await resolveMarketplaceOrderUserName(checkout.userId, checkout.email, isGuest);
+  notifyMarketplaceOrderCreated({
+    kind: 'server',
+    userId: checkout.userId,
+    userName,
+    orderCode: order.orderCode,
+    serviceName: service.title,
+    price: order.price.toString(),
+    orderId: order.id,
+  });
   void createInvoice({
     userId: checkout.userId,
     kind: 'ORDER',

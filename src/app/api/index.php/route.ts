@@ -20,6 +20,10 @@ import {
 } from '@/lib/api-key-security';
 import { requireRuntimeLicense } from '@/lib/license-guard';
 import { enforceGlobalApiWhitelist, isIpBlocked } from '@/lib/global-ip-policy';
+import {
+  isDhruPlaceAction,
+  normalizeDhruInboundParameters,
+} from '@/lib/dhru-inbound-legacy';
 
 export const dynamic = 'force-dynamic';
 
@@ -499,7 +503,11 @@ export async function POST(req: Request) {
   const apiaccesskey = String(form.get('apiaccesskey') ?? '').trim();
   const action = String(form.get('action') ?? '').trim().toLowerCase();
   const parametersRaw = String(form.get('parameters') ?? '');
-  const parameters = parseXmlLikeParameters(parametersRaw);
+  const parameters = normalizeDhruInboundParameters(
+    action,
+    form,
+    parseXmlLikeParameters(parametersRaw),
+  );
 
   const clientIp = getClientIp(req);
   const userAgent = req.headers.get('user-agent');
@@ -513,7 +521,7 @@ export async function POST(req: Request) {
     return auth.response;
   }
 
-  if (action === 'placeimeiorder' || action === 'placeserverorder') {
+  if (isDhruPlaceAction(action)) {
     const licenseDenied = await requireRuntimeLicense();
     if (licenseDenied) {
       const payload = (await licenseDenied.json()) as { reason?: string };
@@ -605,21 +613,26 @@ export async function POST(req: Request) {
           },
         });
       }
-      case 'imeiservicelist': {
+      case 'imeiservicelist':
+      case 'getservices': {
         const imeiList = await buildClassicImeiListPayload();
         const serverList = await buildClassicServerListPayload();
         return ok({ LIST: { ...imeiList, ...serverList } });
       }
       case 'serverservicelist':
-      case 'fileservicelist': {
+      case 'fileservicelist':
+      case 'getserverservices': {
         const list = await buildClassicServerListPayload();
         return ok({ LIST: list });
       }
       case 'placeimeiorder':
-      case 'placeserverorder': {
+      case 'placeserverorder':
+      case 'placeorder': {
         return await placeImeiStyleOrder(auth.userId, parameters);
       }
-      case 'getimeiorder': {
+      case 'getimeiorder':
+      case 'getstatus':
+      case 'getserverorder': {
         return await getImeiStyleOrderStatus(parameters);
       }
       default:

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { apiError, apiSuccess, requireApiRole } from '@/lib/api-auth'
 import { createImeiServiceSchema } from '@/lib/validations/imei'
+import { buildManualInternalRef } from '@/lib/service-source'
 import type { Prisma } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -55,14 +56,37 @@ export async function POST(req: Request) {
 
     // Verify FK integrity
     const [api, group] = await Promise.all([
-      prisma.imeiApi.findUnique({ where: { id: parsed.data.apiId } }),
+      parsed.data.apiId ? prisma.imeiApi.findUnique({ where: { id: parsed.data.apiId } }) : Promise.resolve(null),
       prisma.imeiServiceGroup.findUnique({ where: { id: parsed.data.groupId } }),
     ])
-    if (!api) return apiError('API provider not found', 404)
+    if (parsed.data.sourceType === 'PROVIDER_SYNCED' && !api) return apiError('API provider not found', 404)
     if (!group) return apiError('Service group not found', 404)
 
+    if (parsed.data.sourceType === 'PROVIDER_SYNCED' && parsed.data.apiId && parsed.data.toolId) {
+      const existingLink = await prisma.imeiService.findFirst({
+        where: { apiId: parsed.data.apiId, toolId: parsed.data.toolId },
+        select: { id: true, title: true },
+      })
+      if (existingLink) {
+        return apiError(`Provider service already linked to "${existingLink.title}"`, 409)
+      }
+    }
+
+    let internalRef: string | null = null
+    if (parsed.data.sourceType === 'MANUAL') {
+      const count = await prisma.imeiService.count({
+        where: { sourceType: 'MANUAL' },
+      })
+      internalRef = buildManualInternalRef('imei', count + 1)
+    }
+
     const created = await prisma.imeiService.create({
-      data: parsed.data,
+      data: {
+        ...parsed.data,
+        apiId: parsed.data.sourceType === 'MANUAL' ? null : parsed.data.apiId ?? null,
+        toolId: parsed.data.sourceType === 'MANUAL' ? null : parsed.data.toolId ?? null,
+        internalRef,
+      },
       include: {
         group: { select: { id: true, title: true } },
         api: { select: { id: true, title: true } },

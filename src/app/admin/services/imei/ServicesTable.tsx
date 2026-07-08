@@ -24,6 +24,8 @@ type Row = {
   price: number;
   status: string;
   provider: string;
+  sourceType: 'PROVIDER_SYNCED' | 'MANUAL';
+  toolId: string | null;
   delivery: string;
   description: string;
   requiresImei: boolean;
@@ -49,6 +51,7 @@ export function ServicesTable({
   const [findText, setFindText] = React.useState('');
   const [replaceText, setReplaceText] = React.useState('');
   const [bulkReplacing, setBulkReplacing] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
 
   const filtered = React.useMemo(
     () => filterCatalogRows(rows, search, groupFilter, 'A'),
@@ -270,6 +273,16 @@ export function ServicesTable({
         resultCount={filtered.length}
       />
 
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-paper hover:bg-primary-600"
+        >
+          New Service
+        </button>
+      </div>
+
       <div className="mb-3 rounded-xl border border-line bg-paper-50 px-4 py-3">
         <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
           Find & replace in titles
@@ -415,7 +428,9 @@ export function ServicesTable({
                   <td className="px-4 py-3 font-mono text-xs">A.{r.ref}</td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-ink">{r.title}</div>
-                    <div className="font-mono text-[10px] text-ink-muted">{r.group}</div>
+                    <div className="font-mono text-[10px] text-ink-muted">
+                      {r.group} · {r.sourceType === 'MANUAL' ? 'Manual' : r.provider}
+                    </div>
                   </td>
                   <td className="hidden px-4 py-3 text-xs text-ink-muted lg:table-cell">{r.delivery}</td>
                   <td className="px-4 py-3 text-right">
@@ -478,7 +493,377 @@ export function ServicesTable({
           onSave={(patch) => update(editing.id, patch)}
         />
       )}
+
+      {creating && (
+        <NewImeiServiceDialog
+          groups={groups}
+          onClose={() => setCreating(false)}
+          onCreated={() => {
+            setCreating(false);
+            router.refresh();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+type ProviderOption = { id: string; title: string; apiType: string };
+type ProviderServiceOption = {
+  toolId: string;
+  title: string;
+  description?: string | null;
+  groupName: string;
+  price: number;
+  deliveryTime?: string;
+  requiresImei?: boolean;
+  requiresNetwork?: boolean;
+  requiresModel?: boolean;
+  requiresProvider?: boolean;
+  requiresPin?: boolean;
+  requiresKbh?: boolean;
+  requiresMep?: boolean;
+  requiresPrd?: boolean;
+  requiresSn?: boolean;
+  requiresEcid?: boolean;
+  source: 'cached' | 'live';
+};
+
+function NewImeiServiceDialog({
+  groups,
+  onClose,
+  onCreated,
+}: {
+  groups: CatalogGroupOption[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [sourceType, setSourceType] = React.useState<'PROVIDER_SYNCED' | 'MANUAL'>('MANUAL');
+  const [providers, setProviders] = React.useState<ProviderOption[]>([]);
+  const [services, setServices] = React.useState<ProviderServiceOption[]>([]);
+  const [apiId, setApiId] = React.useState('');
+  const [toolId, setToolId] = React.useState('');
+  const [groupId, setGroupId] = React.useState(groups[0]?.id ?? '');
+  const [title, setTitle] = React.useState('');
+  const [description, setDescription] = React.useState('');
+  const [price, setPrice] = React.useState('0');
+  const [deliveryTime, setDeliveryTime] = React.useState('');
+  const [status, setStatus] = React.useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
+  const [requiresImei, setRequiresImei] = React.useState(true);
+  const [requiresSn, setRequiresSn] = React.useState(false);
+  const [requiresEcid, setRequiresEcid] = React.useState(false);
+  const [loadingProviders, setLoadingProviders] = React.useState(true);
+  const [loadingServices, setLoadingServices] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    void (async () => {
+      setLoadingProviders(true);
+      try {
+        const res = await fetch('/api/admin/imei/services/create-options');
+        const j = await res.json();
+        if (res.ok && j.success) {
+          setProviders(j.data.providers ?? []);
+        } else {
+          toast.error('Failed to load provider list');
+        }
+      } catch {
+        toast.error('Failed to load provider list');
+      } finally {
+        setLoadingProviders(false);
+      }
+    })();
+  }, []);
+
+  async function loadProviderServices(nextApiId: string, refresh = false) {
+    if (!nextApiId) {
+      setServices([]);
+      return;
+    }
+    setLoadingServices(true);
+    try {
+      const url = `/api/admin/imei/services/create-options?apiId=${encodeURIComponent(nextApiId)}${refresh ? '&refresh=true' : ''}`;
+      const res = await fetch(url);
+      const j = await res.json();
+      if (res.ok && j.success) {
+        setServices(j.data.services ?? []);
+      } else {
+        toast.error('Failed to load provider services');
+      }
+    } catch {
+      toast.error('Failed to load provider services');
+    } finally {
+      setLoadingServices(false);
+    }
+  }
+
+  function applyProviderService(nextToolId: string) {
+    setToolId(nextToolId);
+    const svc = services.find((s) => s.toolId === nextToolId);
+    if (!svc) return;
+    setTitle(svc.title);
+    setDescription(svc.description ?? '');
+    setPrice(String(svc.price));
+    setDeliveryTime(svc.deliveryTime ?? '');
+    const matchingGroup = groups.find((g) => g.title === svc.groupName);
+    if (matchingGroup) setGroupId(matchingGroup.id);
+    setRequiresImei(svc.requiresImei ?? true);
+    setRequiresSn(svc.requiresSn ?? false);
+    setRequiresEcid(svc.requiresEcid ?? false);
+  }
+
+  async function save() {
+    const priceNum = Number(price);
+    if (!title.trim() || !Number.isFinite(priceNum) || priceNum < 0) {
+      toast.error('Please complete the required fields');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/imei/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceType,
+          apiId: sourceType === 'PROVIDER_SYNCED' ? apiId : null,
+          toolId: sourceType === 'PROVIDER_SYNCED' ? toolId : null,
+          groupId,
+          title: title.trim(),
+          description,
+          price: priceNum,
+          deliveryTime: deliveryTime || null,
+          status,
+          requiresImei,
+          requiresNetwork: false,
+          requiresModel: false,
+          requiresProvider: false,
+          requiresPin: false,
+          requiresKbh: false,
+          requiresMep: false,
+          requiresPrd: false,
+          requiresSn,
+          requiresEcid,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.success) {
+        toast.error('Create failed', { description: j.error ?? 'Unknown error' });
+        return;
+      }
+      toast.success('Service created');
+      onCreated();
+    } catch {
+      toast.error('Create failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-5xl rounded-2xl bg-paper p-5 shadow-xl">
+        <div className="mb-4 flex items-start justify-between border-b border-line pb-3">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+              New IMEI service
+            </div>
+            <div className="mt-1 font-mono text-[10px] text-ink-muted">
+              Create manual service or link to provider service
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-line px-3 py-1 text-xs font-bold text-ink hover:border-ink"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mb-5 grid gap-4 lg:grid-cols-2">
+          <label className="rounded-xl border border-line bg-paper-50 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-ink">Manual service</span>
+              <input
+                type="radio"
+                checked={sourceType === 'MANUAL'}
+                onChange={() => setSourceType('MANUAL')}
+              />
+            </div>
+            <p className="mt-2 text-xs text-ink-muted">Orders stay local and wait for admin manual review.</p>
+          </label>
+          <label className="rounded-xl border border-line bg-paper-50 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-ink">Sync with provider</span>
+              <input
+                type="radio"
+                checked={sourceType === 'PROVIDER_SYNCED'}
+                onChange={() => setSourceType('PROVIDER_SYNCED')}
+              />
+            </div>
+            <p className="mt-2 text-xs text-ink-muted">Store provider service ID so orders can be sent upstream.</p>
+          </label>
+        </div>
+
+        {sourceType === 'PROVIDER_SYNCED' && (
+          <div className="mb-5 rounded-xl border border-line bg-paper-50 p-4">
+            <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
+              <div>
+                <div className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                  API provider
+                </div>
+                <select
+                  value={apiId}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setApiId(next);
+                    setToolId('');
+                    void loadProviderServices(next, false);
+                  }}
+                  disabled={loadingProviders}
+                  className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink"
+                >
+                  <option value="">{loadingProviders ? 'Loading providers…' : 'Select provider'}</option>
+                  {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                  Provider service
+                </div>
+                <select
+                  value={toolId}
+                  onChange={(e) => applyProviderService(e.target.value)}
+                  disabled={!apiId || loadingServices}
+                  className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink"
+                >
+                  <option value="">
+                    {!apiId ? 'Select provider first' : loadingServices ? 'Loading services…' : 'Select service'}
+                  </option>
+                  {services.map((s) => (
+                    <option key={s.toolId} value={s.toolId}>
+                      [{s.source}] {s.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => void loadProviderServices(apiId, true)}
+                  disabled={!apiId || loadingServices}
+                  className="rounded-full border border-line bg-paper px-4 py-2 text-xs font-semibold text-ink hover:border-ink disabled:opacity-60"
+                >
+                  Refresh from provider
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-5 lg:grid-cols-12">
+          <div className="space-y-5 lg:col-span-8">
+            <Input
+              label="Service name"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Service name shown to users"
+              required
+            />
+            <div>
+              <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                Description (rich text)
+              </div>
+              <RichTextEditor value={description} onChange={setDescription} placeholder="Write service description…" />
+            </div>
+          </div>
+          <div className="space-y-4 lg:col-span-4">
+            <div>
+              <div className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                Group
+              </div>
+              <select
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
+                className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink"
+              >
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Input
+              label="Retail price"
+              type="number"
+              min={0}
+              step={1}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              required
+            />
+
+            <Input
+              label="Delivery time"
+              value={deliveryTime}
+              onChange={(e) => setDeliveryTime(e.target.value)}
+              placeholder="e.g. 1-24 hours"
+            />
+
+            <div>
+              <div className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                Status
+              </div>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as 'ACTIVE' | 'INACTIVE')}
+                className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink"
+              >
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+              </select>
+            </div>
+
+            <div className="rounded-xl border border-line bg-paper-50 p-4">
+              <div className="border-b border-line pb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                Required fields
+              </div>
+              <div className="mt-3 space-y-2 text-sm">
+                {[
+                  ['IMEI', requiresImei, setRequiresImei],
+                  ['Serial number', requiresSn, setRequiresSn],
+                  ['ECID', requiresEcid, setRequiresEcid],
+                ].map(([label, checked, setter]) => (
+                  <label key={label as string} className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-ink">{label as string}</span>
+                    <input
+                      type="checkbox"
+                      checked={checked as boolean}
+                      onChange={(e) => (setter as React.Dispatch<React.SetStateAction<boolean>>)(e.target.checked)}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={saving || title.trim().length < 2 || Number(price) < 0 || (sourceType === 'PROVIDER_SYNCED' && (!apiId || !toolId))}
+              onClick={() => void save()}
+              className="w-full rounded-full bg-ink px-4 py-2 text-xs font-bold text-paper disabled:opacity-60"
+            >
+              {saving ? 'Creating…' : 'Create service'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

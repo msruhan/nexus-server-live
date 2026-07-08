@@ -32,6 +32,7 @@ const ROUTE_PERMISSIONS: Array<{ prefix: string; perm: PermissionKey }> = [
   { prefix: '/admin/ip-management', perm: 'manageApiKeys' },
   { prefix: '/admin/email', perm: 'manageEmailSettings' },
   { prefix: '/admin/telegram', perm: 'manageTelegram' },
+  { prefix: '/admin/discord', perm: 'manageTelegram' },
   { prefix: '/admin/system', perm: 'manageSystem' },
   { prefix: '/admin/backup', perm: 'manageBackups' },
   { prefix: '/admin/download-tools', perm: 'editCms' },

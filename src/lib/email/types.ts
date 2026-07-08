@@ -43,6 +43,7 @@ export const ALL_EMAIL_EVENTS: EmailEvent[] = [
   'admin.order.new',
   'admin.topup.new',
   'admin.ticket.new',
+  'admin.report.scheduled',
 ];
 
 export const EMAIL_EVENT_GROUPS: Array<{
@@ -93,6 +94,7 @@ export const EMAIL_EVENT_GROUPS: Array<{
       { key: 'admin.order.new', label: 'New order placed' },
       { key: 'admin.topup.new', label: 'New top-up request' },
       { key: 'admin.ticket.new', label: 'New support ticket' },
+      { key: 'admin.report.scheduled', label: 'Scheduled analytics report' },
     ],
   },
 ];

@@ -32,12 +32,15 @@ export default async function AdminServerServicesPage() {
         groups={groups}
         rows={services.map((s) => ({
           id: s.id,
-          ref: s.toolId ?? '—',
+          ref: s.internalRef ?? s.toolId ?? '—',
           title: s.title,
           groupId: s.boxId,
           group: s.box.title,
           price: Number(s.price),
           status: s.status,
+          provider: s.api?.title ?? 'Manual',
+          sourceType: s.sourceType,
+          toolId: s.toolId ?? null,
           delivery: s.deliveryTime ?? '—',
           description: s.description ?? '',
           requiredFields: s.requiredFields ?? '',
