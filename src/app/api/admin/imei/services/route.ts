@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db'
 import { apiError, apiSuccess, requireApiRole } from '@/lib/api-auth'
 import { createImeiServiceSchema } from '@/lib/validations/imei'
 import { buildManualInternalRef } from '@/lib/service-source'
+import { postNewService } from '@/lib/telegram/channel'
+import { postDiscordNewService } from '@/lib/discord/webhook'
 import type { Prisma } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -57,7 +59,10 @@ export async function POST(req: Request) {
     // Verify FK integrity
     const [api, group] = await Promise.all([
       parsed.data.apiId ? prisma.imeiApi.findUnique({ where: { id: parsed.data.apiId } }) : Promise.resolve(null),
-      prisma.imeiServiceGroup.findUnique({ where: { id: parsed.data.groupId } }),
+      prisma.imeiServiceGroup.findUnique({
+        where: { id: parsed.data.groupId },
+        select: { id: true, title: true, marketplaceVisible: true },
+      }),
     ])
     if (parsed.data.sourceType === 'PROVIDER_SYNCED' && !api) return apiError('API provider not found', 404)
     if (!group) return apiError('Service group not found', 404)
@@ -92,6 +97,23 @@ export async function POST(req: Request) {
         api: { select: { id: true, title: true } },
       },
     })
+
+    // Fire-and-forget: notify when a service is created already ACTIVE + marketplace-visible.
+    if (created.status === 'ACTIVE' && group.marketplaceVisible) {
+      void postNewService({
+        title: created.title,
+        category: group.title ?? 'IMEI',
+        price: Number(created.price),
+        deliveryTime: created.deliveryTime,
+      })
+      void postDiscordNewService({
+        title: created.title,
+        category: group.title ?? 'IMEI',
+        price: Number(created.price),
+        deliveryTime: created.deliveryTime,
+      })
+    }
+
     return apiSuccess(created, 201)
   } catch (e) {
     console.error('[ADMIN_IMEI_SERVICES_POST]', e)

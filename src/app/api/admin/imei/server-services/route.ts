@@ -5,6 +5,8 @@ import {
   resolveRequiredFieldsFromUpdate,
 } from '@/lib/validations/server'
 import { buildManualInternalRef } from '@/lib/service-source'
+import { postNewService } from '@/lib/telegram/channel'
+import { postDiscordNewService } from '@/lib/discord/webhook'
 import type { Prisma } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -57,7 +59,10 @@ export async function POST(req: Request) {
 
     const [api, box] = await Promise.all([
       parsed.data.apiId ? prisma.imeiApi.findUnique({ where: { id: parsed.data.apiId } }) : Promise.resolve(null),
-      prisma.serverServiceBox.findUnique({ where: { id: parsed.data.boxId } }),
+      prisma.serverServiceBox.findUnique({
+        where: { id: parsed.data.boxId },
+        select: { id: true, title: true, marketplaceVisible: true },
+      }),
     ])
     if (parsed.data.sourceType === 'PROVIDER_SYNCED' && !api) return apiError('API provider not found', 404)
     if (!box) return apiError('Server group not found', 404)
@@ -91,6 +96,23 @@ export async function POST(req: Request) {
       },
       include: { box: { select: { id: true, title: true } }, api: { select: { id: true, title: true } } },
     })
+
+    // Fire-and-forget: notify when a service is created already ACTIVE + marketplace-visible.
+    if (created.status === 'ACTIVE' && box.marketplaceVisible) {
+      void postNewService({
+        title: created.title,
+        category: box.title ?? 'Server',
+        price: Number(created.price),
+        deliveryTime: created.deliveryTime,
+      })
+      void postDiscordNewService({
+        title: created.title,
+        category: box.title ?? 'Server',
+        price: Number(created.price),
+        deliveryTime: created.deliveryTime,
+      })
+    }
+
     return apiSuccess(created, 201)
   } catch (e) {
     console.error('[ADMIN_SERVER_SERVICES_POST]', e)
