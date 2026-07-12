@@ -4,6 +4,7 @@ import * as React from 'react';
 import { formatDate } from '@/lib/format';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { UserActivationStatus } from './UserActivationStatus';
+import { UserPricingPreview } from './UserPricingPreview';
 import { UserWalletCredit } from './UserWalletCredit';
 import { UserGroupSelect, type UserGroupOption } from './UserGroupSelect';
 import { CatalogTableToolbar } from '@/components/admin/CatalogTableToolbar';
@@ -113,12 +114,20 @@ export function UsersTable({
                 <td className="px-4 py-3 text-right font-mono text-xs">{u.orders}</td>
                 <td className="px-4 py-3 font-mono text-xs text-ink-muted">{formatDate(u.joined)}</td>
                 <td className="px-4 py-3 text-right">
-                  <UserActivationStatus
-                    userId={u.id}
-                    active={u.active}
-                    emailVerifiedAt={u.emailVerifiedAt}
-                    emailVerificationToken={u.emailVerificationToken}
-                  />
+                  <div className="inline-flex items-center justify-end gap-2">
+                    <UserPricingPreview
+                      userId={u.id}
+                      userName={u.name}
+                      userEmail={u.email}
+                      groupName={u.group}
+                    />
+                    <UserActivationStatus
+                      userId={u.id}
+                      active={u.active}
+                      emailVerifiedAt={u.emailVerifiedAt}
+                      emailVerificationToken={u.emailVerificationToken}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}
