@@ -2,49 +2,44 @@
  * Tiered pricing resolution.
  *
  * Single source of truth for "what does THIS user pay for THIS service?".
- * Used by:
- *   - /api/imei/orders            (user-facing order placement)
- *   - /api/imei/server-orders
- *   - /api/public/v1/orders/imei  (reseller API)
- *   - /api/public/v1/orders/server
- *   - /api/index.php              (Dhru-compat reseller API)
  *
- * Rules of resolution (in order):
- *   1. If the user has a PriceGroup with a ServicePriceOverride for this
- *      specific service → use override.price (per-row override).
- *   2. Else if the user has a PriceGroup with adjustmentType FIXED →
- *      retail + fixedAdjustment (e.g. -5 or +5 USD), floored at 0.
- *   3. Else if adjustmentType PERCENT and discountPercent > 0 →
- *      apply percent off retail, ROUND DOWN to 2 decimal places (USD).
- *   4. Else → return service.price unchanged.
- *
- * Defensive defaults:
- *   - User without group: returns service.price (no DB lookup beyond user).
- *   - Errors anywhere in this function: callers catch and fall back to
- *     service.price. Tiered pricing is a "nice extra" — if it ever breaks,
- *     the user just pays full retail. NEVER fail order placement because
- *     of pricing resolution.
+ * Precedence:
+ *   1. PriceGroupRule scope=SERVICE (per-service)
+ *   2. PriceGroupRule scope=CATALOG_GROUP (IMEI group / server box)
+ *   3. PriceGroup global default (when defaultEnabled)
+ *   4. Retail service.price
  */
 import { Prisma } from '@prisma/client';
 import type { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '@/lib/db';
+import { applyPriceRule, ruleValuesFromRow, type PriceRuleValues } from '@/lib/price-group-rule';
 
 export type ServiceKind = 'imei' | 'server';
 
 export type ResolvedPrice = {
   price: Decimal;
   base: Decimal;
-  discountPercent: number; // 0 if no group / override path
-  source: 'retail' | 'group_percent' | 'group_fixed' | 'group_override';
+  discountPercent: number;
+  source:
+    | 'retail'
+    | 'group_percent'
+    | 'group_fixed'
+    | 'group_override'
+    | 'group_rule_service'
+    | 'group_rule_catalog';
   groupName: string | null;
 };
 
-function multiplyByPercentDown(base: Decimal, percent: number): Decimal {
-  // base * (100 - percent) / 100, rounded down to 2 decimal places (USD cents).
-  const factor = new Prisma.Decimal((100 - percent) / 100);
-  const product = base.mul(factor);
-  // Round down to 2 decimal places.
-  return product.toDecimalPlaces(2, Prisma.Decimal.ROUND_DOWN);
+function globalRuleFromGroup(group: {
+  adjustmentType: string;
+  discountPercent: unknown;
+  fixedAdjustment: unknown;
+}): PriceRuleValues {
+  const adjustmentType = group.adjustmentType === 'FIXED' ? 'FIXED' : 'PERCENT';
+  if (adjustmentType === 'FIXED') {
+    return { ruleType: 'FIXED', fixedAdjustment: Number(group.fixedAdjustment ?? 0) };
+  }
+  return { ruleType: 'PERCENT', discountPercent: Number(group.discountPercent ?? 0) };
 }
 
 export async function resolveServicePriceForUser(args: {
@@ -52,6 +47,7 @@ export async function resolveServicePriceForUser(args: {
   serviceId: string;
   kind: ServiceKind;
   basePrice: Decimal;
+  catalogGroupId?: string | null;
 }): Promise<ResolvedPrice> {
   const { userId, serviceId, kind, basePrice } = args;
 
@@ -65,6 +61,7 @@ export async function resolveServicePriceForUser(args: {
             id: true,
             name: true,
             isActive: true,
+            defaultEnabled: true,
             adjustmentType: true,
             discountPercent: true,
             fixedAdjustment: true,
@@ -83,67 +80,116 @@ export async function resolveServicePriceForUser(args: {
       };
     }
 
-    // Per-service override?
-    const override = await prisma.servicePriceOverride.findFirst({
+    const group = user.priceGroup;
+    let catalogGroupId = args.catalogGroupId ?? null;
+
+    if (!catalogGroupId) {
+      if (kind === 'imei') {
+        const svc = await prisma.imeiService.findUnique({
+          where: { id: serviceId },
+          select: { groupId: true },
+        });
+        catalogGroupId = svc?.groupId ?? null;
+      } else {
+        const svc = await prisma.serverService.findUnique({
+          where: { id: serviceId },
+          select: { boxId: true },
+        });
+        catalogGroupId = svc?.boxId ?? null;
+      }
+    }
+
+    const serviceRule = await prisma.priceGroupRule.findFirst({
       where: {
-        priceGroupId: user.priceGroup.id,
+        priceGroupId: group.id,
+        scope: 'SERVICE',
         ...(kind === 'imei' ? { imeiServiceId: serviceId } : { serverServiceId: serviceId }),
       },
-      select: { price: true },
     });
-    if (override) {
+
+    if (serviceRule) {
+      const values = ruleValuesFromRow(serviceRule);
       return {
-        price: override.price,
+        price: applyPriceRule(basePrice, values),
         base: basePrice,
-        discountPercent: 0,
-        source: 'group_override',
-        groupName: user.priceGroup.name,
+        discountPercent: values.ruleType === 'PERCENT' ? Number(values.discountPercent ?? 0) : 0,
+        source: 'group_rule_service',
+        groupName: group.name,
       };
     }
 
-    const adjustmentType = user.priceGroup.adjustmentType === 'FIXED' ? 'FIXED' : 'PERCENT';
+    if (catalogGroupId) {
+      const catalogRule = await prisma.priceGroupRule.findFirst({
+        where: {
+          priceGroupId: group.id,
+          scope: 'CATALOG_GROUP',
+          ...(kind === 'imei'
+            ? { imeiGroupId: catalogGroupId }
+            : { serverBoxId: catalogGroupId }),
+        },
+      });
+      if (catalogRule) {
+        const values = ruleValuesFromRow(catalogRule);
+        return {
+          price: applyPriceRule(basePrice, values),
+          base: basePrice,
+          discountPercent: values.ruleType === 'PERCENT' ? Number(values.discountPercent ?? 0) : 0,
+          source: 'group_rule_catalog',
+          groupName: group.name,
+        };
+      }
+    }
+
+    if (!group.defaultEnabled) {
+      return {
+        price: basePrice,
+        base: basePrice,
+        discountPercent: 0,
+        source: 'retail',
+        groupName: group.name,
+      };
+    }
+
+    const globalValues = globalRuleFromGroup(group);
+    const adjustmentType = globalValues.ruleType;
 
     if (adjustmentType === 'FIXED') {
-      const delta = Number(user.priceGroup.fixedAdjustment ?? 0);
+      const delta = Number(globalValues.fixedAdjustment ?? 0);
       if (!Number.isFinite(delta) || delta === 0) {
         return {
           price: basePrice,
           base: basePrice,
           discountPercent: 0,
           source: 'retail',
-          groupName: user.priceGroup.name,
+          groupName: group.name,
         };
       }
-      const summed = basePrice.add(new Prisma.Decimal(delta)).toDecimalPlaces(2, Prisma.Decimal.ROUND_DOWN);
-      const price = summed.lessThan(0) ? new Prisma.Decimal(0) : summed;
       return {
-        price,
+        price: applyPriceRule(basePrice, globalValues),
         base: basePrice,
         discountPercent: 0,
         source: 'group_fixed',
-        groupName: user.priceGroup.name,
+        groupName: group.name,
       };
     }
 
-    // Group-wide percent discount
-    const percent = Number(user.priceGroup.discountPercent ?? 0);
+    const percent = Number(globalValues.discountPercent ?? 0);
     if (!Number.isFinite(percent) || percent <= 0) {
       return {
         price: basePrice,
         base: basePrice,
         discountPercent: 0,
         source: 'retail',
-        groupName: user.priceGroup.name,
+        groupName: group.name,
       };
     }
-    const clamped = Math.max(0, Math.min(50, percent));
-    const next = multiplyByPercentDown(basePrice, clamped);
+
     return {
-      price: next,
+      price: applyPriceRule(basePrice, globalValues),
       base: basePrice,
-      discountPercent: clamped,
+      discountPercent: Math.max(0, Math.min(50, percent)),
       source: 'group_percent',
-      groupName: user.priceGroup.name,
+      groupName: group.name,
     };
   } catch (e) {
     console.error('[pricing] resolve failed; falling back to retail', e);

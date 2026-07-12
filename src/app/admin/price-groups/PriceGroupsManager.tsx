@@ -14,12 +14,14 @@ type Group = {
   id: string;
   name: string;
   description: string | null;
+  defaultEnabled: boolean;
   adjustmentType: PriceGroupAdjustmentType;
   discountPercent: number;
   fixedAdjustment: number;
   isActive: boolean;
   users: number;
-  overrides: number;
+  rules: number;
+  summary: string;
 };
 
 export function PriceGroupsManager({ initial }: { initial: Group[] }) {
@@ -31,6 +33,7 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [adjustmentType, setAdjustmentType] = React.useState<PriceGroupAdjustmentType>('PERCENT');
+  const [defaultEnabled, setDefaultEnabled] = React.useState(true);
   const [discountPercent, setDiscountPercent] = React.useState('10');
   const [fixedAdjustment, setFixedAdjustment] = React.useState('-5');
   const { pageRows, currentPage, pageCount, setPage } = useTablePagination(groups, [groups.length]);
@@ -39,12 +42,14 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
 
   function buildPayload(overrides?: Partial<Group>) {
     const type = overrides?.adjustmentType ?? adjustmentType;
+    const enabled = overrides?.defaultEnabled ?? defaultEnabled;
     return {
       name: (overrides?.name ?? name).trim(),
       description: (overrides?.description ?? description).trim() || null,
+      defaultEnabled: enabled,
       adjustmentType: type,
-      discountPercent: type === 'PERCENT' ? Number(overrides?.discountPercent ?? discountPercent) : 0,
-      fixedAdjustment: type === 'FIXED' ? Number(overrides?.fixedAdjustment ?? fixedAdjustment) : 0,
+      discountPercent: enabled && type === 'PERCENT' ? Number(overrides?.discountPercent ?? discountPercent) : 0,
+      fixedAdjustment: enabled && type === 'FIXED' ? Number(overrides?.fixedAdjustment ?? fixedAdjustment) : 0,
     };
   }
 
@@ -69,17 +74,25 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
         id: row.id,
         name: row.name,
         description: row.description,
+        defaultEnabled: row.defaultEnabled ?? true,
         adjustmentType: row.adjustmentType,
         discountPercent: Number(row.discountPercent),
         fixedAdjustment: Number(row.fixedAdjustment ?? 0),
         isActive: row.isActive,
         users: 0,
-        overrides: 0,
+        rules: 0,
+        summary: formatPriceGroupRule({
+          defaultEnabled: row.defaultEnabled ?? true,
+          adjustmentType: row.adjustmentType,
+          discountPercent: Number(row.discountPercent),
+          fixedAdjustment: Number(row.fixedAdjustment ?? 0),
+        }),
       },
     ]);
     setName('');
     setDescription('');
     setAdjustmentType('PERCENT');
+    setDefaultEnabled(true);
     setDiscountPercent('10');
     setFixedAdjustment('-5');
     toast.success('User group created');
@@ -92,6 +105,7 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
       body: JSON.stringify({
         name: patch.name ?? group.name,
         description: patch.description !== undefined ? patch.description : group.description,
+        defaultEnabled: patch.defaultEnabled ?? group.defaultEnabled,
         adjustmentType: patch.adjustmentType ?? group.adjustmentType,
         discountPercent: patch.discountPercent ?? group.discountPercent,
         fixedAdjustment: patch.fixedAdjustment ?? group.fixedAdjustment,
@@ -104,6 +118,12 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
       return;
     }
     const row = json.data;
+    const serialized = {
+      defaultEnabled: row.defaultEnabled ?? true,
+      adjustmentType: row.adjustmentType as PriceGroupAdjustmentType,
+      discountPercent: Number(row.discountPercent),
+      fixedAdjustment: Number(row.fixedAdjustment ?? 0),
+    };
     setGroups((g) =>
       g.map((x) =>
         x.id === group.id
@@ -111,10 +131,12 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
               ...x,
               name: row.name,
               description: row.description,
-              adjustmentType: row.adjustmentType,
-              discountPercent: Number(row.discountPercent),
-              fixedAdjustment: Number(row.fixedAdjustment ?? 0),
+              defaultEnabled: serialized.defaultEnabled,
+              adjustmentType: serialized.adjustmentType,
+              discountPercent: serialized.discountPercent,
+              fixedAdjustment: serialized.fixedAdjustment,
               isActive: row.isActive,
+              summary: formatPriceGroupRule(serialized),
             }
           : x,
       ),
@@ -146,11 +168,13 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
       <form onSubmit={createGroup} className="rounded-2xl border border-line bg-paper-50 p-5">
         <h3 className="font-display text-lg font-extrabold tracking-tight">New user group</h3>
         <p className="mt-1 text-sm text-ink-muted">
-          Example: Reseller with 10% off, or a fixed −$5 on every service. Per-service custom prices
-          can be set after creating the group.
+          Set a global default, or leave it off and configure catalog group / per-service rules on the
+          pricing page.
         </p>
 
         <AdjustmentFields
+          defaultEnabled={defaultEnabled}
+          onDefaultEnabled={setDefaultEnabled}
           adjustmentType={adjustmentType}
           onAdjustmentType={setAdjustmentType}
           discountPercent={discountPercent}
@@ -186,10 +210,10 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
           <thead>
             <tr className="border-b border-line bg-paper-100 text-left font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
               <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Pricing rule</th>
+              <th className="px-4 py-3">Pricing</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Users</th>
-              <th className="px-4 py-3">Overrides</th>
+              <th className="px-4 py-3">Rules</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -207,9 +231,7 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
                     <div className="font-semibold">{g.name}</div>
                     {g.description && <div className="text-xs text-ink-muted">{g.description}</div>}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs">
-                    {formatPriceGroupRule(g)}
-                  </td>
+                  <td className="px-4 py-3 font-mono text-xs">{g.summary}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -220,7 +242,7 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
                     </span>
                   </td>
                   <td className="px-4 py-3">{g.users}</td>
-                  <td className="px-4 py-3">{g.overrides}</td>
+                  <td className="px-4 py-3">{g.rules}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap justify-end gap-2">
                       <Link
@@ -275,6 +297,8 @@ export function PriceGroupsManager({ initial }: { initial: Group[] }) {
 }
 
 function AdjustmentFields({
+  defaultEnabled,
+  onDefaultEnabled,
   adjustmentType,
   onAdjustmentType,
   discountPercent,
@@ -282,6 +306,8 @@ function AdjustmentFields({
   fixedAdjustment,
   onFixedAdjustment,
 }: {
+  defaultEnabled: boolean;
+  onDefaultEnabled: (v: boolean) => void;
   adjustmentType: PriceGroupAdjustmentType;
   onAdjustmentType: (v: PriceGroupAdjustmentType) => void;
   discountPercent: string;
@@ -291,10 +317,26 @@ function AdjustmentFields({
 }) {
   return (
     <div className="mt-4 space-y-3 rounded-xl border border-line bg-paper p-4">
-      <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
-        Default pricing for all services
-      </div>
-      <div className="flex flex-wrap gap-2">
+      <label className="flex items-start gap-3 text-left">
+        <input
+          type="checkbox"
+          checked={defaultEnabled}
+          onChange={(e) => onDefaultEnabled(e.target.checked)}
+          className="mt-1 h-4 w-4"
+        />
+        <span>
+          <span className="text-sm font-medium">Enable default pricing for all services</span>
+          <span className="mt-1 block text-xs text-ink-muted">
+            When off, members pay retail unless a catalog or service rule applies.
+          </span>
+        </span>
+      </label>
+      {defaultEnabled && (
+        <>
+          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+            Default rule
+          </div>
+          <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => onAdjustmentType('PERCENT')}
@@ -314,7 +356,17 @@ function AdjustmentFields({
           Fixed amount (± USD)
         </button>
       </div>
-      {adjustmentType === 'PERCENT' ? (
+      {adjustmentType === 'FIXED' ? (
+        <Input
+          label="Adjustment (USD)"
+          type="number"
+          step={0.01}
+          value={fixedAdjustment}
+          onChange={(e) => onFixedAdjustment(e.target.value)}
+          hint="Negative = cheaper (e.g. -5). Positive = markup (e.g. +5)."
+          required
+        />
+      ) : (
         <Input
           label="Discount %"
           type="number"
@@ -326,16 +378,8 @@ function AdjustmentFields({
           hint="10 = 10% off retail price"
           required
         />
-      ) : (
-        <Input
-          label="Adjustment (USD)"
-          type="number"
-          step={0.01}
-          value={fixedAdjustment}
-          onChange={(e) => onFixedAdjustment(e.target.value)}
-          hint="Negative = cheaper (e.g. -5). Positive = markup (e.g. +5)."
-          required
-        />
+      )}
+        </>
       )}
     </div>
   );
@@ -352,6 +396,7 @@ function EditGroupDialog({
 }) {
   const [name, setName] = React.useState(group.name);
   const [description, setDescription] = React.useState(group.description ?? '');
+  const [defaultEnabled, setDefaultEnabled] = React.useState(group.defaultEnabled);
   const [adjustmentType, setAdjustmentType] = React.useState<PriceGroupAdjustmentType>(group.adjustmentType);
   const [discountPercent, setDiscountPercent] = React.useState(String(group.discountPercent));
   const [fixedAdjustment, setFixedAdjustment] = React.useState(String(group.fixedAdjustment));
@@ -364,6 +409,8 @@ function EditGroupDialog({
           <Input label="Group name" value={name} onChange={(e) => setName(e.target.value)} required />
           <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
           <AdjustmentFields
+            defaultEnabled={defaultEnabled}
+            onDefaultEnabled={setDefaultEnabled}
             adjustmentType={adjustmentType}
             onAdjustmentType={setAdjustmentType}
             discountPercent={discountPercent}
@@ -383,9 +430,10 @@ function EditGroupDialog({
               onSave({
                 name: name.trim(),
                 description: description.trim() || null,
+                defaultEnabled,
                 adjustmentType,
-                discountPercent: Number(discountPercent),
-                fixedAdjustment: Number(fixedAdjustment),
+                discountPercent: defaultEnabled && adjustmentType === 'PERCENT' ? Number(discountPercent) : 0,
+                fixedAdjustment: defaultEnabled && adjustmentType === 'FIXED' ? Number(fixedAdjustment) : 0,
               })
             }
             className="rounded-full bg-ink px-4 py-2 text-xs font-bold text-paper disabled:opacity-60"

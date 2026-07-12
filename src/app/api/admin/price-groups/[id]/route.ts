@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 const patchSchema = z.object({
   name: z.string().trim().min(2).max(64).optional(),
   description: z.string().trim().max(1000).optional().nullable(),
+  defaultEnabled: z.boolean().optional(),
   adjustmentType: z.enum(['PERCENT', 'FIXED']).optional(),
   discountPercent: z.number().min(0).max(50).optional(),
   fixedAdjustment: z.number().min(-100000).max(100000).optional(),

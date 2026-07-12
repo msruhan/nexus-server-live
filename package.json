@@ -1,6 +1,6 @@
 {
   "name": "nexus-server",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "private": true,
   "scripts": {
     "postinstall": "prisma generate",
@@ -18,6 +18,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:migrate-order-codes": "tsx scripts/migrate-order-codes.ts",
+    "db:migrate-price-overrides": "tsx scripts/migrate-price-overrides.ts",
     "db:studio": "prisma studio",
     "db:setup": "npm run db:up && sleep 3 && npm run db:push && npm run db:seed",
     "db:setup:supabase": "node --env-file=.env.supabase scripts/setup-supabase.mjs",

@@ -12,12 +12,14 @@ const createSchema = z
   .object({
     name: z.string().trim().min(2).max(64),
     description: z.string().trim().max(1000).optional().nullable(),
+    defaultEnabled: z.boolean().optional(),
     adjustmentType: adjustmentTypeSchema.default('PERCENT'),
     discountPercent: z.number().min(0).max(50).optional(),
     fixedAdjustment: z.number().min(-100000).max(100000).optional(),
     isActive: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.defaultEnabled === false) return;
     if (data.adjustmentType === 'PERCENT' && data.discountPercent === undefined) {
       ctx.addIssue({ code: 'custom', message: 'Discount % is required', path: ['discountPercent'] });
     }
@@ -39,10 +41,11 @@ export async function GET() {
       adjustmentType: true,
       discountPercent: true,
       fixedAdjustment: true,
+      defaultEnabled: true,
       isActive: true,
       isDefault: true,
       createdAt: true,
-      _count: { select: { users: true, overrides: true } },
+      _count: { select: { users: true, rules: true } },
     },
   });
   return apiSuccess(rows.map(serializePriceGroup));
@@ -61,6 +64,7 @@ export async function POST(req: Request) {
       data: {
         name: parsed.data.name,
         description: parsed.data.description ?? null,
+        defaultEnabled: parsed.data.defaultEnabled ?? true,
         adjustmentType: parsed.data.adjustmentType,
         discountPercent: isPercent ? (parsed.data.discountPercent ?? 0) : 0,
         fixedAdjustment: isPercent ? 0 : (parsed.data.fixedAdjustment ?? 0),

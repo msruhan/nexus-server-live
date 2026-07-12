@@ -1,7 +1,7 @@
 # Flexible price group rules — design spec
 
 **Date:** 2026-07-12  
-**Status:** Draft — pending user review  
+**Status:** Approved — implemented 2026-07-12  
 **Scope:** NexusServer admin pricing (User groups / `PriceGroup`)
 
 ## Problem
