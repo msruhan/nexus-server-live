@@ -30,7 +30,7 @@ export default async function AdminUsersPage() {
             All <span className="font-serif italic font-normal">members</span>.
           </>
         }
-        subtitle="Assign user groups · add wallet credit · manage activation status."
+        subtitle="Assign user groups · add wallet credit · resend verification emails · manage activation status."
       />
 
       <UsersTable

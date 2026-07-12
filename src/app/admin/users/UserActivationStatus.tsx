@@ -47,11 +47,31 @@ export function UserActivationStatus({
     router.refresh();
   }
 
+  async function resendVerification() {
+    setBusy(true);
+    const res = await fetch(`/api/admin/users/${userId}/resend-verification`, { method: 'POST' });
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    setBusy(false);
+    if (!res.ok) {
+      toast.error('Resend failed', { description: json.error ?? 'Could not send verification email' });
+      return;
+    }
+    toast.success('Verification email sent', {
+      description: 'Ask the user to check inbox and spam folder.',
+    });
+    router.refresh();
+  }
+
   if (pendingEmail) {
     return (
-      <span className="rounded-full bg-sky-100 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-sky-800">
-        Pending email
-      </span>
+      <button
+        type="button"
+        onClick={() => void resendVerification()}
+        disabled={busy}
+        className="rounded-full bg-sky-100 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-sky-800 hover:bg-sky-200 disabled:opacity-60"
+      >
+        {busy ? 'Sending…' : 'Pending email · resend'}
+      </button>
     );
   }
 

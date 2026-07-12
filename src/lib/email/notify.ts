@@ -460,7 +460,7 @@ export async function notifyEmailVerification(input: {
   email: string;
   name: string;
   token: string;
-}) {
+}): Promise<{ ok: boolean; logId: string | null; reason?: string }> {
   try {
     const siteName = await loadSiteName();
     const verifyUrl = `${resolveBaseUrl()}/verify-email?token=${encodeURIComponent(input.token)}`;
@@ -469,7 +469,7 @@ export async function notifyEmailVerification(input: {
       recipientName: input.name || 'there',
       verifyUrl,
     });
-    await sendEmail({
+    return await sendEmail({
       to: input.email,
       subject: `Verify your ${siteName} account`,
       text,
@@ -480,6 +480,7 @@ export async function notifyEmailVerification(input: {
     });
   } catch (e) {
     console.error('[notify] auth.email_verification', e);
+    return { ok: false, logId: null, reason: 'notify_failed' };
   }
 }
 
