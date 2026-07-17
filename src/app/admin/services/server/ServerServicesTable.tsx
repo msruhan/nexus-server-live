@@ -202,6 +202,7 @@ export function ServerServicesTable({
         <EditServerServiceDialog
           key={editing.id}
           row={editing}
+          groups={groups}
           busy={busy === editing.id}
           onClose={() => setEditing(null)}
           onSave={(patch) => update(editing.id, patch)}
@@ -642,18 +643,22 @@ function NewServerServiceDialog({
 
 function EditServerServiceDialog({
   row,
+  groups,
   busy,
   onClose,
   onSave,
 }: {
   row: Row;
+  groups: CatalogGroupOption[];
   busy: boolean;
   onClose: () => void;
   onSave: (patch: Record<string, unknown>) => void;
 }) {
   const [title, setTitle] = React.useState(row.title);
   const [description, setDescription] = React.useState(row.description || '');
+  const [boxId, setBoxId] = React.useState(row.groupId || groups[0]?.id || '');
   const [price, setPrice] = React.useState(String(row.price));
+  const [deliveryTime, setDeliveryTime] = React.useState(row.delivery === '—' ? '' : row.delivery);
   const [fieldDefs, setFieldDefs] = React.useState<FieldRow[]>(
     () => parseServerFieldDefs(row.requiredFields).map((d) => ({ ...d })),
   );
@@ -722,7 +727,7 @@ function EditServerServiceDialog({
         </div>
 
         <div className="grid gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-7 space-y-5">
+          <div className="space-y-5 lg:col-span-7">
             <Input
               label="Service name"
               value={title}
@@ -738,7 +743,24 @@ function EditServerServiceDialog({
             </div>
           </div>
 
-          <div className="lg:col-span-5 space-y-4">
+          <div className="space-y-4 lg:col-span-5">
+            <div>
+              <div className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                Group
+              </div>
+              <select
+                value={boxId}
+                onChange={(e) => setBoxId(e.target.value)}
+                className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink"
+              >
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <Input
               label="Retail price"
               type="number"
@@ -748,6 +770,13 @@ function EditServerServiceDialog({
               onChange={(e) => setPrice(e.target.value)}
               hint="Catalog price debited from the customer wallet (same as table column)."
               required
+            />
+
+            <Input
+              label="Delivery time"
+              value={deliveryTime}
+              onChange={(e) => setDeliveryTime(e.target.value)}
+              placeholder="e.g. 1-24 hours"
             />
 
             <div className="rounded-xl border border-line bg-paper-50 p-4">
@@ -907,7 +936,9 @@ function EditServerServiceDialog({
                 onSave({
                   title: title.trim(),
                   description,
+                  boxId,
                   price: priceNum,
+                  deliveryTime: deliveryTime.trim() || null,
                   fieldDefs,
                 })
               }
