@@ -17,12 +17,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-function toPlainText(html: string | null): string | null {
-  if (!html) return null;
-  const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  return text || null;
-}
-
 const IMEI_BADGES: Array<[keyof ImeiRequireFlags, string]> = [
   ['requiresImei', 'IMEI'],
   ['requiresSn', 'Serial'],
@@ -84,7 +78,8 @@ export default async function MarketplaceDetailPage({
     description = group.description;
     imageUrl = group.imageUrl;
     rows = group.services.map((s) => ({
-      description: toPlainText(s.description),
+      description: s.description,
+      groupTitle: group.title,
       badges: IMEI_BADGES.filter(([flag]) => s[flag]).map(([, label]) => label),
       modal: {
         kind: 'imei',
@@ -122,7 +117,8 @@ export default async function MarketplaceDetailPage({
     rows = box.services.map((s) => {
       const fieldDefs = parseServerFieldDefs(s.requiredFields);
       return {
-        description: toPlainText(s.description),
+        description: s.description,
+        groupTitle: box.title,
         badges: fieldDefs.map((f) => f.label),
         modal: {
           kind: 'server' as const,

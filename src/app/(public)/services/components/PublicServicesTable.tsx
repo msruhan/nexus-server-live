@@ -2,10 +2,14 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { ArrowUpRight } from '@phosphor-icons/react/dist/ssr'
+import { ArrowUpRight, Info } from '@phosphor-icons/react/dist/ssr'
 import { formatUSD } from '@/lib/format'
 import { CatalogTableToolbar } from '@/components/admin/CatalogTableToolbar'
 import { TablePagination, useTablePagination } from '@/components/ui/TablePagination'
+import {
+  ServiceDetailsModal,
+  type ServiceDetails,
+} from '@/components/services/ServiceDetailsModal'
 
 export type PublicServiceRow = {
   id: string
@@ -15,6 +19,7 @@ export type PublicServiceRow = {
   price: number
   groupId?: string
   groupTitle?: string
+  description?: string | null
 }
 
 export function PublicServicesTable({
@@ -28,6 +33,7 @@ export function PublicServicesTable({
 }) {
   const [q, setQ] = React.useState('')
   const [groupFilter, setGroupFilter] = React.useState('')
+  const [details, setDetails] = React.useState<ServiceDetails | null>(null)
 
   const groups = React.useMemo(() => {
     const map = new Map<string, string>()
@@ -51,6 +57,17 @@ export function PublicServicesTable({
   }, [rows, q, groupFilter])
 
   const { pageRows, currentPage, pageCount, setPage } = useTablePagination(filtered, [q, groupFilter], pageSize)
+
+  function openDetails(r: PublicServiceRow) {
+    setDetails({
+      title: r.title,
+      groupTitle: r.groupTitle,
+      priceLabel: formatUSD(r.price),
+      deliveryTime: r.deliveryTime,
+      description: r.description,
+      kindLabel: r.type === 'imei' ? 'IMEI service' : 'Server service',
+    })
+  }
 
   return (
     <div className="mt-10">
@@ -90,12 +107,21 @@ export function PublicServicesTable({
                   {formatUSD(r.price)}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Link
-                    href={`${orderHrefPrefix}/${r.type}/${r.id}`}
-                    className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-ink-muted hover:text-ink"
-                  >
-                    Order <ArrowUpRight size={12} weight="bold" />
-                  </Link>
+                  <div className="inline-flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => openDetails(r)}
+                      className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-ink-muted hover:text-ink"
+                    >
+                      Details <Info size={12} weight="bold" />
+                    </button>
+                    <Link
+                      href={`${orderHrefPrefix}/${r.type}/${r.id}`}
+                      className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-ink-muted hover:text-ink"
+                    >
+                      Order <ArrowUpRight size={12} weight="bold" />
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -116,6 +142,8 @@ export function PublicServicesTable({
         totalItems={filtered.length}
         onPageChange={setPage}
       />
+
+      <ServiceDetailsModal service={details} onClose={() => setDetails(null)} />
     </div>
   )
 }

@@ -1,13 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowUpRight } from '@phosphor-icons/react/dist/ssr';
+import { ArrowUpRight, Info } from '@phosphor-icons/react/dist/ssr';
 import { OrderModal, type ModalService } from './OrderModal';
+import {
+  ServiceDetailsModal,
+  type ServiceDetails,
+} from '@/components/services/ServiceDetailsModal';
 
 export type ServiceRow = {
   modal: ModalService;
   description: string | null;
   badges: string[];
+  groupTitle?: string | null;
 };
 
 export function MarketplaceServices({
@@ -24,6 +29,7 @@ export function MarketplaceServices({
   initialServiceId?: string | null;
 }) {
   const [selected, setSelected] = React.useState<ModalService | null>(null);
+  const [details, setDetails] = React.useState<ServiceDetails | null>(null);
 
   React.useEffect(() => {
     if (!initialServiceId) return;
@@ -39,6 +45,17 @@ export function MarketplaceServices({
         </p>
       </div>
     );
+  }
+
+  function openDetails(row: ServiceRow) {
+    setDetails({
+      title: row.modal.title,
+      groupTitle: row.groupTitle,
+      priceLabel: row.modal.priceLabel,
+      deliveryTime: row.modal.deliveryTime,
+      description: row.description,
+      kindLabel: row.modal.kind === 'imei' ? 'IMEI service' : 'Server service',
+    });
   }
 
   return (
@@ -67,6 +84,14 @@ export function MarketplaceServices({
               </div>
               <button
                 type="button"
+                onClick={() => openDetails(row)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-paper px-3 py-2 text-[11px] font-bold text-ink transition-colors hover:border-ink sm:gap-1.5 sm:px-4 sm:py-2.5 sm:text-xs"
+              >
+                Details
+                <Info weight="bold" size={12} />
+              </button>
+              <button
+                type="button"
                 onClick={() => setSelected(row.modal)}
                 className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-2 text-[11px] font-bold text-paper transition-colors hover:bg-primary-600 sm:gap-1.5 sm:px-5 sm:py-2.5 sm:text-xs"
               >
@@ -85,6 +110,8 @@ export function MarketplaceServices({
         guestGateways={guestGateways}
         onClose={() => setSelected(null)}
       />
+
+      <ServiceDetailsModal service={details} onClose={() => setDetails(null)} />
     </>
   );
 }

@@ -12,6 +12,7 @@ export default async function ImeiServicesPage() {
     select: {
       id: true,
       title: true,
+      description: true,
       deliveryTime: true,
       price: true,
       group: { select: { id: true, title: true } },
@@ -44,6 +45,7 @@ export default async function ImeiServicesPage() {
           id: s.id,
           type: 'imei' as const,
           title: s.title,
+          description: s.description,
           deliveryTime: s.deliveryTime,
           price: Number(s.price),
           groupId: s.group.id,

@@ -12,6 +12,7 @@ export default async function UserServerServicesPage() {
     select: {
       id: true,
       title: true,
+      description: true,
       deliveryTime: true,
       price: true,
       box: { select: { id: true, title: true } },
@@ -35,6 +36,7 @@ export default async function UserServerServicesPage() {
           id: s.id,
           type: 'server' as const,
           title: s.title,
+          description: s.description,
           deliveryTime: s.deliveryTime,
           price: Number(s.price),
           groupId: s.box.id,

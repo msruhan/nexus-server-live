@@ -12,6 +12,7 @@ export default async function ServerServicesPage() {
     select: {
       id: true,
       title: true,
+      description: true,
       deliveryTime: true,
       price: true,
       box: { select: { id: true, title: true } },
@@ -44,6 +45,7 @@ export default async function ServerServicesPage() {
           id: s.id,
           type: 'server' as const,
           title: s.title,
+          description: s.description,
           deliveryTime: s.deliveryTime,
           price: Number(s.price),
           groupId: s.box.id,
