@@ -8,7 +8,12 @@ export const dynamic = 'force-dynamic'
 export default async function UserServerServicesPage() {
   const services = await prisma.serverService.findMany({
     where: { status: ServiceStatus.ACTIVE },
-    orderBy: { price: 'asc' },
+    orderBy: [
+      { box: { sortOrder: 'asc' } },
+      { box: { title: 'asc' } },
+      { price: 'asc' },
+      { title: 'asc' },
+    ],
     select: {
       id: true,
       title: true,

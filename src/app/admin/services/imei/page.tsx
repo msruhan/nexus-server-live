@@ -7,7 +7,13 @@ export const dynamic = 'force-dynamic';
 export default async function AdminImeiServicesPage() {
   const [services, groups] = await Promise.all([
     prisma.imeiService.findMany({
-      orderBy: [{ status: 'asc' }, { price: 'asc' }],
+      orderBy: [
+        { status: 'asc' },
+        { group: { sortOrder: 'asc' } },
+        { group: { title: 'asc' } },
+        { price: 'asc' },
+        { title: 'asc' },
+      ],
       include: { group: true, api: true },
     }),
     prisma.imeiServiceGroup.findMany({

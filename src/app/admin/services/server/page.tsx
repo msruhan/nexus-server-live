@@ -7,7 +7,13 @@ export const dynamic = 'force-dynamic';
 export default async function AdminServerServicesPage() {
   const [services, groups] = await Promise.all([
     prisma.serverService.findMany({
-      orderBy: [{ status: 'asc' }, { price: 'asc' }],
+      orderBy: [
+        { status: 'asc' },
+        { box: { sortOrder: 'asc' } },
+        { box: { title: 'asc' } },
+        { price: 'asc' },
+        { title: 'asc' },
+      ],
       include: { box: true, api: true },
     }),
     prisma.serverServiceBox.findMany({

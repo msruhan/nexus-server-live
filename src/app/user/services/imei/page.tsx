@@ -8,7 +8,12 @@ export const dynamic = 'force-dynamic'
 export default async function UserImeiServicesPage() {
   const services = await prisma.imeiService.findMany({
     where: { status: ServiceStatus.ACTIVE },
-    orderBy: [{ price: 'asc' }],
+    orderBy: [
+      { group: { sortOrder: 'asc' } },
+      { group: { title: 'asc' } },
+      { price: 'asc' },
+      { title: 'asc' },
+    ],
     select: {
       id: true,
       title: true,
